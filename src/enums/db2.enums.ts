@@ -1,3 +1,36 @@
+// src/enums/db2.enums.ts
+
+/**
+ * @fileoverview This file contains the definition of the Db2ConnectionState enum.
+ * The Db2ConnectionState enum is used to represent various states of a Db2 database connection.
+ * These states provide a standardized way to manage and track the connection status within
+ * the application, enabling consistent handling of connection-related scenarios such as
+ * connection establishment, errors, disconnections, and failovers.
+ *
+ * @enum {string} Db2ConnectionState
+ *
+ * @exports Db2ConnectionState
+ */
+
+/**
+ * @enum Db2ConnectionState
+ * @description An enumeration of possible states for a Db2 database connection.
+ * These states help in tracking and managing the lifecycle of a Db2 connection,
+ * facilitating error handling, monitoring, and operational control.
+ *
+ * @readonly
+ * @property {string} CONNECTED - Indicates that the connection to the Db2 database is successfully established.
+ * @property {string} DISCONNECTED - Indicates that the connection to the Db2 database has been disconnected.
+ * @property {string} ERROR - Indicates that an error has occurred with the Db2 connection.
+ * @property {string} CONNECTING - Indicates that the system is currently attempting to establish a connection to the Db2 database.
+ * @property {string} RECONNECTING - Indicates that the system is attempting to reconnect to the Db2 database after a connection loss.
+ * @property {string} CONNECTION_REFUSED - Indicates that a connection attempt to the Db2 database was refused.
+ * @property {string} CONNECTION_TIMEOUT - Indicates that a connection attempt to the Db2 database has timed out.
+ * @property {string} CONNECTION_CLOSED - Indicates that the connection to the Db2 database was intentionally closed.
+ * @property {string} FAILOVER_IN_PROGRESS - Indicates that a failover to a replica Db2 database is currently in progress.
+ * @property {string} POOL_DRAINED - Indicates that the connection pool has been drained, closing all active connections.
+ */
+
 export enum Db2ConnectionState {
   CONNECTED = "CONNECTED", // Successfully connected to the DB2 database
   DISCONNECTED = "DISCONNECTED", // Disconnected from the DB2 database
