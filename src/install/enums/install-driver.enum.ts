@@ -1,3 +1,5 @@
+// src/install/enums/install-driver.enum.ts
+
 export enum Platform {
   WINDOWS = "win32", // Windows
   MACOS = "darwin", // macOS (formerly Mac OS X)

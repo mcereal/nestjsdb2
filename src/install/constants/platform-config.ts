@@ -6,7 +6,7 @@ import { PlatformConfig } from "../interfaces/platform-config.interface";
 
 export const platformConfig: PlatformConfig = {
   [Platform.WINDOWS]: {
-    defaultInstallDir: path.join(process.env.APPDATA || "", "nestjs-ibm-db2"),
+    defaultInstallDir: path.join(process.env.APPDATA || "", "ibmDb2"),
     driverFileName: {
       [Architecture.X64]: "ntx64_odbc_cli.zip",
     },
@@ -16,11 +16,11 @@ export const platformConfig: PlatformConfig = {
       process.env.HOME || "",
       "Library",
       "Application Support",
-      "nestjs-ibm-db2"
+      "ibmDb2"
     ),
     driverFileName: {
-      [Architecture.X64]: "macos64_odbc_cli.tar.gz",
-      [Architecture.ARM64]: null, // Special handling for ARM64 with Rosetta
+      [Architecture.X64]: "macos64_odbc_cli.tar.gz", // Use Rosetta to run x86_64
+      [Architecture.ARM64]: "macos64_odbc_cli.tar.gz", // Assume ARM64 can use the same as x64 for now
     },
   },
   [Platform.LINUX]: {
@@ -28,7 +28,7 @@ export const platformConfig: PlatformConfig = {
       process.env.HOME || "",
       ".local",
       "share",
-      "nestjs-ibm-db2"
+      "ibmDb2"
     ),
     driverFileName: {
       [Architecture.X64]: "linuxx64_odbc_cli.tar.gz",
@@ -37,13 +37,13 @@ export const platformConfig: PlatformConfig = {
     },
   },
   [Platform.AIX]: {
-    defaultInstallDir: path.join("/usr", "local", "nestjs-ibm-db2"),
+    defaultInstallDir: path.join("/usr", "local", "ibmDb2"),
     driverFileName: {
       [Architecture.PPC64]: "aix64_odbc_cli.tar.gz",
     },
   },
   [Platform.ZOS]: {
-    defaultInstallDir: path.join("/usr", "local", "nestjs-ibm-db2"),
+    defaultInstallDir: path.join("/usr", "local", "ibmDb2"),
     driverFileName: {
       [Architecture.S390X]: "zos_s390x_odbc_cli.tar.gz",
     },

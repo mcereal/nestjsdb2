@@ -4,4 +4,6 @@ export enum Commands {
   CHECK = "check",
   UPDATE = "update",
   CONFIG = "config",
+  LIST_INSTALLED_DRIVERS = "list",
+  LIST_REMOTE_DRIVERS = "--list-remote",
 }

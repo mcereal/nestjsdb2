@@ -1,5 +1,3 @@
-// src/db/driver-manager.ts
-
 import fs from "fs-extra";
 import path from "path";
 import { Logger } from "@nestjs/common";
@@ -56,11 +54,17 @@ export class DriverManager {
     platformSpecificPaths.push(...envPaths);
 
     for (const dir of platformSpecificPaths) {
-      if (fs.existsSync(dir)) {
-        this.logger.log(`DB2 CLI driver found at ${dir}`);
-        return dir;
+      // Check if directory exists and contains a versioned driver directory
+      const versionedDirs = this.getVersionedDirectories(dir);
+      if (versionedDirs.length > 0) {
+        this.logger.log(
+          `DB2 CLI driver found in versioned directory at ${versionedDirs[0]}`
+        );
+        return versionedDirs[0];
       } else {
-        this.logger.debug(`DB2 CLI driver not found at ${dir}`);
+        this.logger.debug(
+          `DB2 CLI driver not found in versioned directory at ${dir}`
+        );
       }
     }
 
@@ -98,43 +102,56 @@ export class DriverManager {
       case Platform.WINDOWS:
         return [
           defaultDir,
-          path.join(defaultDir, "clidriver"),
           path.resolve(process.cwd(), "clidriver"),
-          path.join(process.env.APPDATA || "", "ibm_db2", "clidriver"),
-          "C:\\Program Files\\IBM\\db2\\clidriver",
+          path.join(process.env.APPDATA || "", "ibmDb2"),
+          "C:\\Program Files\\IBM\\db2",
         ];
       case Platform.MACOS:
         return [
           defaultDir,
-          path.join(defaultDir, "clidriver"),
           path.resolve(process.cwd(), "clidriver"),
-          path.join(process.env.HOME || "", "clidriver"),
-          "/usr/local/lib/nestjs-ibm-db2/clidriver",
-          "/opt/nestjs-ibm-db2/clidriver",
+          path.join(process.env.HOME || "", "ibmDb2"),
+          "/usr/local/lib/ibmDb2",
+          "/opt/ibmDb2",
         ];
       case Platform.LINUX:
       case Platform.AIX:
         return [
           defaultDir,
-          path.join(defaultDir, "clidriver"),
           path.resolve(process.cwd(), "clidriver"),
-          path.join(process.env.HOME || "", "clidriver"),
-          "/usr/local/nestjs-ibm-db2/clidriver",
-          "/opt/nestjs-ibm-db2/clidriver",
-          "/usr/lib/nestjs-ibm-db2/clidriver",
-          "/usr/lib64/nestjs-ibm-db2/clidriver",
-          "/usr/share/nestjs-ibm-db2/clidriver",
+          path.join(process.env.HOME || "", "ibmDb2"),
+          "/usr/local/ibmDb2",
+          "/opt/ibmDb2",
+          "/usr/lib/ibmDb2",
+          "/usr/lib64/ibmDb2",
+          "/usr/share/ibmDb2",
         ];
       case Platform.ZOS:
         return [
           defaultDir,
-          path.join(defaultDir, "clidriver"),
           path.resolve(process.cwd(), "clidriver"),
-          "/usr/local/nestjs-ibm-db2/clidriver",
+          "/usr/local/ibmDb2",
         ];
       default:
         return [defaultDir]; // Fallback for other/unknown platforms
     }
+  }
+
+  /**
+   * Get a list of versioned directories (e.g., v11.5.9) in a given directory.
+   * @param baseDir The base directory to search for versioned directories.
+   * @returns {string[]} An array of versioned directory paths.
+   */
+  private getVersionedDirectories(baseDir: string): string[] {
+    if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) {
+      return [];
+    }
+
+    return fs
+      .readdirSync(baseDir)
+      .filter((subDir) => /^v\d+\.\d+\.\d+$/.test(subDir)) // Match versioned directories
+      .map((subDir) => path.join(baseDir, subDir))
+      .filter((dir) => fs.existsSync(dir) && fs.statSync(dir).isDirectory());
   }
 
   /**
@@ -204,14 +221,14 @@ export class DriverManager {
         return ["db2cli.dll", "clidriver\\bin\\db2cli.exe"];
       case Platform.MACOS:
         return arch === Architecture.ARM64
-          ? ["libdb2.dylib", "clidriver/bin/db2cli"]
-          : ["libdb2.dylib", "clidriver/bin/db2cli"];
+          ? ["libdb2.dylib", "bin/db2cli"]
+          : ["libdb2.dylib", "bin/db2cli"];
       case Platform.LINUX:
-        return ["libdb2.so", "clidriver/bin/db2cli"];
+        return ["libdb2.so", "bin/db2cli"];
       case Platform.AIX:
-        return ["libdb2.a", "clidriver/bin/db2cli"];
+        return ["libdb2.a", "bin/db2cli"];
       case Platform.ZOS:
-        return ["libdb2.so", "clidriver/bin/db2cli"]; // Update with actual z/OS driver files as needed
+        return ["libdb2.so", "bin/db2cli"]; // Update with actual z/OS driver files as needed
       default:
         return ["db2cli", "libdb2.so"]; // General default case
     }

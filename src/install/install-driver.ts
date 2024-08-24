@@ -16,9 +16,11 @@ import { Platform, Architecture } from "./enums/install-driver.enum";
 import { platformConfig } from "./constants/platform-config";
 import { ErrorCode } from "./enums/error-codes.enum";
 import { exec, execSync } from "child_process";
+import { fetchAvailableVersions } from "../cli/db2-cli";
+import { CLIOptions } from "../cli/interfaces";
 
-const DEFAULT_DOWNLOAD_URL =
-  "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli";
+const DRIVER_BASE_URL =
+  "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/";
 const MAX_RETRIES = 3;
 
 const logger = new Logger("DB2 Driver Installer");
@@ -62,20 +64,29 @@ const handleError = (error: Error): void => {
 };
 
 /**
- * Determine the default installation directory based on the OS and configuration file.
+ * Determine the default installation directory based on the OS and configuration file,
+ * and check if the driver is already installed.
  * @param config - The loaded configuration options.
- * @returns {string} The default installation directory path.
+ * @returns {Promise<{installDir: string, isInstalled: boolean}>} - The default installation directory path and whether the driver is installed.
  */
-export const getDefaultInstallDir = (config: InstallOptions = {}): string => {
-  if (config.installDir) {
-    return config.installDir;
-  }
+export const getOrCheckDriverInstallation = async (
+  config: InstallOptions = {}
+): Promise<{ installDir: string; isInstalled: boolean }> => {
+  const installDir =
+    config.installDir ||
+    process.env.IBM_DB_HOME ||
+    (platformConfig[os.platform()]?.defaultInstallDir ??
+      path.resolve(process.cwd(), "installer"));
 
-  const platform = getPlatform();
-  const configPlatform = platformConfig[platform];
-  return configPlatform
-    ? configPlatform.defaultInstallDir
-    : path.resolve(process.cwd(), "installer");
+  // Use version-specific directory directly
+  const version = config.version || "v11.5.9"; // Replace with dynamic versioning logic as needed
+  const driverPath = path.join(installDir, version);
+  const isInstalled = await fs.pathExists(driverPath);
+
+  logger.log(`Checking installation directory: ${installDir}`);
+  logger.log(`Driver installed: ${isInstalled ? "Yes" : "No"}`);
+
+  return { installDir, isInstalled };
 };
 
 /**
@@ -84,83 +95,69 @@ export const getDefaultInstallDir = (config: InstallOptions = {}): string => {
  * @param arch - The current architecture.
  * @returns {string} The driver file name.
  */
-const getDriverFileName = (platform: Platform, arch: Architecture): string => {
+export const getDriverFileName = (
+  platform: Platform,
+  arch: Architecture
+): string => {
   const config = platformConfig[platform];
   if (!config) {
     throw new Error(`Unsupported platform: ${platform}`);
   }
 
-  const driverFileName = config.driverFileName;
-  if (typeof driverFileName === "string") {
-    return driverFileName;
+  // Correctly access the driver file name from the configuration
+  const driverFileName = config.driverFileName[arch];
+  if (!driverFileName) {
+    logger.error(
+      `No driver file found for platform ${platform} with architecture ${arch}`
+    );
+    process.exit(1);
   }
 
-  if (driverFileName[arch] !== undefined) {
-    if (platform === Platform.MACOS && arch === Architecture.ARM64) {
-      try {
-        // Check if currently running under Rosetta (x86_64) and if ts-node is available
-        const isRosetta = execSync("arch").toString().trim() === "i386";
-        const tsNodeExists = execSync("which ts-node").toString().trim();
+  if (platform === Platform.MACOS && arch === Architecture.ARM64) {
+    try {
+      // Check if currently running under Rosetta (x86_64) and if ts-node is available
+      const isRosetta = execSync("arch").toString().trim() === "i386";
+      const tsNodeExists = execSync("which ts-node").toString().trim();
 
-        if (!isRosetta) {
-          if (tsNodeExists) {
-            // Construct the command to switch to Rosetta using ts-node with env variables
-            const command = `env LICENSE_AGREEMENT_SHOWN=true arch -x86_64 ts-node ${path.resolve(
-              process.argv[1]
-            )} ${process.argv.slice(2).join(" ")}`;
-            logger.log(
-              `Switching to Rosetta (x86_64) environment using ts-node...`
-            );
-            logger.log(`Running command: ${command}`);
-
-            // Execute the command to restart under Rosetta
-            execSync(command, {
-              stdio: "inherit",
-              env: { ...process.env, LICENSE_AGREEMENT_SHOWN: "true" },
-            });
-            process.exit(0); // Exit the current script to avoid running further in the wrong architecture
-          } else {
-            logger.error(
-              "ts-node is required but not found. Please install ts-node globally using npm."
-            );
-            process.exit(1);
-          }
-        } else {
+      if (!isRosetta) {
+        if (tsNodeExists) {
+          // Construct the command to switch to Rosetta using ts-node with env variables
+          const command = `env LICENSE_AGREEMENT_SHOWN=true arch -x86_64 ts-node ${path.resolve(
+            process.argv[1]
+          )} ${process.argv.slice(2).join(" ")}`;
           logger.log(
-            "Running under Rosetta (x86_64) with ts-node available. Continuing installation..."
+            `Switching to Rosetta (x86_64) environment using ts-node...`
           );
-          return driverFileName[Architecture.X64];
+          logger.log(`Running command: ${command}`);
+
+          // Execute the command to restart under Rosetta
+          execSync(command, {
+            stdio: "inherit",
+            env: { ...process.env, LICENSE_AGREEMENT_SHOWN: "true" },
+          });
+          process.exit(0); // Exit the current script to avoid running further in the wrong architecture
+        } else {
+          logger.error(
+            "ts-node is required but not found. Please install ts-node globally using npm."
+          );
+          process.exit(1);
         }
-      } catch (error) {
-        logger.error(
-          "Error checking Rosetta environment or ts-node availability:",
-          error.message
+      } else {
+        logger.log(
+          "Running under Rosetta (x86_64) with ts-node available. Continuing installation..."
         );
-        process.exit(1);
+        return driverFileName; // Use the correct driver file name for ARM under Rosetta
       }
+    } catch (error) {
+      logger.error(
+        "Error checking Rosetta environment or ts-node availability:",
+        error.message
+      );
+      process.exit(1);
     }
-    return driverFileName[arch] || "";
   }
 
-  throw new Error(
-    `Unsupported architecture: ${arch} for platform: ${platform}`
-  );
-};
-
-/**
- * Get the current platform as a Platform enum.
- * @returns {Platform} The current platform.
- */
-const getPlatform = (): Platform => {
-  return os.platform() as Platform;
-};
-
-/**
- * Get the current architecture as an Architecture enum.
- * @returns {Architecture} The current architecture.
- */
-const getArchitecture = (): Architecture => {
-  return os.arch() as Architecture;
+  return driverFileName; // Return the resolved driver file name
 };
 
 /**
@@ -300,74 +297,82 @@ const promptUser = (message: string): Promise<string> => {
 };
 
 /**
- * Load configuration from .db2configrc or db2config.json, giving precedence to .db2configrc.
- * @returns {Promise<CLIOptions>} - The loaded configuration options.
+ * Function to load the configuration file.
+ * This checks for both `.db2configrc` and `db2config.json`, giving
+ * precedence to `.db2configrc` if both are present.
+ * @returns {Promise<CLIOptions>} - The current configuration options.
  */
-const loadConfig = async (): Promise<InstallOptions> => {
-  const configPathRc = path.resolve(process.cwd(), ".db2configrc");
-  const configPathJson = path.resolve(process.cwd(), "db2config.json");
+const loadConfig = async (): Promise<CLIOptions> => {
+  const db2ConfigRcPath = path.resolve(process.cwd(), ".db2configrc");
+  const db2ConfigJsonPath = path.resolve(process.cwd(), "db2config.json");
 
-  if (await fs.pathExists(configPathRc)) {
-    logger.log("Loading configuration from .db2configrc");
-    return await fs.readJson(configPathRc);
-  } else if (await fs.pathExists(configPathJson)) {
-    logger.log("Loading configuration from db2config.json");
-    return await fs.readJson(configPathJson);
+  let config: CLIOptions = {};
+
+  try {
+    if (await fs.pathExists(db2ConfigRcPath)) {
+      logger.log("Loading configuration from .db2configrc");
+      const fileContent = await fs.readFile(db2ConfigRcPath, "utf-8");
+      if (fileContent.trim()) {
+        config = JSON.parse(fileContent);
+      } else {
+        logger.warn(".db2configrc is empty. Using default configuration.");
+      }
+    } else if (await fs.pathExists(db2ConfigJsonPath)) {
+      logger.log("Loading configuration from db2config.json");
+      const fileContent = await fs.readFile(db2ConfigJsonPath, "utf-8");
+      if (fileContent.trim()) {
+        config = JSON.parse(fileContent);
+      } else {
+        logger.warn("db2config.json is empty. Using default configuration.");
+      }
+    }
+  } catch (error) {
+    logger.error(`Failed to load configuration: ${error.message}`);
   }
 
-  return {};
+  return config;
 };
 
-/**
- * Function to check if the driver is already installed.
- * It checks the directory specified in configuration files or environment variables.
- * @param installDir - The directory to check for driver installation.
- * @returns {Promise<boolean>} - True if the driver is installed, false otherwise.
- */
-const checkDriverInstallation = async (
-  installDir: string
-): Promise<boolean> => {
-  const driverPath =
-    process.env.IBM_DB_HOME || path.join(installDir, "clidriver");
-  return fs.pathExists(driverPath);
-};
-
-/**
- * Main function to handle driver installation.
- * Downloads the DB2 CLI driver based on the platform and architecture.
- * Extracts the driver files and sets the IBM_DB_HOME environment variable.
- * Cleans up the downloaded driver file after installation.
- * Logs the installation status.
- * Exits the process with an error code if installation fails.
- * @param options - The installation options.
- * @returns {Promise<void>}
- */
 export const installDriver = async (
   options: InstallOptions = {}
 ): Promise<void> => {
   try {
-    // Load configuration from .db2configrc or db2config.json
     const config = await loadConfig();
+    logger.log("Loaded configuration.");
 
-    // Check if the license agreement has already been shown
-    if (!process.env.LICENSE_AGREEMENT_SHOWN) {
-      logger.log(LICENSE_AGREEMENT);
-      process.env.LICENSE_AGREEMENT_SHOWN = "true"; // Set the environment variable
+    const { installDir, isInstalled } = await getOrCheckDriverInstallation({
+      ...config,
+      ...options,
+    });
+
+    logger.log(`Determined install directory: ${installDir}`);
+    logger.log(`Driver is installed: ${isInstalled ? "Yes" : "No"}`);
+
+    // Fetch available versions if not provided
+    let version = options.version;
+    if (!version) {
+      logger.log(
+        "No specific version provided. Fetching the latest version..."
+      );
+      const availableVersions = await fetchAvailableVersions();
+      if (availableVersions.length === 0) {
+        throw new Error(
+          "No available versions found. Unable to proceed with installation."
+        );
+      }
+      version = availableVersions.sort().pop(); // Default to the latest version
+      logger.log(`Defaulting to the latest version: ${version}`);
     }
 
-    const installDir = options.outputPath || getDefaultInstallDir(config);
-    const clidriverDir = path.join(installDir, "clidriver");
+    const versionDir = path.join(installDir, version);
+    logger.log(`Version directory set to: ${versionDir}`);
 
-    // Check if the driver is already installed
-    const isInstalled = await checkDriverInstallation(installDir);
     if (isInstalled && !options.force) {
       if (
         !process.argv.includes("--skip-prompt") &&
         !process.env.DB2_DRIVER_INSTALL_PROMPT_ANSWERED
       ) {
         logger.log("Driver is already installed.");
-
-        // Prompt user to reinstall
         const answer = await promptUser(
           "Do you want to reinstall the driver? (y/N): "
         );
@@ -375,7 +380,7 @@ export const installDriver = async (
           logger.log("Skipping reinstallation.");
           return;
         } else {
-          process.env.DB2_DRIVER_INSTALL_PROMPT_ANSWERED = "true"; // Set the environment variable
+          process.env.DB2_DRIVER_INSTALL_PROMPT_ANSWERED = "true";
         }
       }
     }
@@ -384,46 +389,39 @@ export const installDriver = async (
       logger.warn(
         "Force mode enabled: Existing installation will be overwritten."
       );
-      await fs.remove(clidriverDir);
+      await fs.remove(versionDir);
     }
 
-    await fs.ensureDir(installDir);
+    await fs.ensureDir(versionDir);
 
-    const platform = getPlatform();
-    const arch = getArchitecture();
-
-    const driverFileName = getDriverFileName(platform, arch);
+    const driverFileName =
+      platformConfig[os.platform()]?.driverFileName[os.arch()];
     const driverFilePath = path.join(installDir, driverFileName);
+    logger.log(`Driver file path set to: ${driverFilePath}`);
 
-    // Check if the driver file has already been downloaded
     if (fs.existsSync(driverFilePath)) {
       logger.log(
         `Driver file already exists at ${driverFilePath}. Skipping download.`
       );
-      if (options.checksum) {
-        await validateChecksum(driverFilePath, options.checksum);
-      }
     } else {
-      const driverUrl = `${
-        options.downloadUrl || DEFAULT_DOWNLOAD_URL
-      }/${driverFileName}`;
-
+      const driverUrl = `${DRIVER_BASE_URL}${version}/${driverFileName}`;
+      logger.log(`Starting download from ${driverUrl}`);
       await downloadFile({
         url: driverUrl,
         outputPath: driverFilePath,
-        retryCount: options.retryCount || MAX_RETRIES,
+        retryCount: options.retryCount || 3,
         checksum: options.checksum,
         skipSslVerification: options.skipSslVerification,
       });
     }
 
-    await extractFile(driverFilePath, clidriverDir);
-
-    process.env.IBM_DB_HOME = clidriverDir;
-
+    logger.log(`Extracting driver files to ${versionDir}`);
+    await extractFile(driverFilePath, versionDir);
     await fs.remove(driverFilePath);
 
-    logger.log("DB2 CLI driver installed successfully.");
+    logger.log(
+      `DB2 CLI driver version ${version} installed successfully at ${versionDir}.`
+    );
   } catch (error) {
     handleError(error);
   }
