@@ -9,7 +9,7 @@ import { Logger } from "@nestjs/common";
 import { LogLevel } from "../install/enums/install-driver.enum";
 import { Commands } from "./enums/cli.enum";
 import { CLIOptions } from "./interfaces/cli.interface";
-import { getDefaultInstallDir } from "../install/install-driver"; // Import helper function
+import { getDefaultInstallDir } from "../install/install-driver";
 
 // Instantiate the NestJS Logger
 const logger = new Logger("DB2 CLI");
@@ -53,12 +53,30 @@ const saveConfig = async (options: CLIOptions): Promise<void> => {
  * Main function to execute the CLI commands.
  */
 const main = async () => {
+  logger.log("Starting DB2 CLI...");
+
   const program = new Command();
 
   program
     .name("db2-cli")
     .version("1.0.0")
-    .description("CLI for managing IBM DB2 CLI driver");
+    .description("CLI for managing IBM DB2 CLI driver")
+    .helpOption("-h, --help", "Display help for the DB2 CLI commands")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ db2-cli install
+  $ db2-cli install --force --verbose
+  $ db2-cli uninstall
+  $ db2-cli config --set logLevel debug
+  $ db2-cli update
+  $ db2-cli config --get logLevel`
+    )
+    .helpCommand(
+      "help [command]",
+      "Display help information about a specific command"
+    );
 
   program
     .command(Commands.INSTALL)
@@ -89,10 +107,7 @@ const main = async () => {
       "Skip SSL certificate verification for downloads"
     )
     .option("-o, --output-path <path>", "Specify custom installation directory")
-    .option(
-      "--install-dir <path>", // New option for custom install directory
-      "Specify the installation directory"
-    )
+    .option("--install-dir <path>", "Specify the installation directory")
     .option(
       "--check-only",
       "Check if the driver is already installed without installing"
@@ -104,6 +119,15 @@ const main = async () => {
     .option(
       "--config <path>",
       "Load installation options from a configuration file"
+    )
+    .helpOption("-h, --help", "Display help for the install command")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ db2-cli install --download-url <url>
+  $ db2-cli install --log-level debug
+  $ db2-cli install --retries 5`
     )
     .action(async (options) => {
       try {
@@ -145,7 +169,6 @@ const main = async () => {
           return;
         }
 
-        // Call the installDriver function with the parsed options
         await installDriver({ ...installOptions, outputPath: installDir });
       } catch (error) {
         logger.error(`An error occurred: ${(error as Error).message}`);
@@ -153,10 +176,11 @@ const main = async () => {
       }
     });
 
-  // Add 'uninstall' command
   program
     .command(Commands.UNINSTALL)
     .description("Uninstall the IBM DB2 CLI driver")
+    .helpOption("-h, --help", "Display help for the uninstall command")
+    .addHelpText("after", "Example: $ db2-cli uninstall")
     .action(async () => {
       try {
         const installDir = getDefaultInstallDir();
@@ -176,10 +200,11 @@ const main = async () => {
       }
     });
 
-  // Add 'update' command
   program
     .command(Commands.UPDATE)
     .description("Update the IBM DB2 CLI driver to the latest version")
+    .helpOption("-h, --help", "Display help for the update command")
+    .addHelpText("after", "Example: $ db2-cli update")
     .action(async () => {
       try {
         logger.log("Updating the DB2 CLI driver...");
@@ -191,13 +216,21 @@ const main = async () => {
       }
     });
 
-  // Add 'config' command
   program
     .command(Commands.CONFIG)
     .description("Manage CLI configuration settings")
     .option("--set <key> <value>", "Set a configuration option")
     .option("--get <key>", "Get a configuration option")
     .option("--reset", "Reset configuration to default")
+    .helpOption("-h, --help", "Display help for the config command")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ db2-cli config --set logLevel debug
+  $ db2-cli config --get logLevel
+  $ db2-cli config --reset`
+    )
     .action(async (options) => {
       try {
         const config = await loadConfig();
@@ -229,7 +262,6 @@ const main = async () => {
       }
     });
 
-  // Parse the command-line arguments
   await program.parseAsync(process.argv);
 };
 

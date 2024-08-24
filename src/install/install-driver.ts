@@ -101,7 +101,7 @@ const getDriverFileName = (platform: Platform, arch: Architecture): string => {
       logger.warn(
         "Then, you can run this script using Rosetta by running the following command:"
       );
-      logger.warn(`\n  arch -x86_64 node src/install/install-driver.js\n`);
+      logger.warn(`\n  arch -x86_64 ts-node src/install/install-driver.ts\n`);
       process.exit(1);
     }
     return driverFileName[arch] || "";

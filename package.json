@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "install-driver": "ts-node src/cli/cli.ts",
+    "install-driver": "ts-node src/cli/db2-cli.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint . --ext .ts",
