@@ -94,6 +94,9 @@ const main = async () => {
       logger.warn(
         "Rosetta is not installed. This installation requires Rosetta for compatibility with x86_64 applications."
       );
+      logger.warn(
+        "For more information on Rosetta 2 setup, please refer to the README.md."
+      );
 
       const answer = await promptUser(
         "Would you like to run the setup script to install Rosetta, Homebrew, Node, and ts-node? (y/N): "
@@ -104,10 +107,16 @@ const main = async () => {
           execSync("sh ./macos-arm-setup.sh", { stdio: "inherit" });
         } catch (error) {
           logger.error(`Setup script failed: ${error.message}`);
+          logger.error(
+            "For more information on setting up Rosetta 2, please see the README.md."
+          );
           process.exit(1);
         }
       } else {
         logger.error("Rosetta setup is required to proceed. Exiting.");
+        logger.error(
+          "For more information on setting up Rosetta 2, please see the README.md."
+        );
         process.exit(1);
       }
     } else {
