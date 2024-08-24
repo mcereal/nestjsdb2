@@ -29,6 +29,8 @@
  * @property {string} CONNECTION_CLOSED - Indicates that the connection to the Db2 database was intentionally closed.
  * @property {string} FAILOVER_IN_PROGRESS - Indicates that a failover to a replica Db2 database is currently in progress.
  * @property {string} POOL_DRAINED - Indicates that the connection pool has been drained, closing all active connections.
+ * @property {string} AUTHENTICATING - Indicates that the system is currently authenticating with the Db2 database.
+ * @property {string} AUTH_FAILED - Indicates that authentication with the Db2 database has failed.
  */
 
 export enum Db2ConnectionState {

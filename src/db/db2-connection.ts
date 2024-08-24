@@ -1,5 +1,26 @@
 // src/db/db2.connection.ts
 
+/**
+ * @fileoverview This file contains the Db2Connection class, which manages connections to a Db2 database.
+ * The class provides methods for connecting to the database, executing queries, managing transactions,
+ * and handling connection pooling. It also includes methods for checking the health of the connection,
+ * draining the connection pool, and handling graceful shutdown of the application.
+ *
+ * @class Db2Connection
+ *
+ * @requires Logger from "@nestjs/common"
+ * @requires Socket from "net"
+ * @requires TLSSocket from "tls"
+ * @requires Db2ConnectionState from "../enums/db2.enums"
+ * @requires Db2ConfigOptions from "src/interfaces/db2.interface"
+ * @requires Db2ConnectionInterface from "src/interfaces/db2.interface"
+ * @requires Db2Error from "../errors/db2.error"
+ * @requires SocketManager from "./socket-manager"
+ * @requires TransactionManager from "./transaction-manager"
+ *
+ * @exports Db2Connection
+ */
+
 import { Socket } from "net";
 import { TLSSocket } from "tls";
 import { Db2ConnectionState } from "../enums/db2.enums";
@@ -12,6 +33,60 @@ import { Db2Error } from "../errors/db2.error";
 import { SocketManager } from "./socket-manager";
 import { TransactionManager } from "./transaction-manager";
 
+/**
+ * Class representing a connection to a Db2 database.
+ * The class provides methods for connecting to the database, executing queries, managing transactions,
+ * and handling connection pooling. It also includes methods for checking the health of the connection,
+ * draining the connection pool, and handling graceful shutdown of the application.
+ * @class
+ * @implements {Db2ConnectionInterface}
+ * @public
+ * @final
+ * @requires Logger
+ * @requires Socket
+ * @requires TLSSocket
+ * @requires Db2ConnectionState
+ * @requires Db2ConfigOptions
+ * @requires Db2ConnectionInterface
+ * @requires Db2Error
+ * @requires SocketManager
+ * @requires TransactionManager
+ * @param {Db2ConfigOptions} options - The configuration options for the Db2 connection.
+ * @property {Logger} logger - The logger instance for logging connection events and errors.
+ * @property {Db2ConnectionState} state - The current state of the Db2 connection.
+ * @property {number} activeConnections - The number of active connections in the connection pool.
+ * @property {Array<Socket | TLSSocket>} connectionPool - The pool of socket connections to the Db2 database.
+ * @property {Db2ConfigOptions} options - The configuration options for the Db2 connection.
+ * @property {SocketManager} socketManager - The socket manager instance for managing socket connections.
+ * @property {TransactionManager} transactionManager - The transaction manager instance for managing transactions.
+ * @property {number} lastUsedTime - The timestamp of the last time a connection was used.
+ * @property {number} creationTime - The timestamp of when the connection was created.
+ * @property {number} totalConnections - The total number of connections made to the database.
+ * @property {number} failedConnectionAttempts - The number of failed connection attempts.
+ * @method connect - Connects to the Db2 database.
+ * @method disconnect - Disconnects all connections to the Db2 database.
+ * @method beginTransaction - Begins a transaction with the database.
+ * @method commitTransaction - Commits a transaction with the database.
+ * @method rollbackTransaction - Rolls back a transaction with the database.
+ * @method query - Executes a SQL query against the Db2 database.
+ * @method executePreparedStatement - Executes a prepared statement against the Db2 database.
+ * @method borrowConnection - Borrows a connection from the connection pool.
+ * @method releaseConnection - Releases a connection back to the connection pool.
+ * @method startIdleConnectionCleanup - Periodically checks for idle connections and closes them.
+ * @method startConnectionLifetimeCheck - Periodically checks for connections that have exceeded their max lifetime.
+ * @method retryConnection - Retries connection attempts with exponential backoff.
+ * @method logConnectionMetrics - Logs metrics for connection pool usage.
+ * @method transactional - Begins a transaction with rollback support on error.
+ * @method switchToReplica - Switches to a replica host in case of primary failure.
+ * @method handleShutdown - Handles graceful shutdown of the application.
+ * @method validateConfig - Validates the Db2 configuration options.
+ * @method checkHealth - Checks the health of the connection.
+ * @method getActiveConnectionsCount - Returns the number of active connections.
+ * @method drainPool - Drains the connection pool.
+ * @method getState - Returns the current state of the connection.
+ * @method handleError - Handles errors by logging and rethrowing them.
+ * @exports Db2Connection
+ */
 export class Db2Connection implements Db2ConnectionInterface {
   private readonly logger = new Logger(Db2Connection.name);
   private state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED;
@@ -65,6 +140,12 @@ export class Db2Connection implements Db2ConnectionInterface {
     };
   }
 
+  /**
+   * Connect to the Db2 database.
+   * @returns {Promise<void>}
+   * @throws {Db2Error} if the maximum connection pool size is reached.
+   * @throws {Db2Error} if an error occurs while connecting.
+   */
   async connect(): Promise<void> {
     this.logger.log(
       `Request to connect. Active connections: ${this.activeConnections}`
@@ -104,6 +185,10 @@ export class Db2Connection implements Db2ConnectionInterface {
     }
   }
 
+  /**
+   * Disconnect all connections to the Db2 database.
+   * @returns {Promise<void>}
+   */
   async disconnect(): Promise<void> {
     this.logger.log("Disconnecting all Db2 connections...");
     for (const conn of this.connectionPool) {
@@ -115,14 +200,26 @@ export class Db2Connection implements Db2ConnectionInterface {
     this.logger.log("All Db2 connections have been disconnected.");
   }
 
+  /**
+   * Begin a transaction with the database
+   * @returns {Promise<void>}
+   */
   async beginTransaction(): Promise<void> {
     return this.transactionManager.beginTransaction();
   }
 
+  /**
+   * Commit a transaction with the database.
+   * @returns {Promise<void>}
+   */
   async commitTransaction(): Promise<void> {
     return this.transactionManager.commitTransaction();
   }
 
+  /**
+   * Rollback a transaction with the database.
+   * @returns {Promise<void>}
+   */
   async rollbackTransaction(): Promise<void> {
     return this.transactionManager.rollbackTransaction();
   }
@@ -130,6 +227,7 @@ export class Db2Connection implements Db2ConnectionInterface {
   /**
    * Remove a socket from the connection pool.
    * @param socket The socket to remove.
+   * @returns {void}
    */
   private removeSocketFromPool(socket: Socket | TLSSocket): void {
     this.connectionPool = this.connectionPool.filter((conn) => conn !== socket);
@@ -241,6 +339,7 @@ export class Db2Connection implements Db2ConnectionInterface {
   /**
    * Release a connection back to the pool.
    * @param socket The socket to release.
+   * @returns {void}
    */
 
   private releaseConnection(socket: Socket | TLSSocket): void {
@@ -256,6 +355,8 @@ export class Db2Connection implements Db2ConnectionInterface {
   }
   /**
    * Periodically check for idle connections and close them.
+   * @param interval The interval for checking idle connections.
+   * @returns {void}
    */
   private startIdleConnectionCleanup(interval: number = 60000): void {
     setInterval(() => {
@@ -274,6 +375,11 @@ export class Db2Connection implements Db2ConnectionInterface {
     }, interval);
   }
 
+  /**
+   * Periodically check for connections that have exceeded their max lifetime.
+   * @param interval The interval for checking connection lifetime.
+   * @returns {void}
+   */
   private startConnectionLifetimeCheck(interval: number = 60000): void {
     setInterval(() => {
       const now = Date.now();
@@ -292,6 +398,13 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Retry connection attempts with exponential backoff.
+   * @param attempts The number of retry attempts.
+   * @returns {Promise<void>}
+   * @throws {Db2Error} if the retry policy is set to 'none'.
+   * @throws {Db2Error} if the maximum number of retry attempts is reached.
+   * @throws {Db2Error} if the connection fails after multiple attempts.
+   * @throws {Db2Error} if no replica hosts are available for failover.
+   * @throws {Db2Error} if the connection timeout is less than 1000ms.
    */
   private async retryConnection(attempts: number = 0): Promise<void> {
     const maxRetries = this.options.retryAttempts || 3;
@@ -317,6 +430,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Log metrics for connection pool usage.
+   * @returns {void}
    */
   private logConnectionMetrics(): void {
     const activeCount = this.connectionPool.filter(
@@ -340,6 +454,9 @@ export class Db2Connection implements Db2ConnectionInterface {
   }
   /**
    * Begin a transaction with rollback support on error.
+   * @param operation The operation to perform within the transaction.
+   * @returns The result of the transaction operation.
+   * @throws {Error} if an error occurs during the transaction.
    */
   async transactional<T>(operation: () => Promise<T>): Promise<T> {
     await this.beginTransaction();
@@ -355,6 +472,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Switch to a replica host in case of primary failure.
+   * @returns {void}
    */
   private switchToReplica(): void {
     if (
@@ -372,6 +490,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Handle graceful shutdown.
+   * @returns {Promise<void>}
    */
   async handleShutdown(): Promise<void> {
     this.logger.log("Graceful shutdown initiated. Closing all connections.");
@@ -381,6 +500,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Validate Db2 configuration options.
+   * @returns {void}
    */
   private validateConfig(): void {
     const errors: string[] = [];
@@ -450,6 +570,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Return the number of active connections.
+   * @returns The number of active connections.
    */
   getActiveConnectionsCount(): number {
     return this.activeConnections;
@@ -457,6 +578,7 @@ export class Db2Connection implements Db2ConnectionInterface {
 
   /**
    * Drain the connection pool.
+   * @returns {Promise<void>}
    */
 
   async drainPool(): Promise<void> {
@@ -482,6 +604,7 @@ export class Db2Connection implements Db2ConnectionInterface {
    * Error handling method for logging and rethrowing errors.
    * @param error The error to handle
    * @param context Context of the error occurrence
+   * @returns {void}
    */
   private handleError(error: any, context: string): void {
     const errorMessage = `Error in ${context}: ${error.message}`;

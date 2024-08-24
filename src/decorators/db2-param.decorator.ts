@@ -1,3 +1,5 @@
+// src/decorators/db2-param.decorator.ts
+
 /**
  * @fileoverview This file contains the implementation of the Db2Param decorator.
  * The Db2Param decorator is a custom parameter decorator used in NestJS controllers to extract

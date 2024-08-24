@@ -14,7 +14,8 @@
  * @exports CacheResult
  */
 
-import { Cache } from "cache-manager"; // Assuming you're using a cache manager
+import { Cache } from "cache-manager";
+import { Logger } from "@nestjs/common";
 
 /**
  * @function CacheResult
@@ -40,26 +41,47 @@ import { Cache } from "cache-manager"; // Assuming you're using a cache manager
  * }
  */
 export function CacheResult(ttl: number = 60): MethodDecorator {
+  const logger = new Logger("CacheResultDecorator");
+
   return function (
-    _target: Object,
-    _propertyKey: string | symbol,
+    target: Object,
+    propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
       const cache = (this as any).cache as Cache; // Retrieve the cache manager instance
-      const cacheKey = `${_propertyKey.toString()}-${JSON.stringify(args)}`; // Create a unique cache key based on method name and arguments
-
-      const cachedResult = await cache.get(cacheKey); // Check if result is in cache
-      if (cachedResult) {
-        return cachedResult; // Return cached result if available
+      if (!cache) {
+        logger.warn(
+          `Cache manager not available for ${propertyKey.toString()}. Proceeding without caching.`
+        );
+        return originalMethod.apply(this, args);
       }
 
-      const result = await originalMethod.apply(this, args); // Execute the original method
-      await cache.set(cacheKey, result, { ttl }); // Cache the result with the specified TTL
+      const cacheKey = `${propertyKey.toString()}-${JSON.stringify(args)}`; // Create a unique cache key based on method name and arguments
 
-      return result; // Return the result of the method execution
+      try {
+        const cachedResult = await cache.get(cacheKey); // Check if result is in cache
+        if (cachedResult !== undefined) {
+          logger.debug(`Cache hit for key: ${cacheKey}`);
+          return cachedResult; // Return cached result if available
+        }
+
+        logger.debug(`Cache miss for key: ${cacheKey}. Executing method.`);
+        const result = await originalMethod.apply(this, args); // Execute the original method
+        await cache.set(cacheKey, result, ttl); // Cache the result with the specified TTL
+
+        return result; // Return the result of the method execution
+      } catch (error) {
+        logger.error(
+          `Cache operation failed for ${propertyKey.toString()}: ${
+            error.message
+          }`
+        );
+        // Fallback: execute the method without caching
+        return originalMethod.apply(this, args);
+      }
     };
 
     return descriptor;

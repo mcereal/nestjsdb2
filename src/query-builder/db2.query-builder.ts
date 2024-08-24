@@ -29,7 +29,7 @@
  *
  */
 
-import { Db2Service } from "./db2.service";
+import { Db2Service } from "src/services/db2.service";
 
 /**
  * @class Db2QueryBuilder

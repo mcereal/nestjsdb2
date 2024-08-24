@@ -1,3 +1,5 @@
+// src/decorators/db2-transaction.decorator.ts
+
 /**
  * @fileoverview This file contains the implementation of the Transaction decorator.
  * The Transaction decorator is used to wrap a method in a database transaction, ensuring

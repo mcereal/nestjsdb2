@@ -1,3 +1,5 @@
+// src/decorators/db2-connection-state.decorator.ts
+
 /**
  * @fileoverview This file contains the implementation of the CheckDb2ConnectionState decorator.
  * This decorator checks the state of the Db2 connection before executing the decorated method.

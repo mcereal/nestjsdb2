@@ -1,3 +1,5 @@
+// src/decorators/db2-query.decorator.ts
+
 /**
  * @fileoverview This file contains the implementation of the Db2Query decorator.
  * The Db2Query decorator is used to automatically execute a specified Db2 query
