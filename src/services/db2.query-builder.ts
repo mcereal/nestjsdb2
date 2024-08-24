@@ -1,3 +1,5 @@
+// src/services/db2.query-builder.ts
+
 /**
  * @fileoverview This file contains the implementation of the Db2QueryBuilder class.
  * This class provides a fluent interface for building and executing SQL queries
@@ -8,12 +10,56 @@
  * @class Db2QueryBuilder
  *
  * @exports Db2QueryBuilder
+ * @requires Db2Service
+ *
+ * @example
+ * const queryBuilder = new Db2QueryBuilder();
+ * queryBuilder
+ *  .select("id", "name")
+ * .from("users")
+ * .where("age > ?", [18])
+ * .orderBy("name", "ASC")
+ * .limit(10);
+ *
+ * const { query, params } = queryBuilder.build();
+ * console.log(query); // SELECT id, name FROM users WHERE age > ? ORDER BY name ASC LIMIT 10
+ *
+ * const results = await queryBuilder.execute<User>(dbService);
+ * console.log(results); // [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }]
+ *
  */
 
+import { Db2Service } from "./db2.service";
+
+/**
+ * @class Db2QueryBuilder
+ * @classdesc A fluent interface for building and executing SQL queries for Db2 databases.
+ * This class provides methods for constructing various SQL clauses, such as SELECT, WHERE, JOIN,
+ * GROUP BY, ORDER BY, and more. The query builder supports subqueries, parameterized queries,
+ * and conditional clauses, allowing for flexible and dynamic query generation.
+ *
+ * @example
+ * const queryBuilder = new Db2QueryBuilder();
+ * queryBuilder
+ * .select("id", "name")
+ * .from("users")
+ * .where("age > ?", [18])
+ * .orderBy("name", "ASC")
+ * .limit(10);
+ *
+ * const { query, params } = queryBuilder.build();
+ * console.log(query); // SELECT id, name FROM users WHERE age > ? ORDER BY name ASC LIMIT 10
+ *
+ * const results = await queryBuilder.execute<User>(dbService);
+ * console.log(results); // [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }]
+ *
+ */
 export class Db2QueryBuilder {
   private query: string;
-  private params: any[];
+  private params: Record<string, any>;
   private hasWhereClause: boolean;
+  private namedParamsCounter: number;
+  private schema: string;
 
   constructor() {
     this.reset();
@@ -26,9 +72,29 @@ export class Db2QueryBuilder {
    */
   reset(): Db2QueryBuilder {
     this.query = "";
-    this.params = [];
+    this.params = {};
     this.hasWhereClause = false;
+    this.namedParamsCounter = 0;
     return this;
+  }
+
+  /**
+   * Generates a unique parameter name.
+   * @returns A string representing a unique parameter name.
+   */
+  private generateParamName(): string {
+    return `param${this.namedParamsCounter++}`;
+  }
+
+  /**
+   * Adds a parameter to the query.
+   * @param value - The value of the parameter to add.
+   * @returns The parameter name used for the value.
+   */
+  private addParam(value: any): string {
+    const paramName = this.generateParamName();
+    this.params[paramName] = value;
+    return paramName;
   }
 
   /**
@@ -60,13 +126,24 @@ export class Db2QueryBuilder {
   }
 
   /**
+   * Sets the schema for the query.
+   * @param schemaName - The name of the schema to use.
+   * @returns The Db2QueryBuilder instance for method chaining.
+   */
+  useSchema(schemaName: string): Db2QueryBuilder {
+    this.schema = schemaName;
+    return this;
+  }
+
+  /**
    * Specifies the table to select from, with an optional alias.
    * @param table - The name of the table.
    * @param alias - Optional alias for the table.
    * @returns The Db2QueryBuilder instance for method chaining.
    */
   from(table: string, alias?: string): Db2QueryBuilder {
-    this.query += `FROM ${table} ${alias ? `AS ${alias} ` : ""}`;
+    const schemaPrefix = this.schema ? `${this.schema}.` : "";
+    this.query += `FROM ${schemaPrefix}${table} ${alias ? `AS ${alias} ` : ""}`;
     return this;
   }
 
@@ -84,8 +161,9 @@ export class Db2QueryBuilder {
         "WHERE clause already exists. Use and() or or() to add more conditions."
       );
     }
+    this.validateParams(params); // Validate parameters
     this.query += `WHERE ${condition} `;
-    this.params.push(...params);
+    params.forEach((param) => this.addParam(param)); // Add parameters with validation
     this.hasWhereClause = true;
     return this;
   }
@@ -101,8 +179,9 @@ export class Db2QueryBuilder {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use AND without a preceding WHERE clause.");
     }
+    this.validateParams(params); // Validate parameters
     this.query += `AND ${condition} `;
-    this.params.push(...params);
+    params.forEach((param) => this.addParam(param)); // Add parameters with validation
     return this;
   }
 
@@ -117,8 +196,9 @@ export class Db2QueryBuilder {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use OR without a preceding WHERE clause.");
     }
+    this.validateParams(params); // Validate parameters
     this.query += `OR ${condition} `;
-    this.params.push(...params);
+    params.forEach((param) => this.addParam(param)); // Add parameters with validation
     return this;
   }
 
@@ -187,8 +267,17 @@ export class Db2QueryBuilder {
    * @returns The Db2QueryBuilder instance for method chaining.
    */
   having(condition: string, params: any[] = []): Db2QueryBuilder {
+    // Validate parameters
+    this.validateParams(params);
+
     this.query += `HAVING ${condition} `;
-    this.params.push(...params);
+
+    // Add parameters using named placeholders
+    params.forEach((param) => {
+      const paramName = this.addParam(param);
+      this.query = this.query.replace("?", `:${paramName}`);
+    });
+
     return this;
   }
 
@@ -200,8 +289,10 @@ export class Db2QueryBuilder {
    */
   subquery(subquery: Db2QueryBuilder, alias: string): Db2QueryBuilder {
     const { query: subQueryStr, params: subQueryParams } = subquery.build();
+
     this.query += `(${subQueryStr}) AS ${alias} `;
-    this.params.push(...subQueryParams);
+    Object.assign(this.params, subQueryParams); // Merge subquery parameters into main parameters
+
     return this;
   }
 
@@ -217,12 +308,13 @@ export class Db2QueryBuilder {
       throw new Error("Cannot use IN without a preceding WHERE clause.");
     }
     if (Array.isArray(values)) {
-      this.query += `${column} IN (${values.map(() => "?").join(", ")}) `;
-      this.params.push(...values);
+      this.validateParams(values); // Validate values
+      const paramNames = values.map((value) => `:${this.addParam(value)}`);
+      this.query += `${column} IN (${paramNames.join(", ")}) `;
     } else {
       const { query: subQueryStr, params: subQueryParams } = values.build();
       this.query += `${column} IN (${subQueryStr}) `;
-      this.params.push(...subQueryParams);
+      Object.assign(this.params, subQueryParams);
     }
     return this;
   }
@@ -238,14 +330,17 @@ export class Db2QueryBuilder {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use NOT IN without a preceding WHERE clause.");
     }
+
     if (Array.isArray(values)) {
-      this.query += `${column} NOT IN (${values.map(() => "?").join(", ")}) `;
-      this.params.push(...values);
+      this.validateParams(values); // Validate values
+      const paramNames = values.map((value) => `:${this.addParam(value)}`);
+      this.query += `${column} NOT IN (${paramNames.join(", ")}) `;
     } else {
       const { query: subQueryStr, params: subQueryParams } = values.build();
       this.query += `${column} NOT IN (${subQueryStr}) `;
-      this.params.push(...subQueryParams);
+      Object.assign(this.params, subQueryParams); // Merge subquery params into main params
     }
+
     return this;
   }
 
@@ -261,8 +356,16 @@ export class Db2QueryBuilder {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use BETWEEN without a preceding WHERE clause.");
     }
-    this.query += `${column} BETWEEN ? AND ? `;
-    this.params.push(start, end);
+
+    // Validate parameters
+    this.validateParams([start, end]);
+
+    // Generate parameter names and add to params
+    const startParamName = this.addParam(start);
+    const endParamName = this.addParam(end);
+
+    this.query += `${column} BETWEEN :${startParamName} AND :${endParamName} `;
+
     return this;
   }
 
@@ -294,25 +397,123 @@ export class Db2QueryBuilder {
   }
 
   /**
-   * Builds the final query string and returns it along with parameters.
-   * Trims extra spaces and appends a semicolon to the end of the query.
-   * @returns An object containing the query string and parameters.
+   * Build the final query string by replacing named parameters.
+   * @returns An object containing the query string with placeholders replaced and parameters.
    */
-  build(): { query: string; params: any[] } {
-    return {
-      query: this.query.trim() + ";",
-      params: this.params,
-    };
+  build(): { query: string; params: Record<string, any> } {
+    let finalQuery = this.query;
+    for (const [key, value] of Object.entries(this.params)) {
+      const placeholder = `:${key}`;
+      finalQuery = finalQuery.replace(new RegExp(placeholder, "g"), "?");
+    }
+    return { query: finalQuery, params: this.params };
   }
 
   /**
-   * Executes the built query using a provided database connection.
-   * @param dbConnection - The database connection to execute the query on.
+   * Adds an INSERT INTO statement for bulk inserts.
+   * @param table - The table to insert into.
+   * @param columns - The columns to insert values into.
+   * @param values - An array of value arrays to insert in bulk.
+   * @returns The Db2QueryBuilder instance for method chaining.
+   */
+  insertInto(
+    table: string,
+    columns: string[],
+    values: any[][]
+  ): Db2QueryBuilder {
+    const placeholders = columns.map(() => "?").join(", ");
+    this.query += `INSERT INTO ${table} (${columns.join(", ")}) VALUES `;
+    this.query += values.map(() => `(${placeholders})`).join(", ");
+    this.params.push(...values.flat());
+    return this;
+  }
+
+  /**
+   * Adds an UPDATE statement for batch updates.
+   * @param table - The table to update.
+   * @param updates - An object mapping columns to their new values.
+   * @param where - The condition to update rows.
+   * @returns The Db2QueryBuilder instance for method chaining.
+   */
+  update(
+    table: string,
+    updates: Record<string, any>,
+    where: string,
+    whereParams: any[]
+  ): Db2QueryBuilder {
+    const setClause = Object.keys(updates)
+      .map((key) => `${key} = ?`)
+      .join(", ");
+    this.query += `UPDATE ${table} SET ${setClause} WHERE ${where} `;
+    this.params.push(...Object.values(updates), ...whereParams);
+    return this;
+  }
+
+  /**
+   * Executes the built query using a provided Db2Service instance.
+   * @param dbService - The Db2Service instance to execute the query on.
    * @returns The results of the query execution.
    * @throws Error if the query execution fails.
    */
-  async execute(dbConnection: any): Promise<any> {
+  async execute<T>(dbService: Db2Service): Promise<T> {
     const { query, params } = this.build();
-    return dbConnection.query(query, params);
+
+    // Convert named parameters to positional parameters for dbService if required
+    const positionalParams = Object.values(params);
+
+    return dbService.query<T>(query, positionalParams);
+  }
+
+  /**
+   * Wraps query execution in a transaction.
+   * @param dbService - The Db2Service instance to execute the query on.
+   * @param operation - The operation to execute as a part of the transaction.
+   * @returns The result of the transaction operation.
+   * @throws Error if the transaction fails.
+   */
+  async inTransaction<T>(
+    dbService: Db2Service,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    await dbService.beginTransaction();
+    try {
+      const result = await operation();
+      await dbService.commitTransaction();
+      return result;
+    } catch (error) {
+      await dbService.rollbackTransaction();
+      throw error;
+    }
+  }
+
+  /**
+   * Validates the parameters to ensure they meet specific requirements.
+   * Throws an error if any parameter is invalid.
+   * @param params - The array of parameters to validate.
+   * @throws Error if a parameter is null, undefined, or of an invalid type.
+   */
+  private validateParams(params: any[]): void {
+    params.forEach((param) => {
+      if (param === undefined || param === null) {
+        throw new Error("Parameter value cannot be null or undefined");
+      }
+
+      // Check for allowed types
+      const allowedTypes = ["string", "number", "boolean", "object"];
+      if (!allowedTypes.includes(typeof param)) {
+        throw new Error(`Invalid parameter type: ${typeof param}`);
+      }
+
+      // Check for object type specifics
+      if (typeof param === "object" && !(param instanceof Date)) {
+        throw new Error("Only Date objects are allowed as parameter objects");
+      }
+
+      // Add more validations as necessary
+      // Example: Check string length
+      if (typeof param === "string" && param.length > 255) {
+        throw new Error("String parameter value exceeds maximum length of 255");
+      }
+    });
   }
 }

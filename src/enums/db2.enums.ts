@@ -42,4 +42,6 @@ export enum Db2ConnectionState {
   CONNECTION_CLOSED = "CONNECTION_CLOSED", // Connection was closed intentionally
   FAILOVER_IN_PROGRESS = "FAILOVER_IN_PROGRESS", // Failover to a replica is in progress
   POOL_DRAINED = "POOL_DRAINED", // Connection pool has been drained
+  AUTHENTICATING = "AUTHENTICATING", // Authenticating with the DB2 database
+  AUTH_FAILED = "AUTH_FAILED", // Authentication with the DB2 database failed
 }

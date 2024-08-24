@@ -1,3 +1,5 @@
+// src/interfaces/db2.interface.ts
+
 /**
  * @fileoverview This file contains the definitions of interfaces used for configuring and managing
  * Db2 database connections. The interfaces define the structure for configuration options,
