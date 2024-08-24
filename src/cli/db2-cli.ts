@@ -10,6 +10,9 @@ import { LogLevel } from "../install/enums/install-driver.enum";
 import { Commands } from "./enums/cli.enum";
 import { CLIOptions } from "./interfaces/cli.interface";
 import { getDefaultInstallDir } from "../install/install-driver";
+import { execSync } from "child_process";
+import readline from "readline";
+import os from "os";
 
 // Instantiate the NestJS Logger
 const logger = new Logger("DB2 CLI");
@@ -49,11 +52,68 @@ const saveConfig = async (options: CLIOptions): Promise<void> => {
   logger.log("Configuration saved successfully.");
 };
 
+// Function to check if Rosetta is installed
+const checkRosettaInstallation = (): boolean => {
+  try {
+    execSync("/usr/bin/pgrep oahd");
+    return true; // Rosetta is installed
+  } catch (error) {
+    return false; // Rosetta is not installed
+  }
+};
+
+// Function to prompt the user
+const promptUser = (message: string): Promise<string> => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+};
+
 /**
  * Main function to execute the CLI commands.
  */
 const main = async () => {
   logger.log("Starting DB2 CLI...");
+  // Check if running on ARM macOS
+  const isMacOS = os.platform() === "darwin";
+  const isARM = os.arch() === "arm64";
+
+  if (isMacOS && isARM) {
+    logger.log("You are using macOS on an ARM architecture.");
+    const hasRosetta = checkRosettaInstallation();
+
+    if (!hasRosetta) {
+      logger.warn(
+        "Rosetta is not installed. This installation requires Rosetta for compatibility with x86_64 applications."
+      );
+
+      const answer = await promptUser(
+        "Would you like to run the setup script to install Rosetta, Homebrew, Node, and ts-node? (y/N): "
+      );
+
+      if (answer.toLowerCase() === "y") {
+        try {
+          execSync("sh ./macos-arm-setup.sh", { stdio: "inherit" });
+        } catch (error) {
+          logger.error(`Setup script failed: ${error.message}`);
+          process.exit(1);
+        }
+      } else {
+        logger.error("Rosetta setup is required to proceed. Exiting.");
+        process.exit(1);
+      }
+    } else {
+      logger.log("Rosetta is installed. Proceeding with installation...");
+    }
+  }
 
   const program = new Command();
 

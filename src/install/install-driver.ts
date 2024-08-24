@@ -5,7 +5,7 @@ import os from "os";
 import path from "path";
 import axios from "axios";
 import AdmZip from "adm-zip";
-import tar from "tar";
+import readline from "readline";
 import crypto from "crypto";
 import { Logger } from "@nestjs/common";
 import {
@@ -15,6 +15,7 @@ import {
 import { Platform, Architecture } from "./enums/install-driver.enum";
 import { platformConfig } from "./constants/platform-config";
 import { ErrorCode } from "./enums/error-codes.enum";
+import { exec, execSync } from "child_process";
 
 const DEFAULT_DOWNLOAD_URL =
   "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli";
@@ -91,18 +92,47 @@ const getDriverFileName = (platform: Platform, arch: Architecture): string => {
 
   if (driverFileName[arch] !== undefined) {
     if (platform === Platform.MACOS && arch === Architecture.ARM64) {
-      logger.warn(
-        "Apple Silicon (ARM64) detected. To run this installer, you must use Rosetta."
-      );
-      logger.warn(
-        "Please run the following command to install Rosetta if you haven't already:"
-      );
-      logger.warn(`\n  softwareupdate --install-rosetta\n`);
-      logger.warn(
-        "Then, you can run this script using Rosetta by running the following command:"
-      );
-      logger.warn(`\n  arch -x86_64 ts-node src/install/install-driver.ts\n`);
-      process.exit(1);
+      try {
+        // Check if currently running under Rosetta (x86_64) and if ts-node is available
+        const isRosetta = execSync("arch").toString().trim() === "i386";
+        const tsNodeExists = execSync("which ts-node").toString().trim();
+
+        if (!isRosetta) {
+          if (tsNodeExists) {
+            // Construct the command to switch to Rosetta using ts-node with env variables
+            const command = `env LICENSE_AGREEMENT_SHOWN=true arch -x86_64 ts-node ${path.resolve(
+              process.argv[1]
+            )} ${process.argv.slice(2).join(" ")}`;
+            logger.log(
+              `Switching to Rosetta (x86_64) environment using ts-node...`
+            );
+            logger.log(`Running command: ${command}`);
+
+            // Execute the command to restart under Rosetta
+            execSync(command, {
+              stdio: "inherit",
+              env: { ...process.env, LICENSE_AGREEMENT_SHOWN: "true" },
+            });
+            process.exit(0); // Exit the current script to avoid running further in the wrong architecture
+          } else {
+            logger.error(
+              "ts-node is required but not found. Please install ts-node globally using npm."
+            );
+            process.exit(1);
+          }
+        } else {
+          logger.log(
+            "Running under Rosetta (x86_64) with ts-node available. Continuing installation..."
+          );
+          return driverFileName[Architecture.X64];
+        }
+      } catch (error) {
+        logger.error(
+          "Error checking Rosetta environment or ts-node availability:",
+          error.message
+        );
+        process.exit(1);
+      }
     }
     return driverFileName[arch] || "";
   }
@@ -111,6 +141,7 @@ const getDriverFileName = (platform: Platform, arch: Architecture): string => {
     `Unsupported architecture: ${arch} for platform: ${platform}`
   );
 };
+
 /**
  * Get the current platform as a Platform enum.
  * @returns {Platform} The current platform.
@@ -206,21 +237,82 @@ const validateChecksum = async (
  * Extracts a zip or tar.gz file to the specified directory.
  * @param filePath - The path of the zip or tar.gz file to extract.
  * @param extractPath - The directory to extract the files to.
- * @returns {void}
+ * @returns {Promise<void>}
  */
-const extractFile = (filePath: string, extractPath: string): void => {
+const extractFile = async (
+  filePath: string,
+  extractPath: string
+): Promise<void> => {
   logger.log(`Extracting ${filePath} to ${extractPath}`);
-  if (filePath.endsWith(".zip")) {
-    const zip = new AdmZip(filePath);
-    zip.extractAllTo(extractPath, true);
-  } else if (filePath.endsWith(".tar.gz")) {
-    tar.x({
-      file: filePath,
-      cwd: extractPath,
-      sync: true,
-    });
+
+  try {
+    // Ensure the extraction path exists
+    fs.ensureDirSync(extractPath);
+
+    if (filePath.endsWith(".zip")) {
+      const zip = new AdmZip(filePath);
+      zip.extractAllTo(extractPath, true);
+    } else if (filePath.endsWith(".tar.gz")) {
+      // Extract directly into the final extractPath
+      const command = `/usr/bin/tar -xzf "${filePath}" -C "${extractPath}"`;
+      await new Promise<void>((resolve, reject) => {
+        exec(command, (error, stdout, stderr) => {
+          if (error) {
+            logger.error(`Error during extraction: ${stderr}`);
+            reject(
+              new Error(`Extraction failed for ${filePath} to ${extractPath}`)
+            );
+          } else {
+            logger.log(`Extraction output: ${stdout}`);
+            resolve();
+          }
+        });
+      });
+    } else {
+      throw new Error(`Unsupported file type for extraction: ${filePath}`);
+    }
+
+    logger.log(`Extracted successfully to ${extractPath}`);
+  } catch (error) {
+    logger.error(`Error during extraction: ${error.message}`);
+    throw new Error(`Extraction failed for ${filePath} to ${extractPath}`);
   }
-  logger.log(`Extracted successfully to ${extractPath}`);
+};
+
+/**
+ * Get the temporary downloads directory.
+ * @returns {string} The path to the temporary downloads directory.
+ */
+const getTempDownloadsDir = (): string => {
+  return path.join(os.tmpdir(), "nestjs-ibm-db2-downloads");
+};
+
+// Function to prompt the user
+const promptUser = (message: string): Promise<string> => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+};
+
+/**
+ * Function to check if the driver is already installed.
+ * @param installDir - The directory to check for driver installation.
+ * @returns {Promise<boolean>} - True if the driver is installed, false otherwise.
+ */
+const checkDriverInstallation = async (
+  installDir: string
+): Promise<boolean> => {
+  const driverPath =
+    process.env.IBM_DB_HOME || path.join(installDir, "clidriver");
+  return fs.pathExists(driverPath);
 };
 
 /**
@@ -237,10 +329,36 @@ export const installDriver = async (
   options: InstallOptions = {}
 ): Promise<void> => {
   try {
-    logger.log(LICENSE_AGREEMENT);
+    // Check if the license agreement has already been shown
+    if (!process.env.LICENSE_AGREEMENT_SHOWN) {
+      logger.log(LICENSE_AGREEMENT);
+      process.env.LICENSE_AGREEMENT_SHOWN = "true"; // Set the environment variable
+    }
 
     const installDir = options.outputPath || getDefaultInstallDir();
     const clidriverDir = path.join(installDir, "clidriver");
+
+    // Check if the driver is already installed
+    const isInstalled = await checkDriverInstallation(installDir);
+    if (isInstalled && !options.force) {
+      if (
+        !process.argv.includes("--skip-prompt") &&
+        !process.env.DB2_DRIVER_INSTALL_PROMPT_ANSWERED
+      ) {
+        logger.log("Driver is already installed.");
+
+        // Prompt user to reinstall
+        const answer = await promptUser(
+          "Do you want to reinstall the driver? (y/N): "
+        );
+        if (answer.toLowerCase() !== "y") {
+          logger.log("Skipping reinstallation.");
+          return;
+        } else {
+          process.env.DB2_DRIVER_INSTALL_PROMPT_ANSWERED = "true"; // Set the environment variable
+        }
+      }
+    }
 
     if (options.force) {
       logger.warn(
@@ -255,20 +373,31 @@ export const installDriver = async (
     const arch = getArchitecture();
 
     const driverFileName = getDriverFileName(platform, arch);
-    const driverUrl = `${
-      options.downloadUrl || DEFAULT_DOWNLOAD_URL
-    }/${driverFileName}`;
     const driverFilePath = path.join(installDir, driverFileName);
 
-    await downloadFile({
-      url: driverUrl,
-      outputPath: driverFilePath,
-      retryCount: options.retryCount || MAX_RETRIES,
-      checksum: options.checksum,
-      skipSslVerification: options.skipSslVerification,
-    });
+    // Check if the driver file has already been downloaded
+    if (fs.existsSync(driverFilePath)) {
+      logger.log(
+        `Driver file already exists at ${driverFilePath}. Skipping download.`
+      );
+      if (options.checksum) {
+        await validateChecksum(driverFilePath, options.checksum);
+      }
+    } else {
+      const driverUrl = `${
+        options.downloadUrl || DEFAULT_DOWNLOAD_URL
+      }/${driverFileName}`;
 
-    extractFile(driverFilePath, clidriverDir);
+      await downloadFile({
+        url: driverUrl,
+        outputPath: driverFilePath,
+        retryCount: options.retryCount || MAX_RETRIES,
+        checksum: options.checksum,
+        skipSslVerification: options.skipSslVerification,
+      });
+    }
+
+    await extractFile(driverFilePath, clidriverDir);
 
     process.env.IBM_DB_HOME = clidriverDir;
 

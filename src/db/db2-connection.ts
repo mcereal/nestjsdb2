@@ -32,6 +32,7 @@ import {
 import { Db2Error } from "../errors/db2.error";
 import { SocketManager } from "./socket-manager";
 import { TransactionManager } from "./transaction-manager";
+import { DriverManager } from "./driver-manager";
 
 /**
  * Class representing a connection to a Db2 database.
@@ -89,6 +90,7 @@ import { TransactionManager } from "./transaction-manager";
  */
 export class Db2Connection implements Db2ConnectionInterface {
   private readonly logger = new Logger(Db2Connection.name);
+  private driverManager: DriverManager;
   private state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED;
   private activeConnections: number = 0;
   private connectionPool: Array<Socket | TLSSocket> = [];
@@ -102,7 +104,9 @@ export class Db2Connection implements Db2ConnectionInterface {
   private failedConnectionAttempts: number;
 
   constructor(options: Db2ConfigOptions) {
-    this.options = this.applyDefaults(options); // Apply sensible defaults
+    this.options = this.applyDefaults(options);
+    this.driverManager = new DriverManager();
+    this.driverManager.verifyDriver();
     this.socketManager = new SocketManager(this.options);
     this.transactionManager = new TransactionManager(this);
 
@@ -116,7 +120,6 @@ export class Db2Connection implements Db2ConnectionInterface {
     this.startIdleConnectionCleanup(); // Check for idle connections
     this.startConnectionLifetimeCheck(); // Check for max connection lifetime
   }
-
   /**
    * Apply sensible default values to the configuration options if not provided.
    * @param options The options to which defaults are applied.
