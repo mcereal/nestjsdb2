@@ -1,3 +1,5 @@
+// src/modules/db2.module.ts
+
 /**
  * @fileoverview This file contains the implementation of the Db2Module for NestJS applications.
  * The Db2Module provides methods to configure and manage the Db2Service, which handles database operations
@@ -16,8 +18,8 @@
  */
 
 import { Module, DynamicModule, Provider } from "@nestjs/common";
-import { Db2Service } from "./src/services/db2.service";
-import { Db2ConfigOptions } from "./src/interfaces/db2.interface";
+import { Db2Service } from "../services/db2.service";
+import { Db2ConfigOptions } from "../interfaces/db2.interface";
 
 @Module({})
 export class Db2Module {
