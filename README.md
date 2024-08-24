@@ -258,10 +258,3 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 ## License
 
 This project is licensed under the terms of the [MIT License](LICENSE.md).
-
-```
-
-[]: # (END) README.md
-
-
-```
