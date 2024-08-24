@@ -19,4 +19,5 @@ export interface InstallOptions {
   outputPath?: string;
   checkOnly?: boolean;
   dryRun?: boolean;
+  installDir?: string;
 }

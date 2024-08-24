@@ -62,14 +62,19 @@ const handleError = (error: Error): void => {
 };
 
 /**
- * Determine the default installation directory based on the OS.
+ * Determine the default installation directory based on the OS and configuration file.
+ * @param config - The loaded configuration options.
  * @returns {string} The default installation directory path.
  */
-export const getDefaultInstallDir = (): string => {
+export const getDefaultInstallDir = (config: InstallOptions = {}): string => {
+  if (config.installDir) {
+    return config.installDir;
+  }
+
   const platform = getPlatform();
-  const config = platformConfig[platform];
-  return config
-    ? config.defaultInstallDir
+  const configPlatform = platformConfig[platform];
+  return configPlatform
+    ? configPlatform.defaultInstallDir
     : path.resolve(process.cwd(), "installer");
 };
 
@@ -279,14 +284,6 @@ const extractFile = async (
   }
 };
 
-/**
- * Get the temporary downloads directory.
- * @returns {string} The path to the temporary downloads directory.
- */
-const getTempDownloadsDir = (): string => {
-  return path.join(os.tmpdir(), "nestjs-ibm-db2-downloads");
-};
-
 // Function to prompt the user
 const promptUser = (message: string): Promise<string> => {
   const rl = readline.createInterface({
@@ -303,7 +300,27 @@ const promptUser = (message: string): Promise<string> => {
 };
 
 /**
+ * Load configuration from .db2configrc or db2config.json, giving precedence to .db2configrc.
+ * @returns {Promise<CLIOptions>} - The loaded configuration options.
+ */
+const loadConfig = async (): Promise<InstallOptions> => {
+  const configPathRc = path.resolve(process.cwd(), ".db2configrc");
+  const configPathJson = path.resolve(process.cwd(), "db2config.json");
+
+  if (await fs.pathExists(configPathRc)) {
+    logger.log("Loading configuration from .db2configrc");
+    return await fs.readJson(configPathRc);
+  } else if (await fs.pathExists(configPathJson)) {
+    logger.log("Loading configuration from db2config.json");
+    return await fs.readJson(configPathJson);
+  }
+
+  return {};
+};
+
+/**
  * Function to check if the driver is already installed.
+ * It checks the directory specified in configuration files or environment variables.
  * @param installDir - The directory to check for driver installation.
  * @returns {Promise<boolean>} - True if the driver is installed, false otherwise.
  */
@@ -329,13 +346,16 @@ export const installDriver = async (
   options: InstallOptions = {}
 ): Promise<void> => {
   try {
+    // Load configuration from .db2configrc or db2config.json
+    const config = await loadConfig();
+
     // Check if the license agreement has already been shown
     if (!process.env.LICENSE_AGREEMENT_SHOWN) {
       logger.log(LICENSE_AGREEMENT);
       process.env.LICENSE_AGREEMENT_SHOWN = "true"; // Set the environment variable
     }
 
-    const installDir = options.outputPath || getDefaultInstallDir();
+    const installDir = options.outputPath || getDefaultInstallDir(config);
     const clidriverDir = path.join(installDir, "clidriver");
 
     // Check if the driver is already installed

@@ -1,4 +1,6 @@
-// src/cli/cli.ts
+#!/usr/bin/env node
+
+// src/cli/db2-cli.ts
 
 import { Command } from "commander";
 import { installDriver } from "../install/install-driver";
@@ -32,22 +34,34 @@ const checkDriverInstallation = async (
 
 /**
  * Function to load the configuration file.
+ * This checks for both `.db2configrc` and `db2config.json`, giving
+ * precedence to `.db2configrc` if both are present.
  * @returns {Promise<CLIOptions>} - The current configuration options.
  */
 const loadConfig = async (): Promise<CLIOptions> => {
-  const configPath = path.resolve(process.cwd(), "config/db2-cli-config.json");
-  if (await fs.pathExists(configPath)) {
-    return await fs.readJson(configPath);
+  const db2ConfigRcPath = path.resolve(process.cwd(), ".db2configrc");
+  const db2ConfigJsonPath = path.resolve(process.cwd(), "db2config.json");
+
+  let config: CLIOptions = {};
+
+  if (await fs.pathExists(db2ConfigRcPath)) {
+    logger.log("Loading configuration from .db2configrc");
+    config = await fs.readJson(db2ConfigRcPath);
+  } else if (await fs.pathExists(db2ConfigJsonPath)) {
+    logger.log("Loading configuration from db2config.json");
+    config = await fs.readJson(db2ConfigJsonPath);
   }
-  return {};
+
+  return config;
 };
 
 /**
  * Function to save the configuration file.
+ * By default, saves to `db2config.json`.
  * @param options - The options to save.
  */
 const saveConfig = async (options: CLIOptions): Promise<void> => {
-  const configPath = path.resolve(process.cwd(), "config/db2-cli-config.json");
+  const configPath = path.resolve(process.cwd(), "db2config.json");
   await fs.writeJson(configPath, options, { spaces: 2 });
   logger.log("Configuration saved successfully.");
 };
@@ -316,9 +330,7 @@ Examples:
             logger.warn(`No configuration found for ${options.get}`);
           }
         } else if (options.reset) {
-          await fs.remove(
-            path.resolve(process.cwd(), "config/db2-cli-config.json")
-          );
+          await fs.remove(path.resolve(process.cwd(), "db2config.json"));
           logger.log("Configuration reset to default.");
         } else {
           logger.log("Current configuration:", config);
