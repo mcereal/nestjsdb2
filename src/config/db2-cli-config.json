@@ -1,0 +1,11 @@
+{
+  "downloadUrl": "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli",
+  "logLevel": "info",
+  "retries": 3,
+  "verbose": false,
+  "force": false,
+  "skipSslVerification": false,
+  "outputPath": "installer",
+  "checkOnly": false,
+  "dryRun": false
+}
