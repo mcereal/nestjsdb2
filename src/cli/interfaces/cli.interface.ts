@@ -1,4 +1,4 @@
-import { LogLevel } from "../../install/enums/install-driver.enum";
+import { LogLevel } from "../enums/install-driver.enum";
 
 export interface CLIOptions {
   downloadUrl?: string;
@@ -13,4 +13,5 @@ export interface CLIOptions {
   dryRun?: boolean;
   config?: string;
   installDir?: string;
+  version?: string;
 }

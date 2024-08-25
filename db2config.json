@@ -7,5 +7,6 @@
   "skipSslVerification": false,
   "outputPath": "installer",
   "checkOnly": false,
-  "dryRun": false
+  "dryRun": false,
+  "installDir": "/usr/local/bin"
 }
