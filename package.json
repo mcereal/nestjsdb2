@@ -4,9 +4,6 @@
   "description": "NestJS module for interacting with IBM DB2 databases",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "db2-cli": "./dist/cli/db2-cli.js"
-  },
   "scripts": {
     "build": "tsc",
     "install-driver": "ts-node src/cli/db2-cli.ts",
@@ -49,6 +46,8 @@
     "cache-manager": "^5.7.6",
     "commander": "^12.1.0",
     "fs-extra": "^11.2.0",
+    "ibm_db": "^3.2.4",
+    "jsonwebtoken": "^9.0.2",
     "kerberos": "^2.1.2",
     "reflect-metadata": "^0.1.13",
     "tar": "^7.4.3"

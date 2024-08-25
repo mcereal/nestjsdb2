@@ -39,7 +39,7 @@ export * from "./modules/db2.module"; // Export the main Db2Module
 export * from "./services/db2.service"; // Export the Db2Service
 export * from "./interfaces"; // Export necessary interfaces
 export * from "./enums"; // Export enums used in the module
-export * from "./query-builder/db2.query-builder"; // Export the query builder
+export * from "./db/db2-query-builder"; // Export the query builder
 export * from "./errors/db2.error"; // Export any custom errors
 export * from "./db/db2-connection"; // Export the custom Db2Connection
 export * from "./db/transaction-manager"; // Export the custom TransactionManager

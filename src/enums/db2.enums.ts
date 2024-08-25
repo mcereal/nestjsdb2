@@ -36,6 +36,7 @@
 export enum Db2ConnectionState {
   CONNECTED = "CONNECTED", // Successfully connected to the DB2 database
   DISCONNECTED = "DISCONNECTED", // Disconnected from the DB2 database
+  DISCONNECTING = "DISCONNECTING", // Currently disconnecting from the DB2 database
   ERROR = "ERROR", // An error has occurred with the DB2 connection
   CONNECTING = "CONNECTING", // Currently attempting to establish a connection
   RECONNECTING = "RECONNECTING", // Attempting to reconnect after a connection loss
