@@ -37,7 +37,11 @@ async function handleRosettaSetup() {
 
       if (userResponse.toLowerCase() === "y") {
         try {
-          execSync("sh ./macos-arm-setup.sh", { stdio: "inherit" });
+          const scriptPath = path.resolve(
+            __dirname,
+            "../../scripts/macos-arm-setup.sh"
+          );
+          execSync(`sh ${scriptPath}`, { stdio: "inherit" });
           logger.log("Rosetta setup completed successfully.");
         } catch (setupError) {
           logger.error(`Setup script failed: ${setupError.message}`);
