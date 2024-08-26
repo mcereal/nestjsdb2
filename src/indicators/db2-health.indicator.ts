@@ -6,8 +6,8 @@ import {
   HealthIndicatorResult,
   HealthCheckError,
 } from "@nestjs/terminus";
-import { Db2Service } from "../services/db2.service"; // Importing the Db2Service
-import { Db2ConnectionState } from "../enums/db2.enums"; // Importing Db2 connection states
+import { Db2Service } from "../services";
+import { Db2ConnectionState } from "../enums";
 
 /**
  * @class Db2HealthIndicator

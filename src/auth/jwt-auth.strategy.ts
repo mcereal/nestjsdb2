@@ -2,9 +2,9 @@
 
 import { Db2AuthStrategy } from "./db2-auth.strategy";
 import { Db2AuthOptions } from "../interfaces/db2.interface";
-import { Db2Error } from "../errors/db2.error";
+import { Db2AuthenticationError, Db2Error } from "../errors/";
 import { Db2Client } from "../db/db2-client";
-import { Db2ConnectionState } from "../enums/db2.enums";
+import { Db2ConnectionState } from "../enums";
 import { Logger } from "@nestjs/common";
 import { verify } from "jsonwebtoken";
 
@@ -37,7 +37,7 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
     } catch (error) {
       this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
       this.logger.error("JWT authentication failed:", error.message);
-      throw new Db2Error("JWT authentication failed.");
+      throw new Db2AuthenticationError("JWT authentication failed.");
     }
   }
 }

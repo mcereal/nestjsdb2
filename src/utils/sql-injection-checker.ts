@@ -3,7 +3,7 @@
 import {
   SqlInjectionCheckerOptions,
   SqlInjectionCheckerInterface,
-} from "src/interfaces";
+} from "../interfaces";
 
 export class SqlInjectionChecker implements SqlInjectionCheckerInterface {
   private readonly options: SqlInjectionCheckerOptions;

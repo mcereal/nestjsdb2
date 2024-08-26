@@ -1,7 +1,7 @@
 // src/decorators/db2-connection-state.decorator.ts
 
-import { Db2Service } from "src/services/db2.service";
-import { Db2ConnectionState } from "src/enums/db2.enums";
+import { Db2Service } from "../services";
+import { Db2ConnectionState } from "../enums";
 import { Logger } from "@nestjs/common";
 
 /**

@@ -3,10 +3,12 @@
 import { Logger } from "@nestjs/common";
 import { promises as fs } from "fs";
 import { join } from "path";
-import { Db2MigrationOptions } from "../interfaces/db2.interface";
-import { formatDb2Error } from "../utils/db2.utils";
-import { Db2Client } from "src/db/db2-client";
-import { Db2MigrationServiceInterface } from "../interfaces";
+import {
+  Db2MigrationOptions,
+  Db2MigrationServiceInterface,
+} from "../interfaces";
+import { Db2Client } from "../db";
+import { handleDb2Error } from "../errors";
 
 export class Db2MigrationService implements Db2MigrationServiceInterface {
   private readonly logger = new Logger(Db2MigrationService.name);
@@ -43,10 +45,9 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       const migrationFiles = await this.loadMigrationFiles();
 
       for (const file of migrationFiles) {
-        // Check if migration should be ignored
         if (
           this.migrationConfig.ignoreExecuted &&
-          this.migrationConfig.tableName && // Check only if tableName is defined
+          this.migrationConfig.tableName &&
           (await this.isMigrationExecuted(file))
         ) {
           this.logger.log(`Skipping executed migration: ${file}`);
@@ -78,14 +79,15 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
 
           this.logger.log(`Migration applied successfully: ${file}`);
         } catch (error) {
-          if (this.migrationConfig.logErrors) {
-            formatDb2Error(
-              error,
-              `Migration script: ${file}`,
-              { file },
-              this.logger
-            );
-          }
+          handleDb2Error(
+            error,
+            `Migration script: ${file}`,
+            {
+              host: this.db2Client.getHost(),
+              database: this.db2Client.getDatabase(),
+            },
+            this.logger
+          );
 
           if (this.migrationConfig.skipOnFail) {
             this.logger.warn(
@@ -103,7 +105,15 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         }
       }
     } catch (error) {
-      formatDb2Error(error, "Migration process", {}, this.logger);
+      handleDb2Error(
+        error,
+        "Migration process",
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
+      );
       throw error;
     }
   }
@@ -118,10 +128,15 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         .filter((file) => file.endsWith(this.migrationConfig.fileExtension))
         .map((file) => join(this.migrationConfig.migrationDir, file));
     } catch (error) {
-      const formattedError = formatDb2Error(error, "Loading migration files");
-      if (this.migrationConfig.logErrors) {
-        this.logger.error(formattedError);
-      }
+      handleDb2Error(
+        error,
+        "Loading migration files",
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
+      );
 
       if (this.migrationConfig.ignoreMissing) {
         this.logger.warn(
@@ -138,7 +153,6 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
    * Checks if a migration file has already been executed.
    */
   private async isMigrationExecuted(file: string): Promise<boolean> {
-    // Return false if tableName is not provided
     if (!this.migrationConfig.tableName) {
       return false;
     }
@@ -153,18 +167,23 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       const result = await this.db2Client.query<{ count: number }>(sql, [file]);
       return result.count > 0;
     } catch (error) {
-      const formattedError = formatDb2Error(
+      handleDb2Error(
         error,
-        "Checking if migration is executed"
+        "Checking if migration is executed",
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
       );
-      this.logger.error(formattedError);
+
       if (this.migrationConfig.ignoreErrors) {
         this.logger.warn(
-          `Ignoring error and continuing. Error: ${formattedError}`
+          `Ignoring error and continuing. Error: ${error.message}`
         );
         return false;
       }
-      throw new Error(formattedError);
+      throw error;
     }
   }
 
@@ -172,7 +191,6 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
    * Marks a migration file as executed in the tracking table.
    */
   private async markMigrationAsExecuted(file: string): Promise<void> {
-    // Do nothing if tableName is not provided
     if (!this.migrationConfig.tableName) {
       return;
     }
@@ -186,18 +204,23 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       await this.db2Client.query(sql, [file]);
       this.logger.log(`Migration marked as executed: ${file}`);
     } catch (error) {
-      const formattedError = formatDb2Error(
+      handleDb2Error(
         error,
-        "Marking migration as executed"
+        "Marking migration as executed",
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
       );
-      this.logger.error(formattedError);
+
       if (this.migrationConfig.ignoreErrors) {
         this.logger.warn(
-          `Ignoring error and continuing. Error: ${formattedError}`
+          `Ignoring error and continuing. Error: ${error.message}`
         );
         return;
       }
-      throw new Error(formattedError);
+      throw error;
     }
   }
 }

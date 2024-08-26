@@ -4,7 +4,7 @@ import SQL_ATTR_ROWCOUNT_PREFETCH, { Pool, Connection } from "ibm_db";
 import { appendFileSync } from "fs";
 import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Db2ClientInterface, Db2ConfigOptions } from "../interfaces";
-import { Db2ConnectionState } from "../enums/db2.enums";
+import { Db2ConnectionState } from "../enums";
 import {
   Db2AuthenticationError,
   Db2ConnectionError,
@@ -13,10 +13,10 @@ import {
   Db2QuerySyntaxError,
   Db2TimeoutError,
   Db2TransactionError,
+  formatDb2Error,
 } from "../errors";
-import { Db2AuthStrategy } from "src/auth/db2-auth.strategy";
-import { createAuthStrategy } from "src/auth/auth-factory";
-import { formatDb2Error } from "src/errors/db2.error";
+import { Db2AuthStrategy } from "../auth/db2-auth.strategy";
+import { createAuthStrategy } from "../auth/auth-factory";
 export class Db2Client
   implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
 {
@@ -320,6 +320,16 @@ export class Db2Client
 
   public getConfig(): Db2ConfigOptions {
     return this.config;
+  }
+
+  // Getter method for host
+  public getHost(): string {
+    return this.config.host;
+  }
+
+  // Getter method for database
+  public getDatabase(): string {
+    return this.config.database;
   }
 
   /**

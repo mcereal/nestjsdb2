@@ -13,24 +13,12 @@ import {
   Db2ConfigOptions,
   Db2ServiceInterface,
 } from "../interfaces";
-import { Db2ConnectionState } from "../enums/db2.enums";
-import { Db2QueryBuilder } from "../db/db2-query-builder";
-import { formatDb2Error } from "src/utils/db2.utils";
-import {
-  Db2AuthenticationError,
-  Db2ConnectionError,
-  Db2Error,
-  Db2PoolError,
-  Db2QuerySyntaxError,
-  Db2TimeoutError,
-  Db2TransactionError,
-  handleDb2Error,
-} from "../../src/errors/db2.error";
+import { Db2ConnectionState } from "../enums";
+import { Db2QueryBuilder, Db2Client, TransactionManager } from "../db";
+import { handleDb2Error } from "../errors";
 import { Cache, caching } from "cache-manager";
 import { redisStore } from "cache-manager-redis-yet";
-import { Db2Client } from "src/db/db2-client";
-import { TransactionManager } from "../db/transaction-manager";
-import { Db2MigrationService } from "./migration.service";
+import { Db2MigrationService } from "./";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 
 @Injectable()
@@ -95,7 +83,16 @@ export class Db2Service
     try {
       await this.client.drainPool();
     } catch (error) {
-      this.handleError(error, "Drain Pool during Module Destroy");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(
+        error,
+        "Drain Pool during Module Destroy",
+        options,
+        this.logger
+      );
     }
 
     try {
@@ -483,51 +480,6 @@ export class Db2Service
     }
     if (options.auth.authType === "kerberos" && !options.auth.krbServiceName) {
       throw new Error("Kerberos authentication requires a service name.");
-    }
-  }
-
-  private handleError(error: any, context: string): void {
-    const formattedError = formatDb2Error(
-      error,
-      context,
-      {
-        host: this.options.host,
-        database: this.options.database,
-      },
-      this.logger
-    );
-
-    // Check the type of error and throw the appropriate custom error
-    if (error instanceof Db2QuerySyntaxError) {
-      this.logger.error(`Syntax Error in ${context}:`, formattedError);
-      throw new Db2QuerySyntaxError(formattedError, error.metadata);
-    } else if (error instanceof Db2TimeoutError) {
-      this.logger.error(`Timeout Error in ${context}:`, formattedError);
-      throw new Db2TimeoutError(formattedError, error.metadata);
-    } else if (error instanceof Db2ConnectionError) {
-      this.logger.error(`Connection Error in ${context}:`, formattedError);
-      throw new Db2ConnectionError(formattedError, error.metadata);
-    } else if (error instanceof Db2AuthenticationError) {
-      this.logger.error(`Authentication Error in ${context}:`, formattedError);
-      throw new Db2AuthenticationError(formattedError, error.metadata);
-    } else if (error instanceof Db2TransactionError) {
-      this.logger.error(`Transaction Error in ${context}:`, formattedError);
-      throw new Db2TransactionError(formattedError, error.metadata);
-    } else if (error instanceof Db2PoolError) {
-      this.logger.error(`Pool Error in ${context}:`, formattedError);
-      throw new Db2PoolError(formattedError, error.metadata);
-    } else if (error instanceof Db2Error) {
-      this.logger.error(`Db2 Error in ${context}:`, formattedError);
-      throw new Db2Error(formattedError, JSON.stringify(error.metadata));
-    } else {
-      // Fallback for unknown errors
-      this.logger.error(`Unknown Error in ${context}:`, formattedError);
-      throw new Db2Error(
-        `Unknown error occurred in ${context}`,
-        JSON.stringify({
-          originalError: formattedError,
-        })
-      );
     }
   }
 }

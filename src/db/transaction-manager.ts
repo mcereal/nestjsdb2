@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { Db2ClientInterface, TransactionManagerInterface } from "../interfaces";
-import { Db2Error } from "../errors/db2.error";
+import { Db2Error } from "../errors";
 import { Db2IsolationLevel } from "../enums";
 
 export class TransactionManager implements TransactionManagerInterface {

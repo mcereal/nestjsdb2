@@ -1,6 +1,6 @@
 // src/interfaces/db2.interface.ts
 
-import { Db2IsolationLevel } from "src/enums";
+import { Db2IsolationLevel } from "../enums";
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
  */

@@ -1,6 +1,6 @@
-import { Db2ConnectionState } from "src/enums";
+import { Db2ConnectionState } from "../enums";
 import { Connection } from "ibm_db";
-import { Db2ConfigOptions } from "./db2.interface";
+import { Db2ConfigOptions } from "./";
 
 export interface Db2ClientInterface {
   // Lifecycle hooks
@@ -41,6 +41,8 @@ export interface Db2ClientInterface {
 
   // Configuration methods
   getConfig(): Db2ConfigOptions;
+  getHost(): string;
+  getDatabase(): string;
   buildConnectionString(config: Db2ConfigOptions): string;
 
   // Pool size management

@@ -1,9 +1,7 @@
 import { Module, DynamicModule, Provider } from "@nestjs/common";
-import { Db2Service } from "../services/db2.service";
-import { Db2Client } from "../db/db2-client";
-import { TransactionManager } from "../db/transaction-manager";
-import { Db2MigrationService } from "../services/migration.service";
-import { Db2ConfigOptions } from "../interfaces/db2.interface";
+import { Db2Service, Db2MigrationService } from "../services";
+import { Db2Client, TransactionManager } from "../db";
+import { Db2ConfigOptions } from "../interfaces";
 import {
   CACHE_MANAGER,
   CacheModule,

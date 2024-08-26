@@ -2,7 +2,7 @@
 
 import { Db2AuthStrategy } from "./db2-auth.strategy";
 import { Db2AuthOptions } from "../interfaces/db2.interface";
-import { Db2Error } from "../errors/db2.error";
+import { Db2AuthenticationError } from "../errors";
 import { Db2Client } from "../db/db2-client";
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Logger } from "@nestjs/common";
@@ -27,7 +27,9 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
     } catch (error) {
       this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
       this.logger.error("Password authentication failed:", error.message);
-      throw new Db2Error("Authentication failed during password strategy");
+      throw new Db2AuthenticationError(
+        "Authentication failed during password strategy"
+      );
     }
   }
 }
