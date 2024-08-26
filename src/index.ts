@@ -10,3 +10,4 @@ export * from "./utils"; // Export any utility functions and classes
 export * from "./indicators"; // Export any performance indicators
 export * from "./db"; // Export the database client and related classes
 export * from "./auth"; // Export the authentication functions
+export * from "./metadata"; // Export the metadata storage classes

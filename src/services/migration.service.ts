@@ -1,4 +1,4 @@
-// src/migration/migration.service.ts
+// migration/migration.service.ts
 
 import { Logger } from "@nestjs/common";
 import { promises as fs } from "fs";
@@ -9,6 +9,7 @@ import {
 } from "../interfaces";
 import { Db2Client } from "../db";
 import { handleDb2Error } from "../errors";
+import { EntityMetadataStorage, EntityMetadata } from "../metadata";
 
 export class Db2MigrationService implements Db2MigrationServiceInterface {
   private readonly logger = new Logger(Db2MigrationService.name);
@@ -32,8 +33,27 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       return;
     }
 
-    if (this.migrationConfig.runOnStart) {
+    if (!this.migrationConfig.runOnStart) {
+      this.logger.log(
+        "Migrations are not configured to run on start. Skipping migration execution."
+      );
+      return;
+    }
+
+    // Proceed with migration execution
+    try {
       await this.executeMigrations();
+    } catch (error) {
+      handleDb2Error(
+        error,
+        "Migration process",
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
+      );
+      throw error;
     }
   }
 
@@ -42,65 +62,55 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
    */
   private async executeMigrations(): Promise<void> {
     try {
+      // Load and execute migration files if configured
       const migrationFiles = await this.loadMigrationFiles();
-
       for (const file of migrationFiles) {
-        if (
-          this.migrationConfig.ignoreExecuted &&
-          this.migrationConfig.tableName &&
-          (await this.isMigrationExecuted(file))
-        ) {
-          this.logger.log(`Skipping executed migration: ${file}`);
-          continue;
-        }
+        await this.executeMigrationFile(file);
+      }
 
-        const script = await fs.readFile(file, "utf-8");
+      // Execute metadata-driven migrations
+      const entities = EntityMetadataStorage.getEntities();
+      for (const entity of entities) {
+        const metadata = EntityMetadataStorage.getEntityMetadata(entity);
+        const createTableSQL = this.generateCreateTableSQL(metadata);
 
+        // Execute or log the SQL script as required
         if (this.migrationConfig.dryRun) {
           this.logger.log(
-            `Dry run enabled. Migration script not executed: ${file}`
+            `Dry run enabled. Migration script not executed: ${createTableSQL}`
           );
-          continue;
-        }
-
-        try {
-          if (this.migrationConfig.logQueries) {
-            this.logger.log(`Executing migration script: ${file}`);
-          }
-
-          await this.db2Client.query(script);
-
-          if (
-            this.migrationConfig.markAsExecuted &&
-            this.migrationConfig.tableName
-          ) {
-            await this.markMigrationAsExecuted(file);
-          }
-
-          this.logger.log(`Migration applied successfully: ${file}`);
-        } catch (error) {
-          handleDb2Error(
-            error,
-            `Migration script: ${file}`,
-            {
-              host: this.db2Client.getHost(),
-              database: this.db2Client.getDatabase(),
-            },
-            this.logger
-          );
-
-          if (this.migrationConfig.skipOnFail) {
-            this.logger.warn(
-              `Skipping remaining migrations due to error in: ${file}`
+        } else {
+          try {
+            this.logger.log(
+              `Executing migration script for table: ${metadata.tableName}`
             );
-            break;
-          } else if (this.migrationConfig.ignoreErrors) {
-            this.logger.warn(
-              `Ignoring error in migration: ${file} and continuing.`
+            await this.db2Client.query(createTableSQL);
+            this.logger.log(
+              `Migration for table ${metadata.tableName} applied successfully.`
             );
-            continue;
-          } else {
-            throw error;
+          } catch (error) {
+            handleDb2Error(
+              error,
+              `Migration script for table: ${metadata.tableName}`,
+              {
+                host: this.db2Client.getHost(),
+                database: this.db2Client.getDatabase(),
+              },
+              this.logger
+            );
+            if (this.migrationConfig.skipOnFail) {
+              this.logger.warn(
+                `Skipping remaining migrations due to error in table: ${metadata.tableName}`
+              );
+              break;
+            } else if (this.migrationConfig.ignoreErrors) {
+              this.logger.warn(
+                `Ignoring error in migration for table: ${metadata.tableName} and continuing.`
+              );
+              continue;
+            } else {
+              throw error;
+            }
           }
         }
       }
@@ -116,6 +126,79 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       );
       throw error;
     }
+  }
+
+  /**
+   * Generates the SQL script for creating a table based on entity metadata.
+   */
+  private generateCreateTableSQL(metadata: EntityMetadata): string {
+    let sql = `CREATE TABLE ${metadata.tableName} (`;
+
+    // Define columns
+    const columnDefinitions = metadata.columns.map((column) => {
+      let columnDef = `${String(
+        column.propertyKey
+      )} ${column.type.toUpperCase()}`;
+      if (column.length) columnDef += `(${column.length})`;
+      if (column.nullable === false) columnDef += ` NOT NULL`;
+      if (
+        metadata.defaultValues.some(
+          (def) => def.propertyKey === column.propertyKey
+        )
+      ) {
+        const defaultValue = metadata.defaultValues.find(
+          (def) => def.propertyKey === column.propertyKey
+        ).value;
+        columnDef += ` DEFAULT ${defaultValue}`;
+      }
+      return columnDef;
+    });
+
+    sql += columnDefinitions.join(", ");
+
+    // Define primary keys
+    if (metadata.primaryKeys.length) {
+      sql += `, PRIMARY KEY (${metadata.primaryKeys.join(", ")})`;
+    }
+
+    // Define unique constraints
+    if (metadata.uniqueColumns.length) {
+      metadata.uniqueColumns.forEach((uniqueColumn) => {
+        sql += `, UNIQUE (${uniqueColumn})`;
+      });
+    }
+
+    // Define foreign keys
+    if (metadata.foreignKeys.length) {
+      metadata.foreignKeys.forEach((fk) => {
+        sql += `, FOREIGN KEY (${String(fk.propertyKey)}) REFERENCES ${
+          fk.reference
+        }`;
+        if (fk.onDelete) {
+          sql += ` ON DELETE ${fk.onDelete}`;
+        }
+      });
+    }
+
+    // Define check constraints
+    if (metadata.checkConstraints.length) {
+      metadata.checkConstraints.forEach((check) => {
+        sql += `, CHECK (${check.constraint})`;
+      });
+    }
+
+    sql += ");";
+
+    // Define indexes
+    if (metadata.indexedColumns.length) {
+      metadata.indexedColumns.forEach((indexedColumn) => {
+        sql += ` CREATE INDEX idx_${metadata.tableName}_${String(
+          indexedColumn
+        )} ON ${metadata.tableName} (${String(indexedColumn)});`;
+      });
+    }
+
+    return sql;
   }
 
   /**
@@ -150,6 +233,68 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
   }
 
   /**
+   * Executes a migration file.
+   */
+  private async executeMigrationFile(file: string): Promise<void> {
+    if (
+      this.migrationConfig.ignoreExecuted &&
+      this.migrationConfig.tableName &&
+      (await this.isMigrationExecuted(file))
+    ) {
+      this.logger.log(`Skipping executed migration: ${file}`);
+      return;
+    }
+
+    const script = await fs.readFile(file, "utf-8");
+
+    if (this.migrationConfig.dryRun) {
+      this.logger.log(
+        `Dry run enabled. Migration script not executed: ${file}`
+      );
+      return;
+    }
+
+    try {
+      if (this.migrationConfig.logQueries) {
+        this.logger.log(`Executing migration script: ${file}`);
+      }
+
+      await this.db2Client.query(script);
+
+      if (
+        this.migrationConfig.markAsExecuted &&
+        this.migrationConfig.tableName
+      ) {
+        await this.markMigrationAsExecuted(file);
+      }
+
+      this.logger.log(`Migration applied successfully: ${file}`);
+    } catch (error) {
+      handleDb2Error(
+        error,
+        `Migration script: ${file}`,
+        {
+          host: this.db2Client.getHost(),
+          database: this.db2Client.getDatabase(),
+        },
+        this.logger
+      );
+
+      if (this.migrationConfig.skipOnFail) {
+        this.logger.warn(
+          `Skipping remaining migrations due to error in: ${file}`
+        );
+      } else if (this.migrationConfig.ignoreErrors) {
+        this.logger.warn(
+          `Ignoring error in migration: ${file} and continuing.`
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Checks if a migration file has already been executed.
    */
   private async isMigrationExecuted(file: string): Promise<boolean> {
@@ -157,11 +302,7 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       return false;
     }
 
-    const sql = `
-        SELECT COUNT(*) AS count 
-        FROM ${this.migrationConfig.tableName} 
-        WHERE migration_file = ?
-    `;
+    const sql = `SELECT COUNT(*) AS count FROM ${this.migrationConfig.tableName} WHERE migration_file = ?`;
 
     try {
       const result = await this.db2Client.query<{ count: number }>(sql, [file]);
@@ -195,10 +336,7 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
       return;
     }
 
-    const sql = `
-        INSERT INTO ${this.migrationConfig.tableName} (migration_file) 
-        VALUES (?)
-    `;
+    const sql = `INSERT INTO ${this.migrationConfig.tableName} (migration_file) VALUES (?)`;
 
     try {
       await this.db2Client.query(sql, [file]);
