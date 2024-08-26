@@ -7,6 +7,7 @@ import {
   OnModuleDestroy,
 } from "@nestjs/common";
 import {
+  Db2CacheOptions,
   Db2ConfigOptions,
   Db2ConnectionInterface,
 } from "../interfaces/db2.interface";
@@ -14,9 +15,11 @@ import { Db2ConnectionState } from "../enums/db2.enums";
 import { Db2QueryBuilder } from "../db/db2-query-builder";
 import { formatDb2Error } from "src/utils/db2.utils";
 import { Db2Error } from "../../src/errors/db2.error";
-import { Cache } from "cache-manager";
+import { Cache, caching } from "cache-manager";
+import { redisStore } from "cache-manager-redis-yet";
 import { Db2Client } from "src/db/db2-client";
 import { TransactionManager } from "../db/transaction-manager";
+import { Db2MigrationService } from "./migration.service";
 
 @Injectable()
 export class Db2Service
@@ -26,6 +29,7 @@ export class Db2Service
   private client: Db2Client;
   private cache?: Cache;
   private transactionManager: TransactionManager;
+  private migrationService: Db2MigrationService;
 
   private options: Db2ConfigOptions;
 
@@ -34,19 +38,56 @@ export class Db2Service
     this.cache = cache;
     this.client = new Db2Client(this.options);
     this.transactionManager = new TransactionManager(this.client);
+
+    if (options.cache?.enabled) {
+      this.initializeCache(options.cache);
+    }
+
+    // Initialize the migration service with migration configuration
+    if (options.migration) {
+      this.migrationService = new Db2MigrationService(this, options.migration);
+    }
   }
 
   async onModuleInit(): Promise<void> {
     this.logger.log("Initializing Db2Service...");
     this.validateConfig(this.options);
     await this.connect();
+
+    // Run migrations if enabled
+    if (this.options.migration?.enabled) {
+      try {
+        await this.migrationService.runMigrations();
+        this.logger.log("Migrations completed successfully.");
+      } catch (error) {
+        this.logger.error("Failed to run migrations:", error.message);
+        throw error; // Optionally handle this according to your error-handling strategy
+      }
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
     this.logger.log("Destroying Db2Service...");
     try {
+      // Drain the connection pool and disconnect the DB2 client
       await this.client.drainPool();
-      await this.disconnect();
+      await this.client.disconnect();
+
+      // Check if caching is enabled and perform cache cleanup
+      if (this.cache) {
+        // Check the configuration to see if we should reset the cache on destroy
+        if (this.options.cache?.resetOnDestroy) {
+          await this.cache.reset(); // Clears all cached data
+          this.logger.log("Cache reset successfully.");
+        }
+
+        // Check if the store has a disconnect method (e.g., Redis store)
+        const cacheStore = this.cache.store as any;
+        if (typeof cacheStore.disconnect === "function") {
+          await cacheStore.disconnect();
+          this.logger.log("Cache store connection closed.");
+        }
+      }
     } catch (error) {
       this.handleError(error, "Module Destroy");
     }
@@ -66,6 +107,23 @@ export class Db2Service
 
   createQueryBuilder(): Db2QueryBuilder {
     return new Db2QueryBuilder();
+  }
+
+  private async initializeCache(cacheOptions: Db2CacheOptions): Promise<void> {
+    if (cacheOptions.store === "redis") {
+      this.cache = await caching(redisStore, {
+        host: cacheOptions.redisHost,
+        port: cacheOptions.redisPort,
+        password: cacheOptions.redisPassword,
+        ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
+      });
+    } else {
+      // Default to in-memory cache
+      this.cache = await caching("memory", {
+        max: cacheOptions.max || 100, // Default max items
+        ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
+      });
+    }
   }
 
   async runMigration(script: string): Promise<void> {
@@ -128,16 +186,24 @@ export class Db2Service
     params: any[] = [],
     timeout?: number
   ): Promise<T> {
-    const startTime = Date.now();
-    try {
-      const result = await this.client.query<T>(sql, params, timeout);
-      this.logQueryDetails(sql, params, Date.now() - startTime);
-      return result;
-    } catch (error) {
-      this.logQueryDetails(sql, params, Date.now() - startTime, error);
-      this.handleError(error, "Query");
-      throw error;
+    if (this.cache) {
+      const cacheKey = this.generateCacheKey(sql, params);
+      const cachedResult = await this.cache.get<T>(cacheKey);
+      if (cachedResult) {
+        this.logger.log(`Cache hit for query: ${sql}`);
+        return cachedResult;
+      }
     }
+
+    const result = await this.client.query<T>(sql, params, timeout);
+
+    if (this.cache) {
+      const cacheKey = this.generateCacheKey(sql, params);
+      await this.cache.set(cacheKey, result);
+      this.logger.log(`Cache set for query: ${sql}`);
+    }
+
+    return result;
   }
 
   async beginTransaction(): Promise<void> {

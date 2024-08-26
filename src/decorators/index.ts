@@ -7,18 +7,26 @@
  * of the module to easily import and use the decorators in their applications.
  *
  * @requires CacheResult from "./cache-result.decorator"
- * @requires Db2ConnectionState from "./db2-connection-state.decorator"
- * @requires Db2Param from "./db2-param.decorator"
- * @requires Db2Query from "./db2-query.decorator"
- * @requires Db2RetryOperation from "./db2-retry-operation.decorator"
- * @requires Db2Transaction from "./db2-transaction.decorator"
- * @requires LogExecutionTime from "./log-execution-time.decorator"
+ * @requires Db2ConnectionState from "./connection-state.decorator"
+ * @requires Db2Param from "./param.decorator"
+ * @requires Db2Query from "./query.decorator"
+ * @requires Db2RetryOperation from "./retry-operation.decorator"
+ * @requires Db2Transaction from "./transaction.decorator"
+ * @requires LogExecutionTime from "./execution-time.decorator"
+ * @requires Db2Transaction from "./transaction.decorator"
+ * @requires Db2Audit from "./audit.decorator"
+ * @requires Db2Pagination from "./pagination.decorator"
+ * 
+
  */
 
 export * from "./cache-result.decorator";
-export * from "./db2-connection-state.decorator";
-export * from "./db2-param.decorator";
-export * from "./db2-query.decorator";
-export * from "./db2-retry-operation.decorator";
-export * from "./db2-transaction.decorator";
+export * from "./connection-state.decorator";
+export * from "./param.decorator";
+export * from "./query.decorator";
+export * from "./retry-operation.decorator";
+export * from "./transaction.decorator";
 export * from "./log-execution-time.decorator";
+export * from "./audit.decorator";
+export * from "./pagination.decorator";
+export * from "./transaction.decorator";

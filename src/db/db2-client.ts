@@ -1,6 +1,6 @@
 // src/db/db2-client.ts
 
-import * as ibmdb from "ibm_db";
+import SQL_ATTR_ROWCOUNT_PREFETCH, { Pool, Connection } from "ibm_db";
 import {
   Db2ConnectionInterface,
   Db2ConfigOptions,
@@ -13,8 +13,8 @@ import { Db2AuthStrategy } from "src/auth/db2-auth.strategy";
 import { createAuthStrategy } from "src/auth/auth-factory";
 
 export class Db2Client implements Db2ConnectionInterface {
-  private pool: ibmdb.Pool;
-  private connection: ibmdb.Connection | null = null;
+  private pool: Pool;
+  private connection: Connection | null = null;
   private config: Db2ConfigOptions;
   private authStrategy: Db2AuthStrategy;
   private logger = new Logger(Db2Client.name);
@@ -27,8 +27,10 @@ export class Db2Client implements Db2ConnectionInterface {
   constructor(config: Db2ConfigOptions) {
     this.config = {
       ...config,
-      maxReconnectAttempts: config.maxReconnectAttempts ?? 3, // Default to 3 attempts
-      reconnectInterval: config.reconnectInterval ?? 5000, // Default to 5000ms
+      retry: {
+        maxReconnectAttempts: config.retry?.maxReconnectAttempts ?? 3, // Default to 3 attempts
+        reconnectInterval: config.retry?.reconnectInterval ?? 5000, // Default to 5 seconds
+      },
       connectionTimeout: config.connectionTimeout ?? 30000, // Default to 30 seconds
       idleTimeout: config.idleTimeout ?? 60000, // Default to 1 minute
       maxLifetime: config.maxLifetime ?? 1800000, // Default to 30 minutes
@@ -37,12 +39,14 @@ export class Db2Client implements Db2ConnectionInterface {
       queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
       prefetchSize: config.prefetchSize ?? 10, // Default to 10 rows
       characterEncoding: config.characterEncoding ?? "UTF-8", // Default to UTF-8
-      logQueries: config.logQueries ?? false, // Default to false
-      logErrors: config.logErrors ?? true, // Default to true
-      profileSql: config.profileSql ?? false, // Default to false
+      logging: {
+        logQueries: config.logging?.logQueries ?? false, // Default to false
+        logErrors: config.logging?.logErrors ?? true, // Default to true
+        profileSql: config.logging?.profileSql ?? false, // Default to false
+      },
     };
     this.authStrategy = createAuthStrategy(config.auth, this);
-    this.pool = new ibmdb.Pool({
+    this.pool = new Pool({
       minPoolSize: config.minPoolSize || 1, // Default to 1 if not set
       maxPoolSize: config.maxPoolSize || 10, // Default to 10 if not set
     });
@@ -51,6 +55,8 @@ export class Db2Client implements Db2ConnectionInterface {
   onModuleInit() {
     // Start idle timeout checks when the module initializes
     this.startIdleTimeoutCheck();
+    // Start pool monitoring
+    this.startPoolMonitoring();
   }
 
   onModuleDestroy() {
@@ -135,8 +141,8 @@ export class Db2Client implements Db2ConnectionInterface {
     this.currentReconnectAttempts++;
 
     // Log reconnect attempts
-    const maxReconnectAttempts = this.config.maxReconnectAttempts || 3;
-    const reconnectInterval = this.config.reconnectInterval || 5000;
+    const maxReconnectAttempts = this.config.retry?.maxReconnectAttempts || 3;
+    const reconnectInterval = this.config.retry?.reconnectInterval || 5000;
 
     if (this.currentReconnectAttempts <= maxReconnectAttempts) {
       this.logger.warn(
@@ -146,14 +152,14 @@ export class Db2Client implements Db2ConnectionInterface {
       await this.reconnect(); // Attempt to reconnect
     } else {
       // Attempt failover to secondary host if configured
-      if (this.config.failoverHost) {
+      if (this.config.retry?.failoverHost) {
         this.logger.warn("Failing over to secondary database host...");
         const originalHost = this.config.host;
         const originalPort = this.config.port;
 
         // Update config to use failover host
-        this.config.host = this.config.failoverHost;
-        this.config.port = this.config.failoverPort || this.config.port;
+        this.config.host = this.config.retry?.failoverHost;
+        this.config.port = this.config.retry?.failoverPort || this.config.port;
 
         try {
           await this.reconnect(); // Attempt to connect to failover host
@@ -223,9 +229,7 @@ export class Db2Client implements Db2ConnectionInterface {
    * @param connStr The connection string for the Db2 database.
    * @returns A promise that resolves to a connection from the pool.
    */
-  public async getConnectionFromPool(
-    connStr: string
-  ): Promise<ibmdb.Connection> {
+  public async getConnectionFromPool(connStr: string): Promise<Connection> {
     return new Promise((resolve, reject) => {
       const acquireTimeout = this.config.acquireTimeoutMillis || 30000; // Default to 30 seconds
 
@@ -273,7 +277,7 @@ export class Db2Client implements Db2ConnectionInterface {
     this.logger.log(`Db2 connection state changed to: ${state}`);
   }
 
-  public async releaseConnection(connection: ibmdb.Connection): Promise<void> {
+  public async releaseConnection(connection: Connection): Promise<void> {
     return new Promise((resolve, reject) => {
       this.state = Db2ConnectionState.DISCONNECTING; // New state to show disconnection in progress
       this.pool.close(connection, (err) => {
@@ -318,7 +322,7 @@ export class Db2Client implements Db2ConnectionInterface {
         }
 
         const prefetchSize = this.config.prefetchSize || 10; // Default to 10 rows if not specified
-        stmt.setAttr(ibmdb.SQL_ATTR_ROWCOUNT_PREFETCH, prefetchSize);
+        stmt.setAttr(SQL_ATTR_ROWCOUNT_PREFETCH, prefetchSize);
 
         const startTime = Date.now();
         stmt.execute(params, (error, result) => {
@@ -328,7 +332,7 @@ export class Db2Client implements Db2ConnectionInterface {
             reject(new Db2Error("Query execution failed"));
           } else {
             const duration = Date.now() - startTime;
-            if (this.config.profileSql) {
+            if (this.config.logging?.profileSql) {
               this.logger.debug(`Query executed in ${duration}ms: ${sql}`);
             }
             resolve(result);
@@ -349,7 +353,7 @@ export class Db2Client implements Db2ConnectionInterface {
    * @param params The query parameters to log.
    */
   private logQuery(message: string, params: any[]) {
-    if (this.config.logQueries) {
+    if (this.config.logging?.logQueries) {
       const logMessage = `${message} | Params: ${JSON.stringify(params)}`;
       this.logger.log(logMessage);
       this.writeTraceLog(logMessage);
@@ -362,7 +366,7 @@ export class Db2Client implements Db2ConnectionInterface {
    * @param error The error object to log.
    */
   private logError(message: string, error: Error) {
-    if (this.config.logErrors) {
+    if (this.config.logging?.logErrors) {
       const logMessage = `${message}: ${error.message}`;
       this.logger.error(logMessage);
       this.writeTraceLog(logMessage);
@@ -370,14 +374,26 @@ export class Db2Client implements Db2ConnectionInterface {
   }
 
   /**
+   * Logs the current pool status, including active and idle connections.
+   */
+  public logPoolStatus(): void {
+    const activeConnections = this.getActiveConnectionsCount();
+    const totalConnections = this.getTotalConnectionsCount();
+
+    this.logger.log(
+      `Connection Pool Status: Active=${activeConnections}, Total=${totalConnections}`
+    );
+  }
+
+  /**
    * Writes trace logs to a file if a trace file path is configured.
    * @param message The trace message to write.
    */
   private writeTraceLog(message: string) {
-    if (this.config.traceFilePath) {
+    if (this.config.logging?.traceFilePath) {
       try {
         appendFileSync(
-          this.config.traceFilePath,
+          this.config.logging?.traceFilePath,
           `${new Date().toISOString()} - ${message}\n`
         );
       } catch (err) {
@@ -387,16 +403,74 @@ export class Db2Client implements Db2ConnectionInterface {
   }
 
   /**
+   * Adjusts the connection pool size based on the current load.
+   * @param activeConnectionsThreshold The threshold for active connections.
+   * @param minPoolSize The new minimum pool size if threshold is exceeded.
+   * @param maxPoolSize The new maximum pool size if threshold is exceeded.
+   */
+  public adjustPoolSizeBasedOnLoad(
+    activeConnectionsThreshold: number,
+    minPoolSize: number,
+    maxPoolSize: number
+  ): void {
+    const activeConnections = this.getActiveConnectionsCount();
+
+    if (activeConnections > activeConnectionsThreshold) {
+      this.setPoolSize(minPoolSize, maxPoolSize);
+      this.logger.warn(
+        `Active connections exceeded threshold (${activeConnectionsThreshold}). Adjusting pool size: min=${minPoolSize}, max=${maxPoolSize}`
+      );
+    }
+  }
+
+  /**
+   * Periodically checks the connection pool status and logs it.
+   * Dynamically adjusts the pool size based on active connection thresholds.
+   * @param interval The interval in milliseconds at which to check the pool status.
+   */
+  private startPoolMonitoring(interval: number = 10000): void {
+    setInterval(() => {
+      this.logPoolStatus();
+
+      const activeConnections = this.getActiveConnectionsCount();
+      const totalConnections = this.getTotalConnectionsCount();
+      const maxPoolSize = this.config.maxPoolSize || 10;
+
+      // Generate warnings if pool is near capacity
+      if (totalConnections >= maxPoolSize * 0.9) {
+        this.logger.warn(
+          `Connection pool usage is at 90% of its capacity (${totalConnections}/${maxPoolSize}). Consider increasing the pool size.`
+        );
+      }
+
+      // Dynamically adjust the pool size if active connections exceed a threshold
+      const activeConnectionsThreshold = 5; // Example threshold
+      const newMinPoolSize = Math.min(10, activeConnections + 2); // Example: increase min pool size
+      const newMaxPoolSize = Math.min(20, activeConnections + 5); // Example: increase max pool size
+
+      if (activeConnections > activeConnectionsThreshold) {
+        this.adjustPoolSizeBasedOnLoad(
+          activeConnectionsThreshold,
+          newMinPoolSize,
+          newMaxPoolSize
+        );
+      }
+    }, interval);
+  }
+
+  /**
    * Retries a database operation based on the configured retry policy.
    * @param operation The operation to retry.
    * @returns A promise that resolves with the result of the operation.
    */
   private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
-    const retryPolicy = this.config.retryPolicy || "none";
+    const retryPolicy = this.config.retry?.retryPolicy || "none";
     const retryAttempts =
-      this.config.connectionRetries || this.config.retryAttempts || 3;
+      this.config.retry?.connectionRetries ||
+      this.config.retry?.retryAttempts ||
+      3;
     const retryInterval =
-      this.config.retryDelay || this.config.retryInterval || 1000;
+      this.config.retry?.retryDelay || this.config.retry?.retryInterval || 1000;
 
     for (let attempt = 1; attempt <= retryAttempts; attempt++) {
       try {
@@ -560,7 +634,7 @@ export class Db2Client implements Db2ConnectionInterface {
    * Returns the current state of the connection.
    * @returns The current connection state.
    */
-  getState(): Db2ConnectionState {
+  public getState(): Db2ConnectionState {
     return this.state;
   }
 
@@ -568,8 +642,18 @@ export class Db2Client implements Db2ConnectionInterface {
    * Returns the number of active connections in the pool.
    * @returns {number}
    */
-  getActiveConnectionsCount(): number {
+  public getActiveConnectionsCount(): number {
     return this.connection ? 1 : 0;
+  }
+
+  /**
+   * Returns the total number of connections in the pool.
+   * @returns The total number of connections.
+   */
+  public getTotalConnectionsCount(): number {
+    return (
+      this.pool.activeConnections.length + this.pool.idleConnections.length
+    ); // Example usage, depends on ibm_db pool implementation
   }
 
   /**
@@ -649,5 +733,25 @@ export class Db2Client implements Db2ConnectionInterface {
       clearInterval(this.connectionLifetimeInterval);
       this.logger.log("Stopped connection lifetime check.");
     }
+  }
+
+  /**
+   * Sets the minimum and maximum pool size dynamically.
+   * @param minPoolSize The minimum number of connections in the pool.
+   * @param maxPoolSize The maximum number of connections in the pool.
+   */
+  public setPoolSize(minPoolSize: number, maxPoolSize: number): void {
+    if (minPoolSize < 1 || maxPoolSize < minPoolSize) {
+      throw new Error("Invalid pool size configuration.");
+    }
+
+    this.pool = new Pool({
+      minPoolSize,
+      maxPoolSize,
+    });
+
+    this.logger.log(
+      `Connection pool size updated: min=${minPoolSize}, max=${maxPoolSize}`
+    );
   }
 }

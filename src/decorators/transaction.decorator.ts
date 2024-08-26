@@ -1,20 +1,7 @@
 // src/decorators/db2-transaction.decorator.ts
 
-/**
- * @fileoverview This file contains the implementation of the Transaction decorator.
- * The Transaction decorator is used to wrap a method in a database transaction, ensuring
- * that all operations within the method are executed within a single transaction context.
- * If the method completes successfully, the transaction is committed. If an error occurs,
- * the transaction is rolled back, ensuring data consistency and integrity.
- *
- * @function Transaction
- *
- * @requires Db2Service from "src/services/db2.service"
- *
- * @exports Transaction
- */
-
 import { Db2Service } from "src/services/db2.service";
+import { Logger } from "@nestjs/common";
 
 /**
  * @function Transaction
@@ -44,9 +31,11 @@ import { Db2Service } from "src/services/db2.service";
  * }
  */
 export function Transaction(): MethodDecorator {
+  const logger = new Logger("TransactionDecorator");
+
   return function (
     _target: Object,
-    _propertyKey: string | symbol,
+    propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ) {
     const originalMethod = descriptor.value;
@@ -57,23 +46,50 @@ export function Transaction(): MethodDecorator {
 
       // Check if Db2Service is available
       if (!db2Service) {
-        throw new Error("Db2Service is not available");
+        const errorMessage = "Db2Service is not available";
+        logger.error(errorMessage);
+        throw new Error(errorMessage);
       }
 
-      // Begin a transaction
-      await db2Service.beginTransaction();
-
+      // Start a transaction
       try {
+        logger.debug(
+          `Starting transaction for method ${propertyKey.toString()}`
+        );
+        await db2Service.beginTransaction();
+
         // Execute the original method within the transaction
         const result = await originalMethod.apply(this, args);
 
         // Commit the transaction if the method completes successfully
         await db2Service.commitTransaction();
+        logger.debug(
+          `Transaction committed successfully for method ${propertyKey.toString()}`
+        );
+
         return result;
       } catch (error) {
         // Roll back the transaction if an error occurs
-        await db2Service.rollbackTransaction();
-        throw error; // Rethrow the error after rolling back the transaction
+        logger.error(
+          `Transaction failed for method ${propertyKey.toString()}: ${
+            error.message
+          }`
+        );
+        try {
+          await db2Service.rollbackTransaction();
+          logger.debug(
+            `Transaction rolled back for method ${propertyKey.toString()}`
+          );
+        } catch (rollbackError) {
+          logger.error(
+            `Failed to roll back transaction for method ${propertyKey.toString()}: ${
+              rollbackError.message
+            }`
+          );
+        }
+
+        // Rethrow the original error after rollback attempt
+        throw error;
       }
     };
 
