@@ -1,19 +1,25 @@
 import { Logger } from "@nestjs/common";
-import { Db2ClientInterface } from "src/interfaces/db2.interface";
+import { Db2ClientInterface, TransactionManagerInterface } from "../interfaces";
 import { Db2Error } from "../errors/db2.error";
+import { Db2IsolationLevel } from "../enums";
 
-export class TransactionManager {
+export class TransactionManager implements TransactionManagerInterface {
   private readonly logger = new Logger(TransactionManager.name);
   private transactionActive: boolean = false;
-  private isolationLevel: string | null = null;
+  private isolationLevel: Db2IsolationLevel | null = null;
 
-  constructor(private client: Db2ClientInterface) {}
+  public constructor(
+    private client: Db2ClientInterface,
+    private defaultIsolationLevel?: Db2IsolationLevel
+  ) {}
 
   /**
-   * Begin a transaction with optional isolation level.
+   * Begin a transaction with an optional isolation level.
    * @param isolationLevel The isolation level for the transaction (optional).
    */
-  async beginTransaction(isolationLevel?: string): Promise<void> {
+  public async beginTransaction(
+    isolationLevel?: Db2IsolationLevel
+  ): Promise<void> {
     if (this.transactionActive) {
       this.logger.warn(
         "A transaction is already active. Nested transactions are not supported."
@@ -22,7 +28,11 @@ export class TransactionManager {
     }
 
     try {
-      this.isolationLevel = isolationLevel || "READ COMMITTED"; // Default isolation level
+      // Use provided isolation level or default if not specified
+      this.isolationLevel =
+        isolationLevel ||
+        this.defaultIsolationLevel ||
+        Db2IsolationLevel.READ_COMMITTED;
 
       const startTime = Date.now();
       if (this.isolationLevel) {
@@ -48,7 +58,7 @@ export class TransactionManager {
    * Commit the current transaction.
    * Throws an error if no transaction is active.
    */
-  async commitTransaction(): Promise<void> {
+  public async commitTransaction(): Promise<void> {
     if (!this.transactionActive) {
       this.logger.warn("No active transaction to commit.");
       throw new Db2Error("No active transaction to commit.");
@@ -70,7 +80,7 @@ export class TransactionManager {
    * Rollback the current transaction.
    * Throws an error if no transaction is active.
    */
-  async rollbackTransaction(): Promise<void> {
+  public async rollbackTransaction(): Promise<void> {
     if (!this.transactionActive) {
       this.logger.warn("No active transaction to rollback.");
       throw new Db2Error("No active transaction to rollback.");
@@ -89,11 +99,11 @@ export class TransactionManager {
   }
 
   /**
-   * Set the transaction isolation level for the current session.
-   * This must be called before `beginTransaction` to take effect.
-   * @param level The desired isolation level (e.g., READ COMMITTED, SERIALIZABLE).
+   * Dynamically set the isolation level for future transactions.
+   * Throws an error if a transaction is currently active.
+   * @param level The desired isolation level.
    */
-  setIsolationLevel(level: string): void {
+  public setIsolationLevel(level: Db2IsolationLevel): void {
     if (this.transactionActive) {
       this.logger.warn(
         "Cannot change isolation level during an active transaction."
@@ -111,7 +121,7 @@ export class TransactionManager {
    * Returns whether a transaction is currently active.
    * @returns A boolean indicating if a transaction is active.
    */
-  isTransactionActive(): boolean {
+  public isTransactionActive(): boolean {
     return this.transactionActive;
   }
 
@@ -121,7 +131,7 @@ export class TransactionManager {
    * @param attempts Number of retry attempts.
    * @param delay Delay between retries.
    */
-  async retryOperation<T>(
+  public async retryOperation<T>(
     operation: () => Promise<T>,
     attempts: number = 3,
     delay: number = 1000
@@ -149,7 +159,7 @@ export class TransactionManager {
    * @param operation The operation to timeout.
    * @param timeout The timeout duration in milliseconds.
    */
-  async withTimeout<T>(
+  public async withTimeout<T>(
     operation: () => Promise<T>,
     timeout: number
   ): Promise<T> {

@@ -1,11 +1,12 @@
 // src/index.ts
 
-export * from "./modules/db2.module"; // Export the main Db2Module
+export * from "./modules"; // Export the main module
 export * from "./services"; // Export the services
-export * from "./interfaces"; // Export necessary interfaces
+export * from "./interfaces"; // Export all interfaces
 export * from "./enums"; // Export enums used in the module
 export * from "./decorators"; // Export all decorators
-export * from "./errors/db2.error"; // Export any custom errors
-export * from "./utils/db2.utils"; // Export any utility functions
-export * from "./indicators/db2-health.indicator"; // Export any performance indicators
+export * from "./errors"; // Export any custom errors
+export * from "./utils"; // Export any utility functions and classes
+export * from "./indicators"; // Export any performance indicators
 export * from "./db"; // Export the database client and related classes
+export * from "./auth"; // Export the authentication functions

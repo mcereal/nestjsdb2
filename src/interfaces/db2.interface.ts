@@ -1,7 +1,6 @@
 // src/interfaces/db2.interface.ts
 
-import { Db2ConnectionState } from "src/enums";
-
+import { Db2IsolationLevel } from "src/enums";
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
  */
@@ -84,6 +83,12 @@ export interface Db2CacheOptions {
   resetOnDestroy?: boolean; // Reset cache on service destroy
 }
 
+export interface SqlInjectionCheckerOptions {
+  enableStrictMode?: boolean; // Enable strict mode for production
+  whitelistedPatterns?: RegExp[]; // Allow certain patterns
+  logWarnings?: boolean; // Log warnings instead of throwing errors
+}
+
 /**
  * Comprehensive configuration options for setting up a Db2 connection.
  */
@@ -96,6 +101,8 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   retry?: Db2RetryOptions;
   migration?: Db2MigrationOptions;
   cache?: Db2CacheOptions;
+
+  defaultIsolationLevel?: Db2IsolationLevel;
 
   connectionTimeout?: number;
   idleTimeout?: number;
@@ -116,57 +123,6 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   currentSchema?: string;
   applicationName?: string;
   tcpKeepAlive?: boolean;
-}
 
-export interface Db2ClientInterface {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
-  executePreparedStatement<T>(sql: string, params?: any[]): Promise<T>;
-  beginTransaction(): Promise<void>;
-  commitTransaction(): Promise<void>;
-  rollbackTransaction(): Promise<void>;
-  checkHealth(): Promise<boolean>;
-  getState(): Db2ConnectionState;
-  getActiveConnectionsCount(): number;
-  getTotalConnectionsCount(): number;
-  drainPool(): Promise<void>;
-  // Add any additional methods needed for client operations
-}
-
-export interface Db2ServiceInterface {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
-  executePreparedStatement<T>(sql: string, params?: any[]): Promise<T>;
-  beginTransaction(): Promise<void>;
-  commitTransaction(): Promise<void>;
-  rollbackTransaction(): Promise<void>;
-  checkHealth(): Promise<{ dbHealth: boolean; transactionActive: boolean }>;
-  batchInsert(
-    tableName: string,
-    columns: string[],
-    valuesArray: any[][]
-  ): Promise<void>;
-  batchUpdate(
-    tableName: string,
-    columns: string[],
-    valuesArray: any[][],
-    whereClause: string
-  ): Promise<void>;
-  // Add any other high-level methods exposed by Db2Service
-}
-
-export interface TransactionManagerInterface {
-  beginTransaction(isolationLevel?: string): Promise<void>;
-  commitTransaction(): Promise<void>;
-  rollbackTransaction(): Promise<void>;
-  setIsolationLevel(level: string): void;
-  isTransactionActive(): boolean;
-  retryOperation<T>(
-    operation: () => Promise<T>,
-    attempts?: number,
-    delay?: number
-  ): Promise<T>;
-  withTimeout<T>(operation: () => Promise<T>, timeout: number): Promise<T>;
+  sqlInjectionCheckerOptions?: SqlInjectionCheckerOptions;
 }

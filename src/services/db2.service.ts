@@ -12,7 +12,7 @@ import {
   Db2CacheOptions,
   Db2ConfigOptions,
   Db2ServiceInterface,
-} from "../interfaces/db2.interface";
+} from "../interfaces";
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Db2QueryBuilder } from "../db/db2-query-builder";
 import { formatDb2Error } from "src/utils/db2.utils";
@@ -35,7 +35,7 @@ export class Db2Service
   private transactionManager: TransactionManager;
   private migrationService: Db2MigrationService;
 
-  constructor(
+  public constructor(
     options: Db2ConfigOptions,
     @Optional() @Inject(CACHE_MANAGER) cacheManager: Cache,
     transactionManager: TransactionManager,
@@ -61,7 +61,7 @@ export class Db2Service
     }
   }
 
-  async onModuleInit(): Promise<void> {
+  public async onModuleInit(): Promise<void> {
     this.logger.log("Initializing Db2Service...");
     this.validateConfig(this.options);
     await this.connect();
@@ -73,12 +73,12 @@ export class Db2Service
         this.logger.log("Migrations completed successfully.");
       } catch (error) {
         this.logger.error("Failed to run migrations:", error.message);
-        throw error; // Optionally handle this according to your error-handling strategy
+        throw error;
       }
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
+  public async onModuleDestroy(): Promise<void> {
     this.logger.log("Destroying Db2Service...");
     try {
       // Drain the connection pool and disconnect the DB2 client
@@ -105,34 +105,28 @@ export class Db2Service
     }
   }
 
-  getState(): Db2ConnectionState {
+  public async connect(): Promise<void> {
+    try {
+      await this.client.connect();
+    } catch (error) {
+      this.handleError(error, "Connection");
+    }
+  }
+
+  public async disconnect(): Promise<void> {
+    await this.client.disconnect();
+  }
+
+  public async drainPool(): Promise<void> {
+    await this.client.drainPool();
+  }
+
+  public getState(): Db2ConnectionState {
     return this.client.getState();
   }
 
-  getActiveConnectionsCount(): number {
+  public getActiveConnectionsCount(): number {
     return this.client.getActiveConnectionsCount();
-  }
-
-  async checkHealth(): Promise<{
-    dbHealth: boolean;
-    transactionActive: boolean;
-  }> {
-    this.logger.log("Performing service-level health check...");
-
-    const dbHealth = await this.client.checkHealth();
-
-    // Check if a transaction is currently active
-    const transactionActive = this.transactionManager
-      ? this.transactionManager.isTransactionActive()
-      : false;
-
-    return {
-      dbHealth,
-      transactionActive,
-    };
-  }
-  createQueryBuilder(): Db2QueryBuilder {
-    return new Db2QueryBuilder();
   }
 
   private async initializeCache(cacheOptions: Db2CacheOptions): Promise<void> {
@@ -154,75 +148,62 @@ export class Db2Service
     }
   }
 
-  async runMigration(script: string): Promise<void> {
-    try {
-      await this.client.query(script);
-      this.logger.log("Migration script executed successfully.");
-    } catch (error) {
-      this.logger.error("Error executing migration script:", error.message);
-      this.handleError(error, "Migration");
+  public async clearCache(sql: string, params: any[] = []): Promise<boolean> {
+    if (this.cache) {
+      try {
+        const cacheKey = this.generateCacheKey(sql, params);
+        await this.cache.del(cacheKey);
+        this.logger.log(`Cache cleared for query: ${sql}`);
+        return true;
+      } catch (error) {
+        this.logger.error("Error clearing cache:", error.message);
+        return false;
+      }
     }
+    return false;
   }
 
-  async executePreparedStatement<T>(
+  private generateCacheKey(sql: string, params: any[]): string {
+    const paramsKey = params.map((p) => JSON.stringify(p)).join(":");
+    return `${sql}:${paramsKey}`;
+  }
+
+  public async checkHealth(): Promise<{
+    dbHealth: boolean;
+    transactionActive: boolean;
+  }> {
+    this.logger.log("Performing service-level health check...");
+
+    const dbHealth = await this.client.checkHealth();
+
+    // Check if a transaction is currently active
+    const transactionActive = this.transactionManager
+      ? this.transactionManager.isTransactionActive()
+      : false;
+
+    return {
+      dbHealth,
+      transactionActive,
+    };
+  }
+
+  private logQueryDetails(
     sql: string,
-    params: any[] = []
-  ): Promise<T> {
-    const start = Date.now();
-    try {
-      const result = await this.client.executePreparedStatement<T>(sql, params);
+    params: any[],
+    duration: number,
+    error?: any
+  ): void {
+    const logMessage = {
+      query: sql,
+      params: params,
+      duration: `${duration} ms`,
+      error: error ? error.message : null,
+    };
 
-      const duration = Date.now() - start;
-
-      if (
-        this.options.logging?.logQueries ||
-        this.options.logging?.profileSql
-      ) {
-        this.logQueryDetails(sql, params, duration);
-      }
-
-      return result;
-    } catch (error) {
-      const duration = Date.now() - start;
-
-      if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
-        this.logQueryDetails(sql, params, duration, error);
-      }
-
-      this.handleError(error, "Execute Prepared Statement");
-    }
+    this.logger.log(JSON.stringify(logMessage));
   }
 
-  async drainPool(): Promise<void> {
-    await this.client.drainPool();
-  }
-
-  async connect(): Promise<void> {
-    try {
-      await this.client.connect();
-    } catch (error) {
-      this.handleError(error, "Connection");
-    }
-  }
-
-  async disconnect(): Promise<void> {
-    await this.client.disconnect();
-  }
-
-  private handleError(error: any, context: string): void {
-    const errorMessage = formatDb2Error(
-      error,
-      context,
-      {
-        host: this.options.host,
-        database: this.options.database,
-      },
-      this.logger
-    );
-    throw new Db2Error(errorMessage);
-  }
-
-  async query<T>(
+  public async query<T>(
     sql: string,
     params: any[] = [],
     timeout?: number
@@ -252,31 +233,36 @@ export class Db2Service
     return result;
   }
 
-  async beginTransaction(): Promise<void> {
+  public async executePreparedStatement<T>(
+    sql: string,
+    params: any[] = []
+  ): Promise<T> {
+    const start = Date.now();
     try {
-      await this.transactionManager.beginTransaction();
+      const result = await this.client.executePreparedStatement<T>(sql, params);
+
+      const duration = Date.now() - start;
+
+      if (
+        this.options.logging?.logQueries ||
+        this.options.logging?.profileSql
+      ) {
+        this.logQueryDetails(sql, params, duration);
+      }
+
+      return result;
     } catch (error) {
-      this.handleError(error, "Begin Transaction");
+      const duration = Date.now() - start;
+
+      if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
+        this.logQueryDetails(sql, params, duration, error);
+      }
+
+      this.handleError(error, "Execute Prepared Statement");
     }
   }
 
-  async commitTransaction(): Promise<void> {
-    try {
-      await this.transactionManager.commitTransaction();
-    } catch (error) {
-      this.handleError(error, "Commit Transaction");
-    }
-  }
-
-  async rollbackTransaction(): Promise<void> {
-    try {
-      await this.transactionManager.rollbackTransaction();
-    } catch (error) {
-      this.handleError(error, "Rollback Transaction");
-    }
-  }
-
-  async batchInsert(
+  public async batchInsert(
     tableName: string,
     columns: string[],
     valuesArray: any[][]
@@ -306,7 +292,7 @@ export class Db2Service
     }
   }
 
-  async batchUpdate(
+  public async batchUpdate(
     tableName: string,
     columns: string[],
     valuesArray: any[][],
@@ -326,7 +312,7 @@ export class Db2Service
         this.options.logging?.logQueries ||
         this.options.logging?.profileSql
       ) {
-        this.logQueryDetails("Batch Update Operation", valuesArray, duration); // Log actual SQL or operation name
+        this.logQueryDetails("Batch Update Operation", valuesArray, duration);
       }
     } catch (error) {
       const duration = Date.now() - start; // Calculate execution duration
@@ -336,10 +322,48 @@ export class Db2Service
           valuesArray,
           duration,
           error
-        ); // Log actual SQL or operation name with error
+        );
       }
       this.handleError(error, "Batch Update");
     }
+  }
+
+  public async beginTransaction(): Promise<void> {
+    try {
+      await this.transactionManager.beginTransaction();
+    } catch (error) {
+      this.handleError(error, "Begin Transaction");
+    }
+  }
+
+  public async commitTransaction(): Promise<void> {
+    try {
+      await this.transactionManager.commitTransaction();
+    } catch (error) {
+      this.handleError(error, "Commit Transaction");
+    }
+  }
+
+  public async rollbackTransaction(): Promise<void> {
+    try {
+      await this.transactionManager.rollbackTransaction();
+    } catch (error) {
+      this.handleError(error, "Rollback Transaction");
+    }
+  }
+
+  public async runMigration(script: string): Promise<void> {
+    try {
+      await this.client.query(script);
+      this.logger.log("Migration script executed successfully.");
+    } catch (error) {
+      this.logger.error("Error executing migration script:", error.message);
+      this.handleError(error, "Migration");
+    }
+  }
+
+  public createQueryBuilder(): Db2QueryBuilder {
+    return new Db2QueryBuilder();
   }
 
   private validateConfig(options: Db2ConfigOptions): void {
@@ -367,39 +391,16 @@ export class Db2Service
     }
   }
 
-  private logQueryDetails(
-    sql: string,
-    params: any[],
-    duration: number,
-    error?: any
-  ): void {
-    const logMessage = {
-      query: sql,
-      params: params,
-      duration: `${duration} ms`,
-      error: error ? error.message : null,
-    };
-
-    this.logger.log(JSON.stringify(logMessage));
-  }
-
-  async clearCache(sql: string, params: any[] = []): Promise<boolean> {
-    if (this.cache) {
-      try {
-        const cacheKey = this.generateCacheKey(sql, params);
-        await this.cache.del(cacheKey);
-        this.logger.log(`Cache cleared for query: ${sql}`);
-        return true;
-      } catch (error) {
-        this.logger.error("Error clearing cache:", error.message);
-        return false;
-      }
-    }
-    return false; // or throw an error if cache is not defined
-  }
-
-  private generateCacheKey(sql: string, params: any[]): string {
-    const paramsKey = params.map((p) => JSON.stringify(p)).join(":");
-    return `${sql}:${paramsKey}`;
+  private handleError(error: any, context: string): void {
+    const errorMessage = formatDb2Error(
+      error,
+      context,
+      {
+        host: this.options.host,
+        database: this.options.database,
+      },
+      this.logger
+    );
+    throw new Db2Error(errorMessage);
   }
 }

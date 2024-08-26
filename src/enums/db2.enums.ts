@@ -48,3 +48,12 @@ export enum Db2ConnectionState {
   AUTHENTICATING = "AUTHENTICATING", // Authenticating with the DB2 database
   AUTH_FAILED = "AUTH_FAILED", // Authentication with the DB2 database failed
 }
+
+export enum Db2IsolationLevel {
+  READ_UNCOMMITTED = "READ UNCOMMITTED", // Dirty reads, non-repeatable reads, phantom reads
+  READ_COMMITTED = "READ COMMITTED", // No dirty reads, possible non-repeatable reads, phantom reads
+  REPEATABLE_READ = "REPEATABLE READ", // No dirty reads, no non-repeatable reads, possible phantom reads
+  SERIALIZABLE = "SERIALIZABLE", // No dirty reads, no non-repeatable reads, no phantom reads
+  CURSOR_STABILITY = "CURSOR STABILITY", // No dirty reads, no non-repeatable reads, no phantom reads
+  UNCOMMITTED_READ = "UNCOMMITTED READ", // Dirty reads, non-repeatable reads, phantom reads
+}

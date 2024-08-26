@@ -5,6 +5,7 @@ import {
   ExecutionContext,
   BadRequestException,
 } from "@nestjs/common";
+import { SqlInjectionChecker } from "../utils/sql-injection-checker"; // Import the SqlInjectionChecker
 
 /**
  * @function Db2Param
@@ -36,40 +37,36 @@ import {
  */
 export const Db2Param = createParamDecorator(
   (data: string | number | undefined, ctx: ExecutionContext) => {
-    // Get the arguments passed to the execution context
+    const sqlInjectionChecker = new SqlInjectionChecker();
     const args = ctx.getArgs();
+
+    let paramValue: any;
 
     // Default to the first argument if no key or index is provided
     if (data === undefined) {
-      return args[0];
-    }
-
-    // Handle extraction based on string key (e.g., 'body', 'query', 'params')
-    if (typeof data === "string") {
-      // Attempt to get the parameter from different context objects
+      paramValue = args[0];
+    } else if (typeof data === "string") {
       const request = ctx.switchToHttp().getRequest();
-      if (request[data]) {
-        return request[data];
-      }
-      // Fallback to searching in args if not found in request
-      const foundArg = args.find(
-        (arg) => arg && typeof arg === "object" && arg[data]
-      );
-      if (foundArg) {
-        return foundArg[data];
-      }
-    }
-
-    // Handle extraction based on array index
-    if (typeof data === "number") {
-      if (args[data] !== undefined) {
-        return args[data];
-      }
+      paramValue =
+        request[data] ||
+        args.find((arg) => arg && typeof arg === "object" && arg[data])?.[data];
+    } else if (typeof data === "number") {
+      paramValue = args[data];
     }
 
     // If the parameter is not found, throw an exception
-    throw new BadRequestException(
-      `Parameter ${data} not found in execution context`
-    );
+    if (paramValue === undefined) {
+      throw new BadRequestException(
+        `Parameter ${data} not found in execution context`
+      );
+    }
+
+    try {
+      sqlInjectionChecker.validateParams([paramValue]);
+    } catch (error) {
+      throw new BadRequestException(`Invalid parameter: ${error.message}`);
+    }
+
+    return paramValue;
   }
 );

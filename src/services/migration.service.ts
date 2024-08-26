@@ -6,12 +6,13 @@ import { join } from "path";
 import { Db2MigrationOptions } from "../interfaces/db2.interface";
 import { formatDb2Error } from "../utils/db2.utils";
 import { Db2Client } from "src/db/db2-client";
+import { Db2MigrationServiceInterface } from "../interfaces";
 
-export class Db2MigrationService {
+export class Db2MigrationService implements Db2MigrationServiceInterface {
   private readonly logger = new Logger(Db2MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
 
-  constructor(
+  public constructor(
     private db2Client: Db2Client,
     migrationConfig: Db2MigrationOptions
   ) {
@@ -21,7 +22,7 @@ export class Db2MigrationService {
   /**
    * Runs database migrations based on the configuration.
    */
-  async runMigrations(): Promise<void> {
+  public async runMigrations(): Promise<void> {
     if (!this.migrationConfig.enabled) {
       this.logger.warn(
         "Migrations are disabled. Skipping migration execution."
