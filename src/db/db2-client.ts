@@ -5,10 +5,18 @@ import { appendFileSync } from "fs";
 import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Db2ClientInterface, Db2ConfigOptions } from "../interfaces";
 import { Db2ConnectionState } from "../enums/db2.enums";
-import { Db2ConnectionError, Db2Error } from "../errors/db2.error";
+import {
+  Db2AuthenticationError,
+  Db2ConnectionError,
+  Db2Error,
+  Db2PoolError,
+  Db2QuerySyntaxError,
+  Db2TimeoutError,
+  Db2TransactionError,
+} from "../errors";
 import { Db2AuthStrategy } from "src/auth/db2-auth.strategy";
 import { createAuthStrategy } from "src/auth/auth-factory";
-import { formatDb2Error } from "src/utils/db2.utils";
+import { formatDb2Error } from "src/errors/db2.error";
 export class Db2Client
   implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
 {
@@ -95,7 +103,7 @@ export class Db2Client
         new Promise<never>((_, reject) =>
           setTimeout(() => {
             this.state = Db2ConnectionState.CONNECTION_TIMEOUT;
-            reject(new Db2Error("Connection timed out"));
+            reject(new Db2ConnectionError("Connection timed out"));
           }, connectionTimeout)
         ),
       ]);
@@ -131,7 +139,7 @@ export class Db2Client
       } catch (error) {
         this.state = Db2ConnectionState.ERROR;
         this.logError("Error disconnecting from Db2 database", error);
-        throw new Db2Error("Failed to disconnect from Db2 database");
+        throw new Db2ConnectionError("Failed to disconnect from Db2 database");
       }
     } else {
       this.logger.warn("No active connection to disconnect.");
@@ -153,7 +161,7 @@ export class Db2Client
     } catch (error) {
       this.state = Db2ConnectionState.ERROR;
       this.logger.error("Reconnection failed:", error.message);
-      throw new Db2Error("Failed to reconnect to Db2 database");
+      throw new Db2ConnectionError("Failed to reconnect to Db2 database");
     }
   }
 
@@ -167,13 +175,27 @@ export class Db2Client
       const acquireTimeout = this.config.acquireTimeoutMillis || 30000; // Default to 30 seconds
 
       const timeoutHandle = setTimeout(() => {
-        reject(new Db2Error("Acquire connection timeout"));
+        reject(
+          new Db2PoolError("Acquire connection timeout", {
+            connStr,
+            timeout: acquireTimeout,
+          })
+        );
       }, acquireTimeout);
 
       this.pool.open(connStr, (err, connection) => {
         clearTimeout(timeoutHandle);
         if (err) {
-          reject(err);
+          this.logger.error(
+            "Error acquiring connection from pool:",
+            err.message
+          );
+          reject(
+            new Db2PoolError("Failed to acquire connection from pool", {
+              connStr,
+              error: err.message,
+            })
+          );
         } else {
           resolve(connection);
         }
@@ -188,7 +210,11 @@ export class Db2Client
         if (err) {
           this.state = Db2ConnectionState.ERROR;
           this.logger.error("Error releasing connection:", err.message);
-          reject(new Db2Error("Failed to release connection"));
+          reject(
+            new Db2PoolError("Failed to release connection back to the pool", {
+              error: err.message,
+            })
+          );
         } else {
           this.state = Db2ConnectionState.DISCONNECTED;
           this.logger.log("Connection successfully released back to the pool.");
@@ -241,7 +267,9 @@ export class Db2Client
             "Error while draining the connection pool:",
             err.message
           );
-          throw new Db2Error("Failed to drain the connection pool.");
+          throw new Db2PoolError("Failed to drain the connection pool.", {
+            error: err.message,
+          });
         } else {
           this.logger.log(
             "All connections in the pool have been successfully drained."
@@ -249,10 +277,12 @@ export class Db2Client
         }
       });
     } catch (error) {
-      // Handle any errors that occur during the draining process
       this.logger.error("Error during pool draining operation:", error.message);
-      throw new Db2Error(
-        "An error occurred while draining the connection pool."
+      throw new Db2PoolError(
+        "An error occurred while draining the connection pool.",
+        {
+          error: error.message,
+        }
       );
     }
   }
@@ -376,7 +406,7 @@ export class Db2Client
         database: this.config.database,
       });
       this.logger.error(`Failed to begin transaction: ${errorMessage}`);
-      throw new Db2Error(
+      throw new Db2TransactionError(
         "Failed to begin transaction. Check logs for details."
       );
     }
@@ -407,7 +437,7 @@ export class Db2Client
         database: this.config.database,
       });
       this.logger.error(`Failed to commit transaction: ${errorMessage}`);
-      throw new Db2Error(
+      throw new Db2TransactionError(
         "Failed to commit transaction. Check logs for details."
       );
     }
@@ -420,7 +450,9 @@ export class Db2Client
   public async rollbackTransaction(): Promise<void> {
     if (this.state !== Db2ConnectionState.CONNECTED) {
       this.logger.error("Cannot rollback transaction. No active connection.");
-      throw new Db2Error("Cannot rollback transaction. No active connection.");
+      throw new Db2TransactionError(
+        "Cannot rollback transaction. No active connection."
+      );
     }
 
     this.logger.log("Rolling back transaction...");
@@ -479,7 +511,19 @@ export class Db2Client
           if (error) {
             this.state = Db2ConnectionState.ERROR;
             this.logError("Query error", error);
-            reject(new Db2Error("Query execution failed", error, params));
+
+            // Check if the error is related to query syntax
+            if (error.message.toLowerCase().includes("syntax")) {
+              reject(
+                new Db2QuerySyntaxError("Query syntax error", {
+                  sql,
+                  params,
+                  error: error.message,
+                })
+              );
+            } else {
+              reject(new Db2Error("Query execution failed", error, params));
+            }
           } else {
             const duration = Date.now() - startTime;
             if (this.config.logging?.profileSql) {
@@ -492,7 +536,19 @@ export class Db2Client
       } catch (error) {
         this.state = Db2ConnectionState.ERROR;
         this.logError("Error preparing query", error);
-        reject(new Db2Error("Failed to prepare or execute the query"));
+
+        // Check if the error is related to query syntax
+        if (error.message.toLowerCase().includes("syntax")) {
+          reject(
+            new Db2QuerySyntaxError("Query syntax error", {
+              sql,
+              params,
+              error: error.message,
+            })
+          );
+        } else {
+          reject(new Db2Error("Failed to prepare or execute the query"));
+        }
       }
     });
   }
@@ -519,7 +575,18 @@ export class Db2Client
       this.connection.prepare(sql, (err, stmt) => {
         if (err) {
           this.logger.error("Error preparing statement:", err.message);
-          reject(new Db2Error("Failed to prepare statement"));
+
+          // Check if the error is related to query syntax
+          if (err.message.toLowerCase().includes("syntax")) {
+            reject(
+              new Db2QuerySyntaxError("Prepared statement syntax error", {
+                sql,
+                error: err.message,
+              })
+            );
+          } else {
+            reject(new Db2Error("Failed to prepare statement"));
+          }
           return;
         }
 
@@ -529,7 +596,22 @@ export class Db2Client
               "Error executing prepared statement:",
               error.message
             );
-            reject(new Db2Error("Prepared statement execution failed"));
+
+            // Check if the error is related to query syntax
+            if (error.message.toLowerCase().includes("syntax")) {
+              reject(
+                new Db2QuerySyntaxError(
+                  "Prepared statement execution syntax error",
+                  {
+                    sql,
+                    params,
+                    error: error.message,
+                  }
+                )
+              );
+            } else {
+              reject(new Db2Error("Prepared statement execution failed"));
+            }
           } else {
             resolve(result);
             stmt.closeSync();
@@ -575,7 +657,7 @@ export class Db2Client
       this.logger.log(`Batch insert completed for table: ${tableName}`);
     } catch (error) {
       this.logError("Batch insert error", error);
-      throw new Db2Error("Batch insert failed");
+      throw new Db2TransactionError("Batch insert failed");
     }
   }
 
@@ -616,7 +698,7 @@ export class Db2Client
       this.logger.log(`Batch update completed for table: ${tableName}`);
     } catch (error) {
       this.logError("Batch update error", error);
-      throw new Db2Error("Batch update failed");
+      throw new Db2TransactionError("Batch update failed");
     }
   }
 
@@ -773,36 +855,102 @@ export class Db2Client
   public async checkHealth(): Promise<boolean> {
     this.logger.log("Performing extended health check...");
 
-    // Check the connection state
-    if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.warn("No active connection. Attempting to reconnect...");
-      await this.reconnect();
-    }
-
-    // Execute a simple query to test the connection
-    const testQuery =
-      this.config.connectionTestQuery || "SELECT 1 FROM SYSIBM.SYSDUMMY1";
     try {
+      // Step 1: Check the connection state and attempt to reconnect if necessary
+      if (this.state !== Db2ConnectionState.CONNECTED) {
+        this.logger.warn("No active connection. Attempting to reconnect...");
+        await this.reconnect();
+      }
+
+      // Step 2: Perform a simple test query to validate the connection
+      const testQuery =
+        this.config.connectionTestQuery || "SELECT 1 FROM SYSIBM.SYSDUMMY1";
       await this.query(testQuery);
+
+      // Step 3: Check the state of the connection pool
+      const activeConnections = this.getActiveConnectionsCount();
+      const totalConnections = this.getTotalConnectionsCount();
+
+      if (activeConnections > totalConnections * 0.9) {
+        this.logger.warn(
+          `Connection pool usage is high: ${activeConnections}/${totalConnections} active connections.`
+        );
+      }
+
+      this.logger.log("Health check passed.");
+      return true;
     } catch (error) {
-      this.state = Db2ConnectionState.ERROR;
-      this.logger.error("Health check failed:", error.message);
-      await this.reconnect();
-      return false;
+      // Step 4: Handle different error types based on error message or type
+      if (error instanceof Db2TimeoutError) {
+        this.logger.error(
+          "Health check failed due to a timeout:",
+          error.toString()
+        );
+      } else if (error instanceof Db2ConnectionError) {
+        this.logger.error(
+          "Health check failed due to a connection error:",
+          error.toString()
+        );
+      } else if (error instanceof Db2AuthenticationError) {
+        this.logger.error(
+          "Health check failed due to an authentication error:",
+          error.toString()
+        );
+      } else if (error instanceof Db2QuerySyntaxError) {
+        this.logger.error(
+          "Health check failed due to a query syntax error:",
+          error.toString()
+        );
+      } else if (error instanceof Db2TransactionError) {
+        this.logger.error(
+          "Health check failed due to a transaction error:",
+          error.toString()
+        );
+      } else if (error instanceof Db2PoolError) {
+        this.logger.error(
+          "Health check failed due to a pool error:",
+          error.toString()
+        );
+      } else if (error instanceof Db2Error) {
+        this.logger.error(
+          "Health check failed due to a Db2-related error:",
+          error.toString()
+        );
+      } else {
+        // Fallback for any other unhandled errors
+        this.logger.error(
+          "Health check failed due to an unknown error:",
+          error.toString()
+        );
+      }
+
+      // Step 5: Attempt to reconnect if the error indicates a connection issue
+      if (
+        error instanceof Db2ConnectionError ||
+        error instanceof Db2TimeoutError ||
+        error instanceof Db2PoolError
+      ) {
+        try {
+          this.logger.log(
+            "Attempting to reconnect after health check failure..."
+          );
+          await this.reconnect();
+        } catch (reconnectError) {
+          this.logger.error(
+            "Reconnection failed after health check error:",
+            reconnectError.toString()
+          );
+          this.state = Db2ConnectionState.ERROR;
+          return false; // Return false if reconnection fails
+        }
+      } else {
+        this.state = Db2ConnectionState.ERROR;
+        return false; // Return false for other types of errors
+      }
+
+      this.logger.log("Reconnection successful after health check error.");
+      return true; // Return true if reconnection is successful
     }
-
-    // Check the state of the connection pool
-    const activeConnections = this.getActiveConnectionsCount();
-    const totalConnections = this.getTotalConnectionsCount();
-
-    if (activeConnections > totalConnections * 0.9) {
-      this.logger.warn(
-        `Connection pool usage is high: ${activeConnections}/${totalConnections} active connections.`
-      );
-    }
-
-    this.logger.log("Health check passed.");
-    return true;
   }
 
   /**

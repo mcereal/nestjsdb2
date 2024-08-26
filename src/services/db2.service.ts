@@ -16,7 +16,16 @@ import {
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Db2QueryBuilder } from "../db/db2-query-builder";
 import { formatDb2Error } from "src/utils/db2.utils";
-import { Db2Error } from "../../src/errors/db2.error";
+import {
+  Db2AuthenticationError,
+  Db2ConnectionError,
+  Db2Error,
+  Db2PoolError,
+  Db2QuerySyntaxError,
+  Db2TimeoutError,
+  Db2TransactionError,
+  handleDb2Error,
+} from "../../src/errors/db2.error";
 import { Cache, caching } from "cache-manager";
 import { redisStore } from "cache-manager-redis-yet";
 import { Db2Client } from "src/db/db2-client";
@@ -64,44 +73,70 @@ export class Db2Service
   public async onModuleInit(): Promise<void> {
     this.logger.log("Initializing Db2Service...");
     this.validateConfig(this.options);
-    await this.connect();
+    try {
+      await this.connect();
 
-    // Run migrations if enabled
-    if (this.options.migration?.enabled) {
-      try {
+      // Run migrations if enabled
+      if (this.options.migration?.enabled) {
         await this.migrationService.runMigrations();
         this.logger.log("Migrations completed successfully.");
-      } catch (error) {
-        this.logger.error("Failed to run migrations:", error.message);
-        throw error;
       }
+    } catch (error) {
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Module Initialization", options, this.logger);
     }
   }
 
   public async onModuleDestroy(): Promise<void> {
     this.logger.log("Destroying Db2Service...");
     try {
-      // Drain the connection pool and disconnect the DB2 client
       await this.client.drainPool();
-      await this.client.disconnect();
+    } catch (error) {
+      this.handleError(error, "Drain Pool during Module Destroy");
+    }
 
-      // Check if caching is enabled and perform cache cleanup
-      if (this.cache) {
-        // Check the configuration to see if we should reset the cache on destroy
+    try {
+      await this.client.disconnect();
+    } catch (error) {
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(
+        error,
+        "Disconnect during Module Destroy",
+        options,
+        this.logger
+      );
+    }
+
+    if (this.cache) {
+      try {
         if (this.options.cache?.resetOnDestroy) {
-          await this.cache.reset(); // Clears all cached data
+          await this.cache.reset();
           this.logger.log("Cache reset successfully.");
         }
 
-        // Check if the store has a disconnect method (e.g., Redis store)
         const cacheStore = this.cache.store as any;
         if (typeof cacheStore.disconnect === "function") {
           await cacheStore.disconnect();
           this.logger.log("Cache store connection closed.");
         }
+      } catch (error) {
+        const options = {
+          host: this.options.host,
+          database: this.options.database,
+        };
+        handleDb2Error(
+          error,
+          "Cache Cleanup during Module Destroy",
+          options,
+          this.logger
+        );
       }
-    } catch (error) {
-      this.handleError(error, "Module Destroy");
     }
   }
 
@@ -109,16 +144,36 @@ export class Db2Service
     try {
       await this.client.connect();
     } catch (error) {
-      this.handleError(error, "Connection");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Connection", options, this.logger);
     }
   }
 
   public async disconnect(): Promise<void> {
-    await this.client.disconnect();
+    try {
+      await this.client.disconnect();
+    } catch (error) {
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Disconnection", options, this.logger);
+    }
   }
 
   public async drainPool(): Promise<void> {
-    await this.client.drainPool();
+    try {
+      await this.client.drainPool();
+    } catch (error) {
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Drain Pool", options, this.logger);
+    }
   }
 
   public getState(): Db2ConnectionState {
@@ -156,7 +211,11 @@ export class Db2Service
         this.logger.log(`Cache cleared for query: ${sql}`);
         return true;
       } catch (error) {
-        this.logger.error("Error clearing cache:", error.message);
+        const options = {
+          host: this.options.host,
+          database: this.options.database,
+        };
+        handleDb2Error(error, "Cache Clear", options, this.logger);
         return false;
       }
     }
@@ -174,17 +233,26 @@ export class Db2Service
   }> {
     this.logger.log("Performing service-level health check...");
 
-    const dbHealth = await this.client.checkHealth();
+    try {
+      const dbHealth = await this.client.checkHealth();
 
-    // Check if a transaction is currently active
-    const transactionActive = this.transactionManager
-      ? this.transactionManager.isTransactionActive()
-      : false;
+      // Check if a transaction is currently active
+      const transactionActive = this.transactionManager
+        ? this.transactionManager.isTransactionActive()
+        : false;
 
-    return {
-      dbHealth,
-      transactionActive,
-    };
+      return {
+        dbHealth,
+        transactionActive,
+      };
+    } catch (error) {
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Service Health Check", options, this.logger);
+      return { dbHealth: false, transactionActive: false };
+    }
   }
 
   private logQueryDetails(
@@ -257,8 +325,12 @@ export class Db2Service
       if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
         this.logQueryDetails(sql, params, duration, error);
       }
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
 
-      this.handleError(error, "Execute Prepared Statement");
+      handleDb2Error(error, "Execute Prepared Statement", options, this.logger);
     }
   }
 
@@ -288,7 +360,11 @@ export class Db2Service
           error
         );
       }
-      this.handleError(error, "Batch Insert");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Batch Insert", options, this.logger);
     }
   }
 
@@ -324,7 +400,11 @@ export class Db2Service
           error
         );
       }
-      this.handleError(error, "Batch Update");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Batch Update", options, this.logger);
     }
   }
 
@@ -332,7 +412,11 @@ export class Db2Service
     try {
       await this.transactionManager.beginTransaction();
     } catch (error) {
-      this.handleError(error, "Begin Transaction");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Begin Transaction", options, this.logger);
     }
   }
 
@@ -340,7 +424,11 @@ export class Db2Service
     try {
       await this.transactionManager.commitTransaction();
     } catch (error) {
-      this.handleError(error, "Commit Transaction");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Commit Transaction", options, this.logger);
     }
   }
 
@@ -348,7 +436,11 @@ export class Db2Service
     try {
       await this.transactionManager.rollbackTransaction();
     } catch (error) {
-      this.handleError(error, "Rollback Transaction");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Rollback Transaction", options, this.logger);
     }
   }
 
@@ -357,8 +449,11 @@ export class Db2Service
       await this.client.query(script);
       this.logger.log("Migration script executed successfully.");
     } catch (error) {
-      this.logger.error("Error executing migration script:", error.message);
-      this.handleError(error, "Migration");
+      const options = {
+        host: this.options.host,
+        database: this.options.database,
+      };
+      handleDb2Error(error, "Migration Execution", options, this.logger);
     }
   }
 
@@ -392,7 +487,7 @@ export class Db2Service
   }
 
   private handleError(error: any, context: string): void {
-    const errorMessage = formatDb2Error(
+    const formattedError = formatDb2Error(
       error,
       context,
       {
@@ -401,6 +496,38 @@ export class Db2Service
       },
       this.logger
     );
-    throw new Db2Error(errorMessage);
+
+    // Check the type of error and throw the appropriate custom error
+    if (error instanceof Db2QuerySyntaxError) {
+      this.logger.error(`Syntax Error in ${context}:`, formattedError);
+      throw new Db2QuerySyntaxError(formattedError, error.metadata);
+    } else if (error instanceof Db2TimeoutError) {
+      this.logger.error(`Timeout Error in ${context}:`, formattedError);
+      throw new Db2TimeoutError(formattedError, error.metadata);
+    } else if (error instanceof Db2ConnectionError) {
+      this.logger.error(`Connection Error in ${context}:`, formattedError);
+      throw new Db2ConnectionError(formattedError, error.metadata);
+    } else if (error instanceof Db2AuthenticationError) {
+      this.logger.error(`Authentication Error in ${context}:`, formattedError);
+      throw new Db2AuthenticationError(formattedError, error.metadata);
+    } else if (error instanceof Db2TransactionError) {
+      this.logger.error(`Transaction Error in ${context}:`, formattedError);
+      throw new Db2TransactionError(formattedError, error.metadata);
+    } else if (error instanceof Db2PoolError) {
+      this.logger.error(`Pool Error in ${context}:`, formattedError);
+      throw new Db2PoolError(formattedError, error.metadata);
+    } else if (error instanceof Db2Error) {
+      this.logger.error(`Db2 Error in ${context}:`, formattedError);
+      throw new Db2Error(formattedError, JSON.stringify(error.metadata));
+    } else {
+      // Fallback for unknown errors
+      this.logger.error(`Unknown Error in ${context}:`, formattedError);
+      throw new Db2Error(
+        `Unknown error occurred in ${context}`,
+        JSON.stringify({
+          originalError: formattedError,
+        })
+      );
+    }
   }
 }
