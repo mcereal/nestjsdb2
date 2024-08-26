@@ -47,13 +47,10 @@
     "cache-manager": "^5.7.6",
     "cache-manager-redis-yet": "^5.1.4",
     "class-validator": "^0.14.1",
-    "commander": "^12.1.0",
     "fs-extra": "^11.2.0",
     "ibm_db": "^3.2.4",
     "jsonwebtoken": "^9.0.2",
-    "kerberos": "^2.1.2",
-    "reflect-metadata": "^0.1.13",
-    "tar": "^7.4.3"
+    "reflect-metadata": "^0.1.13"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.1",
