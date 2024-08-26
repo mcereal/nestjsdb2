@@ -118,10 +118,7 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   tcpKeepAlive?: boolean;
 }
 
-/**
- * Interface for a Db2Connection class, defining methods for managing database connections and executing queries.
- */
-export interface Db2ConnectionInterface {
+export interface Db2ClientInterface {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
@@ -132,5 +129,44 @@ export interface Db2ConnectionInterface {
   checkHealth(): Promise<boolean>;
   getState(): Db2ConnectionState;
   getActiveConnectionsCount(): number;
+  getTotalConnectionsCount(): number;
   drainPool(): Promise<void>;
+  // Add any additional methods needed for client operations
+}
+
+export interface Db2ServiceInterface {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
+  executePreparedStatement<T>(sql: string, params?: any[]): Promise<T>;
+  beginTransaction(): Promise<void>;
+  commitTransaction(): Promise<void>;
+  rollbackTransaction(): Promise<void>;
+  checkHealth(): Promise<{ dbHealth: boolean; transactionActive: boolean }>;
+  batchInsert(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][]
+  ): Promise<void>;
+  batchUpdate(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][],
+    whereClause: string
+  ): Promise<void>;
+  // Add any other high-level methods exposed by Db2Service
+}
+
+export interface TransactionManagerInterface {
+  beginTransaction(isolationLevel?: string): Promise<void>;
+  commitTransaction(): Promise<void>;
+  rollbackTransaction(): Promise<void>;
+  setIsolationLevel(level: string): void;
+  isTransactionActive(): boolean;
+  retryOperation<T>(
+    operation: () => Promise<T>,
+    attempts?: number,
+    delay?: number
+  ): Promise<T>;
+  withTimeout<T>(operation: () => Promise<T>, timeout: number): Promise<T>;
 }

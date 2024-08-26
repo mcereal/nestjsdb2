@@ -2,17 +2,20 @@
 
 import SQL_ATTR_ROWCOUNT_PREFETCH, { Pool, Connection } from "ibm_db";
 import {
-  Db2ConnectionInterface,
+  Db2ClientInterface,
   Db2ConfigOptions,
 } from "../interfaces/db2.interface";
 import { Db2ConnectionState } from "../enums/db2.enums";
-import { Logger } from "@nestjs/common";
-import { Db2Error } from "../errors/db2.error";
+import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Db2ConnectionError, Db2Error } from "../errors/db2.error";
 import { appendFileSync } from "fs";
 import { Db2AuthStrategy } from "src/auth/db2-auth.strategy";
 import { createAuthStrategy } from "src/auth/auth-factory";
+import { formatDb2Error } from "src/utils/db2.utils";
 
-export class Db2Client implements Db2ConnectionInterface {
+export class Db2Client
+  implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
+{
   private pool: Pool;
   private connection: Connection | null = null;
   private config: Db2ConfigOptions;
@@ -168,10 +171,12 @@ export class Db2Client implements Db2ConnectionInterface {
           this.config.host = originalHost;
           this.config.port = originalPort;
           this.logger.error("Failover failed:", failoverError.message);
-          throw new Db2Error("Failed to connect to primary and failover hosts");
+          throw new Db2ConnectionError(
+            "Failed to connect to primary and failover hosts"
+          );
         }
       } else {
-        throw new Db2Error(
+        throw new Db2ConnectionError(
           "All reconnection attempts failed. No failover host configured."
         );
       }
@@ -279,14 +284,14 @@ export class Db2Client implements Db2ConnectionInterface {
 
   public async releaseConnection(connection: Connection): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.state = Db2ConnectionState.DISCONNECTING; // New state to show disconnection in progress
+      this.state = Db2ConnectionState.DISCONNECTING;
       this.pool.close(connection, (err) => {
         if (err) {
-          this.state = Db2ConnectionState.ERROR; // Update to error state
+          this.state = Db2ConnectionState.ERROR;
           this.logger.error("Error releasing connection:", err.message);
           reject(new Db2Error("Failed to release connection"));
         } else {
-          this.state = Db2ConnectionState.DISCONNECTED; // Successfully disconnected
+          this.state = Db2ConnectionState.DISCONNECTED;
           this.logger.log("Connection successfully released back to the pool.");
           resolve();
         }
@@ -329,7 +334,7 @@ export class Db2Client implements Db2ConnectionInterface {
           if (error) {
             this.state = Db2ConnectionState.ERROR;
             this.logError("Query error", error);
-            reject(new Db2Error("Query execution failed"));
+            reject(new Db2Error("Query execution failed", error, params));
           } else {
             const duration = Date.now() - startTime;
             if (this.config.logging?.profileSql) {
@@ -345,6 +350,91 @@ export class Db2Client implements Db2ConnectionInterface {
         reject(new Db2Error("Failed to prepare or execute the query"));
       }
     });
+  }
+
+  // src/db/db2-client.ts
+
+  /**
+   * Executes a batch insert operation on the Db2 database.
+   * @param tableName The name of the table to insert into.
+   * @param columns The columns to insert data into.
+   * @param valuesArray An array of value arrays, each containing values for a single row.
+   * @returns A promise that resolves when the batch insert is complete.
+   */
+  async batchInsert(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][]
+  ): Promise<void> {
+    this.logger.log(`Starting batch insert into table: ${tableName}`);
+
+    if (!this.connection) {
+      this.logger.warn(
+        "No active connection to perform batch insert. Attempting to reconnect..."
+      );
+      await this.reconnect(); // Attempt to reconnect before batch insert
+    }
+
+    const columnsString = columns.join(", ");
+    const placeholders = columns.map(() => "?").join(", "); // Generate placeholders (?, ?, ...)
+    const sql = `INSERT INTO ${tableName} (${columnsString}) VALUES (${placeholders})`;
+
+    try {
+      const stmt = this.connection.prepareSync(sql); // Prepare the statement
+
+      for (const values of valuesArray) {
+        stmt.executeSync(values); // Execute each row
+      }
+
+      stmt.closeSync(); // Close the statement after execution
+      this.logger.log(`Batch insert completed for table: ${tableName}`);
+    } catch (error) {
+      this.logError("Batch insert error", error);
+      throw new Db2Error("Batch insert failed");
+    }
+  }
+
+  // src/db/db2-client.ts
+
+  /**
+   * Executes a batch update operation on the Db2 database.
+   * @param tableName The name of the table to update.
+   * @param columns The columns to update.
+   * @param valuesArray An array of value arrays, each containing values for a single row update.
+   * @param whereClause A string representing the WHERE clause for the update.
+   * @returns A promise that resolves when the batch update is complete.
+   */
+  async batchUpdate(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][],
+    whereClause: string
+  ): Promise<void> {
+    this.logger.log(`Starting batch update on table: ${tableName}`);
+
+    if (!this.connection) {
+      this.logger.warn(
+        "No active connection to perform batch update. Attempting to reconnect..."
+      );
+      await this.reconnect(); // Attempt to reconnect before batch update
+    }
+
+    const setString = columns.map((col) => `${col} = ?`).join(", ");
+    const sql = `UPDATE ${tableName} SET ${setString} WHERE ${whereClause}`;
+
+    try {
+      const stmt = this.connection.prepareSync(sql); // Prepare the statement
+
+      for (const values of valuesArray) {
+        stmt.executeSync(values); // Execute each row update
+      }
+
+      stmt.closeSync(); // Close the statement after execution
+      this.logger.log(`Batch update completed for table: ${tableName}`);
+    } catch (error) {
+      this.logError("Batch update error", error);
+      throw new Db2Error("Batch update failed");
+    }
   }
 
   /**
@@ -403,22 +493,58 @@ export class Db2Client implements Db2ConnectionInterface {
   }
 
   /**
-   * Adjusts the connection pool size based on the current load.
-   * @param activeConnectionsThreshold The threshold for active connections.
-   * @param minPoolSize The new minimum pool size if threshold is exceeded.
-   * @param maxPoolSize The new maximum pool size if threshold is exceeded.
+   * Adjusts the connection pool size dynamically based on the current load.
+   * @param activeConnectionsThreshold The threshold for active connections to trigger pool resizing.
+   * @param minPoolSize The new minimum pool size if the threshold is exceeded.
+   * @param maxPoolSize The new maximum pool size if the threshold is exceeded.
    */
-  public adjustPoolSizeBasedOnLoad(
+  public async adjustPoolSizeBasedOnLoad(
     activeConnectionsThreshold: number,
     minPoolSize: number,
     maxPoolSize: number
-  ): void {
+  ): Promise<void> {
+    // Validate input parameters
+    if (minPoolSize < 1 || maxPoolSize < minPoolSize) {
+      this.logger.error(
+        `Invalid pool size configuration: minPoolSize=${minPoolSize}, maxPoolSize=${maxPoolSize}`
+      );
+      throw new Db2Error("Invalid pool size configuration.");
+    }
+
     const activeConnections = this.getActiveConnectionsCount();
 
+    this.logger.log(
+      `Checking pool load: ${activeConnections} active connections.`
+    );
+
+    // Check if the active connections exceed the threshold
     if (activeConnections > activeConnectionsThreshold) {
-      this.setPoolSize(minPoolSize, maxPoolSize);
+      // Log the decision before making changes
       this.logger.warn(
-        `Active connections exceeded threshold (${activeConnectionsThreshold}). Adjusting pool size: min=${minPoolSize}, max=${maxPoolSize}`
+        `Active connections (${activeConnections}) exceeded threshold (${activeConnectionsThreshold}). Adjusting pool size: min=${minPoolSize}, max=${maxPoolSize}`
+      );
+
+      try {
+        // Gracefully drain the current pool
+        await this.drainPool();
+
+        this.setPoolSize(minPoolSize, maxPoolSize);
+
+        // Reconnect the pool
+        await this.connect(); // Reconnect with new settings
+        this.logger.log(
+          `Successfully adjusted pool size and reconnected: min=${minPoolSize}, max=${maxPoolSize}`
+        );
+      } catch (error) {
+        this.logger.error(
+          "Failed to adjust pool size or reconnect dynamically:",
+          error.message
+        );
+        throw new Db2Error("Failed to adjust pool size dynamically.");
+      }
+    } else {
+      this.logger.log(
+        `Active connections (${activeConnections}) within acceptable limits. No pool size adjustment necessary.`
       );
     }
   }
@@ -444,9 +570,9 @@ export class Db2Client implements Db2ConnectionInterface {
       }
 
       // Dynamically adjust the pool size if active connections exceed a threshold
-      const activeConnectionsThreshold = 5; // Example threshold
-      const newMinPoolSize = Math.min(10, activeConnections + 2); // Example: increase min pool size
-      const newMaxPoolSize = Math.min(20, activeConnections + 5); // Example: increase max pool size
+      const activeConnectionsThreshold = 5;
+      const newMinPoolSize = Math.min(10, activeConnections + 2);
+      const newMaxPoolSize = Math.min(20, activeConnections + 5);
 
       if (activeConnections > activeConnectionsThreshold) {
         this.adjustPoolSizeBasedOnLoad(
@@ -486,14 +612,14 @@ export class Db2Client implements Db2ConnectionInterface {
         );
 
         if (retryPolicy === "simple") {
-          await this.sleep(retryInterval); // Simple retry with constant interval
+          await this.sleep(retryInterval);
         } else if (retryPolicy === "exponentialBackoff") {
           await this.sleep(retryInterval * Math.pow(2, attempt - 1)); // Exponential backoff
         }
       }
     }
 
-    throw new Db2Error("Operation failed after maximum retry attempts."); // Fallback in case all attempts fail
+    throw new Db2Error("Operation failed after maximum retry attempts.");
   }
 
   /**
@@ -505,24 +631,39 @@ export class Db2Client implements Db2ConnectionInterface {
   }
 
   /**
-   * Check if the connection has been idle for too long and close it if necessary.
+   * Checks if the connection has been idle for too long and closes it if necessary.
+   * If the connection is closed due to inactivity, it attempts to reconnect.
    */
-  private checkIdleTimeout() {
+  private async checkIdleTimeout(): Promise<void> {
     const idleTimeout = this.config.idleTimeout || 60000; // Default to 60 seconds
     const now = Date.now();
+
     if (this.connection && now - this.lastUsed > idleTimeout) {
-      this.logger.log("Idle timeout reached, closing connection.");
-      this.disconnect()
-        .then(() => {
-          this.logger.log("Attempting to reconnect after idle timeout...");
-          this.reconnect(); // Reconnect after idle timeout
-        })
-        .catch((error) => {
-          this.logError(
-            "Failed to disconnect during idle timeout check",
-            error
-          );
+      this.logger.warn(
+        `Idle timeout reached (${idleTimeout} ms), closing connection...`
+      );
+
+      try {
+        await this.disconnect();
+        this.logger.log("Connection closed due to idle timeout.");
+
+        // Attempt to reconnect after disconnecting
+        this.logger.log("Attempting to reconnect after idle timeout...");
+        await this.reconnect();
+        this.logger.log("Reconnection successful after idle timeout.");
+      } catch (error) {
+        const errorMessage = formatDb2Error(error, "Idle Timeout Check", {
+          host: this.config.host,
+          database: this.config.database,
+          idleTimeout,
         });
+        this.logger.error(
+          `Failed to handle idle timeout properly: ${errorMessage}`
+        );
+        throw new Db2Error(
+          "Failed to handle idle timeout. Check logs for details."
+        );
+      }
     }
   }
 
@@ -541,7 +682,7 @@ export class Db2Client implements Db2ConnectionInterface {
       this.logger.warn(
         "No active connection to execute the prepared statement. Attempting to reconnect..."
       );
-      await this.reconnect(); // Attempt to reconnect before executing the statement
+      await this.reconnect();
     }
 
     return new Promise<T>((resolve, reject) => {
@@ -561,7 +702,7 @@ export class Db2Client implements Db2ConnectionInterface {
             reject(new Db2Error("Prepared statement execution failed"));
           } else {
             resolve(result);
-            stmt.closeSync(); // Close the statement after execution
+            stmt.closeSync();
           }
         });
       });
@@ -570,64 +711,136 @@ export class Db2Client implements Db2ConnectionInterface {
 
   /**
    * Begins a database transaction.
+   * @throws Db2Error if no active connection is available or transaction initiation fails.
    */
   async beginTransaction(): Promise<void> {
     if (this.state !== Db2ConnectionState.CONNECTED) {
+      this.logger.error("Cannot begin transaction. No active connection.");
       throw new Db2Error("Cannot begin transaction. No active connection.");
     }
 
     this.logger.log("Beginning transaction...");
-    await this.query("BEGIN");
+
+    try {
+      // Initiate the transaction by sending the SQL command to start it
+      await this.query("BEGIN");
+
+      // Log success and state change
+      this.logger.log("Transaction started successfully.");
+    } catch (error) {
+      // Log the error with detailed context and rethrow a Db2Error
+      const errorMessage = formatDb2Error(error, "Begin Transaction", {
+        host: this.config.host,
+        database: this.config.database,
+      });
+      this.logger.error(`Failed to begin transaction: ${errorMessage}`);
+      throw new Db2Error(
+        "Failed to begin transaction. Check logs for details."
+      );
+    }
   }
 
   /**
    * Commits the current transaction.
+   * @throws Db2Error if no active connection is available or the commit operation fails.
    */
   async commitTransaction(): Promise<void> {
     if (this.state !== Db2ConnectionState.CONNECTED) {
+      this.logger.error("Cannot commit transaction. No active connection.");
       throw new Db2Error("Cannot commit transaction. No active connection.");
     }
 
     this.logger.log("Committing transaction...");
-    await this.query("COMMIT");
+
+    try {
+      // Execute the commit command
+      await this.query("COMMIT");
+
+      // Log success
+      this.logger.log("Transaction committed successfully.");
+    } catch (error) {
+      // Log the error with detailed context and rethrow a Db2Error
+      const errorMessage = formatDb2Error(error, "Commit Transaction", {
+        host: this.config.host,
+        database: this.config.database,
+      });
+      this.logger.error(`Failed to commit transaction: ${errorMessage}`);
+      throw new Db2Error(
+        "Failed to commit transaction. Check logs for details."
+      );
+    }
   }
 
   /**
    * Rolls back the current transaction.
+   * @throws Db2Error if no active connection is available or the rollback operation fails.
    */
   async rollbackTransaction(): Promise<void> {
     if (this.state !== Db2ConnectionState.CONNECTED) {
+      this.logger.error("Cannot rollback transaction. No active connection.");
       throw new Db2Error("Cannot rollback transaction. No active connection.");
     }
 
     this.logger.log("Rolling back transaction...");
-    await this.query("ROLLBACK");
+
+    try {
+      // Execute the rollback command
+      await this.query("ROLLBACK");
+
+      // Log success
+      this.logger.log("Transaction rolled back successfully.");
+    } catch (error) {
+      // Log the error with detailed context and rethrow a Db2Error
+      const errorMessage = formatDb2Error(error, "Rollback Transaction", {
+        host: this.config.host,
+        database: this.config.database,
+      });
+      this.logger.error(`Failed to rollback transaction: ${errorMessage}`);
+      throw new Db2Error(
+        "Failed to rollback transaction. Check logs for details."
+      );
+    }
   }
+
+  // src/db/db2-client.ts
 
   /**
    * Checks the health status of the Db2 connection.
    * @returns A promise that resolves with a boolean indicating the health of the connection.
    */
   async checkHealth(): Promise<boolean> {
+    this.logger.log("Performing extended health check...");
+
+    // Check the connection state
     if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.warn(
-        "Cannot check health. No active connection. Attempting to reconnect..."
-      );
-      await this.reconnect(); // Attempt to reconnect if no active connection
+      this.logger.warn("No active connection. Attempting to reconnect...");
+      await this.reconnect();
     }
 
+    // Execute a simple query to test the connection
     const testQuery =
       this.config.connectionTestQuery || "SELECT 1 FROM SYSIBM.SYSDUMMY1";
     try {
       await this.query(testQuery);
-      return true;
     } catch (error) {
       this.state = Db2ConnectionState.ERROR;
       this.logger.error("Health check failed:", error.message);
-      // Attempt to reconnect on health check failure
       await this.reconnect();
       return false;
     }
+
+    // Check the state of the connection pool
+    const activeConnections = this.getActiveConnectionsCount();
+    const totalConnections = this.getTotalConnectionsCount();
+
+    if (activeConnections > totalConnections * 0.9) {
+      this.logger.warn(
+        `Connection pool usage is high: ${activeConnections}/${totalConnections} active connections.`
+      );
+    }
+
+    this.logger.log("Health check passed.");
+    return true;
   }
 
   /**
@@ -638,30 +851,96 @@ export class Db2Client implements Db2ConnectionInterface {
     return this.state;
   }
 
-  /**
-   * Returns the number of active connections in the pool.
-   * @returns {number}
-   */
   public getActiveConnectionsCount(): number {
-    return this.connection ? 1 : 0;
+    try {
+      // Check if the pool has a method to get active connections count
+      if (typeof this.pool.getPoolStatus === "function") {
+        const poolStatus = this.pool.getPoolStatus();
+        const activeConnections = poolStatus?.availablePoolSize || 0;
+
+        this.logger.debug(`Current active connections: ${activeConnections}`);
+        return activeConnections;
+      }
+
+      this.logger.warn(
+        "Active connections count could not be determined. Falling back to default logic."
+      );
+
+      // Manual tracking of active connections if pool method is not available
+      return this.connection ? 1 : 0;
+    } catch (error) {
+      this.logger.error(
+        "Failed to get active connections count:",
+        error.message
+      );
+      throw new Db2Error("Error retrieving the number of active connections.");
+    }
   }
 
   /**
    * Returns the total number of connections in the pool.
-   * @returns The total number of connections.
+   * Logs the total connection count for monitoring purposes.
+   * @returns The total number of connections in the pool.
    */
   public getTotalConnectionsCount(): number {
-    return (
-      this.pool.activeConnections.length + this.pool.idleConnections.length
-    ); // Example usage, depends on ibm_db pool implementation
+    try {
+      // Safely check for pool and connections before accessing their properties
+      const activeConnections = this.pool?.activeConnections?.length || 0;
+      const idleConnections = this.pool?.idleConnections?.length || 0;
+      const totalConnections = activeConnections + idleConnections;
+
+      this.logger.log(
+        `Total connections in the pool: ${totalConnections} (Active: ${activeConnections}, Idle: ${idleConnections})`
+      );
+
+      return totalConnections;
+    } catch (error) {
+      this.logger.error(
+        "Error retrieving total connections count:",
+        error.message
+      );
+
+      // Return 0 as a fallback in case of error
+      return 0;
+    }
   }
 
   /**
-   * Drains the connection pool, closing all active connections.
+   * Drains the connection pool by closing all active connections.
+   * If a specific connection is open, it closes that first and then clears the entire pool.
    */
   async drainPool(): Promise<void> {
-    if (this.connection) {
-      await this.disconnect();
+    try {
+      this.logger.log("Draining the connection pool...");
+
+      // Check and close the current connection
+      if (this.connection) {
+        this.logger.log(
+          "Closing current active connection before draining the pool."
+        );
+        await this.disconnect();
+      }
+
+      // Close all connections in the pool
+      this.pool.closeAll((err) => {
+        if (err) {
+          this.logger.error(
+            "Error while draining the connection pool:",
+            err.message
+          );
+          throw new Db2Error("Failed to drain the connection pool.");
+        } else {
+          this.logger.log(
+            "All connections in the pool have been successfully drained."
+          );
+        }
+      });
+    } catch (error) {
+      // Handle any errors that occur during the draining process
+      this.logger.error("Error during pool draining operation:", error.message);
+      throw new Db2Error(
+        "An error occurred while draining the connection pool."
+      );
     }
   }
 
@@ -736,22 +1015,44 @@ export class Db2Client implements Db2ConnectionInterface {
   }
 
   /**
-   * Sets the minimum and maximum pool size dynamically.
+   * Dynamically sets the minimum and maximum pool size for the database connections.
+   * Validates the inputs and ensures that the pool is adjusted accordingly.
    * @param minPoolSize The minimum number of connections in the pool.
    * @param maxPoolSize The maximum number of connections in the pool.
+   * @throws Db2Error if the provided pool sizes are invalid.
    */
   public setPoolSize(minPoolSize: number, maxPoolSize: number): void {
-    if (minPoolSize < 1 || maxPoolSize < minPoolSize) {
-      throw new Error("Invalid pool size configuration.");
+    try {
+      // Validate pool sizes
+      if (minPoolSize < 1) {
+        throw new Db2Error("Minimum pool size must be at least 1.");
+      }
+      if (maxPoolSize < minPoolSize) {
+        throw new Db2Error(
+          "Maximum pool size must be greater than or equal to the minimum pool size."
+        );
+      }
+
+      // Log current pool sizes for comparison
+      const currentMinSize = this.pool.minPoolSize || "default";
+      const currentMaxSize = this.pool.maxPoolSize || "default";
+
+      this.logger.log(
+        `Adjusting connection pool size: current min=${currentMinSize}, current max=${currentMaxSize}, ` +
+          `new min=${minPoolSize}, new max=${maxPoolSize}`
+      );
+
+      // Update the pool configuration
+      this.pool.setMaxPoolSize(maxPoolSize);
+      this.pool.setMinPoolSize(minPoolSize);
+
+      // Confirm the update
+      this.logger.log(
+        `Connection pool size updated successfully: min=${minPoolSize}, max=${maxPoolSize}`
+      );
+    } catch (error) {
+      this.logger.error("Failed to set pool size:", error.message);
+      throw new Db2Error("An error occurred while setting the pool size.");
     }
-
-    this.pool = new Pool({
-      minPoolSize,
-      maxPoolSize,
-    });
-
-    this.logger.log(
-      `Connection pool size updated: min=${minPoolSize}, max=${maxPoolSize}`
-    );
   }
 }

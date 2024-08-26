@@ -5,11 +5,13 @@ import {
   Logger,
   OnModuleInit,
   OnModuleDestroy,
+  Inject,
+  Optional,
 } from "@nestjs/common";
 import {
   Db2CacheOptions,
   Db2ConfigOptions,
-  Db2ConnectionInterface,
+  Db2ServiceInterface,
 } from "../interfaces/db2.interface";
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Db2QueryBuilder } from "../db/db2-query-builder";
@@ -20,10 +22,11 @@ import { redisStore } from "cache-manager-redis-yet";
 import { Db2Client } from "src/db/db2-client";
 import { TransactionManager } from "../db/transaction-manager";
 import { Db2MigrationService } from "./migration.service";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 
 @Injectable()
 export class Db2Service
-  implements Db2ConnectionInterface, OnModuleInit, OnModuleDestroy
+  implements Db2ServiceInterface, OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(Db2Service.name);
   private client: Db2Client;
@@ -33,19 +36,29 @@ export class Db2Service
 
   private options: Db2ConfigOptions;
 
-  constructor(options: Db2ConfigOptions, cache?: Cache) {
+  constructor(
+    options: Db2ConfigOptions,
+    @Optional() @Inject(CACHE_MANAGER) cacheManager: Cache,
+    transactionManager: TransactionManager,
+    migrationService: Db2MigrationService
+  ) {
     this.options = options;
-    this.cache = cache;
+    this.transactionManager = transactionManager;
+    this.migrationService = migrationService;
+
+    if (options.cache?.enabled) {
+      this.cache = cacheManager;
+      this.logger.log("Cache manager initialized.");
+    } else {
+      this.logger.log("Caching is disabled.");
+    }
+
     this.client = new Db2Client(this.options);
-    this.transactionManager = new TransactionManager(this.client);
 
     if (options.cache?.enabled) {
       this.initializeCache(options.cache);
-    }
-
-    // Initialize the migration service with migration configuration
-    if (options.migration) {
-      this.migrationService = new Db2MigrationService(this, options.migration);
+    } else {
+      this.logger.log("Caching is disabled.");
     }
   }
 
@@ -101,10 +114,24 @@ export class Db2Service
     return this.client.getActiveConnectionsCount();
   }
 
-  async checkHealth(): Promise<boolean> {
-    return await this.client.checkHealth();
-  }
+  async checkHealth(): Promise<{
+    dbHealth: boolean;
+    transactionActive: boolean;
+  }> {
+    this.logger.log("Performing service-level health check...");
 
+    const dbHealth = await this.client.checkHealth();
+
+    // Check if a transaction is currently active
+    const transactionActive = this.transactionManager
+      ? this.transactionManager.isTransactionActive()
+      : false;
+
+    return {
+      dbHealth,
+      transactionActive,
+    };
+  }
   createQueryBuilder(): Db2QueryBuilder {
     return new Db2QueryBuilder();
   }
@@ -117,12 +144,14 @@ export class Db2Service
         password: cacheOptions.redisPassword,
         ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
       });
+      this.logger.log("Redis cache initialized.");
     } else {
       // Default to in-memory cache
       this.cache = await caching("memory", {
         max: cacheOptions.max || 100, // Default max items
         ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
       });
+      this.logger.log("In-memory cache initialized.");
     }
   }
 
@@ -140,9 +169,27 @@ export class Db2Service
     sql: string,
     params: any[] = []
   ): Promise<T> {
+    const start = Date.now();
     try {
-      return await this.client.executePreparedStatement<T>(sql, params);
+      const result = await this.client.executePreparedStatement<T>(sql, params);
+
+      const duration = Date.now() - start;
+
+      if (
+        this.options.logging?.logQueries ||
+        this.options.logging?.profileSql
+      ) {
+        this.logQueryDetails(sql, params, duration);
+      }
+
+      return result;
     } catch (error) {
+      const duration = Date.now() - start;
+
+      if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
+        this.logQueryDetails(sql, params, duration, error);
+      }
+
       this.handleError(error, "Execute Prepared Statement");
     }
   }
@@ -164,21 +211,16 @@ export class Db2Service
   }
 
   private handleError(error: any, context: string): void {
-    const errorMessage = formatDb2Error(error, context, {
-      host: this.options.host,
-      database: this.options.database,
-    });
-
-    const structuredError = {
+    const errorMessage = formatDb2Error(
+      error,
       context,
-      message: errorMessage,
-      host: this.options.host,
-      database: this.options.database,
-      timestamp: new Date().toISOString(),
-    };
-
-    this.logger.error(JSON.stringify(structuredError));
-    throw new Db2Error(errorMessage); // Throw a custom Db2 error
+      {
+        host: this.options.host,
+        database: this.options.database,
+      },
+      this.logger
+    );
+    throw new Db2Error(errorMessage);
   }
 
   async query<T>(
@@ -186,6 +228,7 @@ export class Db2Service
     params: any[] = [],
     timeout?: number
   ): Promise<T> {
+    const start = Date.now();
     if (this.cache) {
       const cacheKey = this.generateCacheKey(sql, params);
       const cachedResult = await this.cache.get<T>(cacheKey);
@@ -202,7 +245,11 @@ export class Db2Service
       await this.cache.set(cacheKey, result);
       this.logger.log(`Cache set for query: ${sql}`);
     }
+    const duration = Date.now() - start;
 
+    if (this.options.logging?.logQueries || this.options.logging?.profileSql) {
+      this.logQueryDetails(sql, params, duration); // Log query details
+    }
     return result;
   }
 
@@ -227,6 +274,72 @@ export class Db2Service
       await this.transactionManager.rollbackTransaction();
     } catch (error) {
       this.handleError(error, "Rollback Transaction");
+    }
+  }
+
+  async batchInsert(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][]
+  ): Promise<void> {
+    const start = Date.now();
+    try {
+      await this.client.batchInsert(tableName, columns, valuesArray);
+
+      const duration = Date.now() - start;
+      if (
+        this.options.logging?.logQueries ||
+        this.options.logging?.profileSql
+      ) {
+        this.logQueryDetails("Batch Insert Operation", valuesArray, duration);
+      }
+    } catch (error) {
+      const duration = Date.now() - start;
+      if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
+        this.logQueryDetails(
+          "Batch Insert Operation",
+          valuesArray,
+          duration,
+          error
+        );
+      }
+      this.handleError(error, "Batch Insert");
+    }
+  }
+
+  async batchUpdate(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][],
+    whereClause: string
+  ): Promise<void> {
+    const start = Date.now();
+    try {
+      await this.client.batchUpdate(
+        tableName,
+        columns,
+        valuesArray,
+        whereClause
+      );
+
+      const duration = Date.now() - start; // Calculate execution duration
+      if (
+        this.options.logging?.logQueries ||
+        this.options.logging?.profileSql
+      ) {
+        this.logQueryDetails("Batch Update Operation", valuesArray, duration); // Log actual SQL or operation name
+      }
+    } catch (error) {
+      const duration = Date.now() - start; // Calculate execution duration
+      if (this.options.logging?.logErrors || this.options.logging?.profileSql) {
+        this.logQueryDetails(
+          "Batch Update Operation",
+          valuesArray,
+          duration,
+          error
+        ); // Log actual SQL or operation name with error
+      }
+      this.handleError(error, "Batch Update");
     }
   }
 

@@ -1,3 +1,5 @@
+import { Logger } from "@nestjs/common";
+
 /**
  * @fileoverview This file contains the implementation of the `formatDb2Error` function.
  * The `formatDb2Error` function is used to create a standardized error message format for
@@ -12,14 +14,15 @@
 
 /**
  * @function formatDb2Error
- * @description Formats a Db2 error into a standardized error message string. This function extracts
- * important details from the error object, such as the error code, message, and stack trace, and
- * combines them with context and optional metadata to produce a comprehensive error message. This
- * formatted message is useful for logging, debugging, and error reporting.
+ * @description Formats a Db2 error into a standardized error message string and logs it using NestJS's Logger.
+ * This function extracts important details from the error object, such as the error code, message, and stack trace,
+ * and combines them with context and optional metadata to produce a comprehensive error message.
+ * This formatted message is useful for logging, debugging, and error reporting.
  *
  * @param {any} error - The error object containing details about the failure. It typically includes properties like `code`, `message`, and `stack`.
  * @param {string} context - A description of where the error occurred, such as the method or process name.
  * @param {Record<string, any>} [metadata] - Optional additional information to include with the error, represented as a key-value pair object.
+ * @param {Logger} [logger] - Optional NestJS Logger to log the error. If not provided, it defaults to a new Logger instance.
  *
  * @returns {string} - A formatted error string that includes the error code, message, context, stack trace (if available), and optional metadata.
  *
@@ -34,20 +37,24 @@
  *     host: 'localhost',
  *     database: 'sampledb'
  *   });
- *   console.error(formattedError);
  * }
  */
 export function formatDb2Error(
   error: any,
   context: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
+  logger: Logger = new Logger("Db2Error")
 ): string {
   const errorCode = error.code || "UNKNOWN_ERROR";
   const errorMessage = error.message || "An unknown error occurred";
   const metadataString = metadata ? JSON.stringify(metadata, null, 2) : "";
   const stackTrace = error.stack ? `\nStack Trace: ${error.stack}` : "";
 
-  return `Error in ${context} - Code: ${errorCode}, Message: ${errorMessage}${stackTrace}${
+  const formattedError = `Error in ${context} - Code: ${errorCode}, Message: ${errorMessage}${stackTrace}${
     metadataString ? `\nMetadata: ${metadataString}` : ""
   }`;
+
+  logger.error(formattedError);
+
+  return formattedError;
 }

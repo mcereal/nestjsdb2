@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { Db2ConnectionInterface } from "src/interfaces/db2.interface";
+import { Db2ClientInterface } from "src/interfaces/db2.interface";
 import { Db2Error } from "../errors/db2.error";
 
 export class TransactionManager {
@@ -7,7 +7,7 @@ export class TransactionManager {
   private transactionActive: boolean = false;
   private isolationLevel: string | null = null;
 
-  constructor(private db2Connection: Db2ConnectionInterface) {}
+  constructor(private client: Db2ClientInterface) {}
 
   /**
    * Begin a transaction with optional isolation level.
@@ -26,7 +26,7 @@ export class TransactionManager {
 
       const startTime = Date.now();
       if (this.isolationLevel) {
-        await this.db2Connection.query(
+        await this.client.query(
           `SET TRANSACTION ISOLATION LEVEL ${this.isolationLevel}`
         );
         this.logger.log(
@@ -34,7 +34,7 @@ export class TransactionManager {
         );
       }
 
-      await this.db2Connection.query("BEGIN TRANSACTION");
+      await this.client.query("BEGIN TRANSACTION");
       this.transactionActive = true;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction started in ${duration}ms.`);
@@ -56,7 +56,7 @@ export class TransactionManager {
 
     try {
       const startTime = Date.now();
-      await this.db2Connection.query("COMMIT");
+      await this.client.query("COMMIT");
       this.transactionActive = false;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction committed in ${duration}ms.`);
@@ -78,7 +78,7 @@ export class TransactionManager {
 
     try {
       const startTime = Date.now();
-      await this.db2Connection.query("ROLLBACK");
+      await this.client.query("ROLLBACK");
       this.transactionActive = false;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction rolled back in ${duration}ms.`);
@@ -105,6 +105,14 @@ export class TransactionManager {
 
     this.isolationLevel = level;
     this.logger.log(`Transaction isolation level set to ${level}.`);
+  }
+
+  /**
+   * Returns whether a transaction is currently active.
+   * @returns A boolean indicating if a transaction is active.
+   */
+  isTransactionActive(): boolean {
+    return this.transactionActive;
   }
 
   /**

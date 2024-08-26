@@ -3,16 +3,16 @@
 import { Logger } from "@nestjs/common";
 import { promises as fs } from "fs";
 import { join } from "path";
-import { Db2Service } from "../services/db2.service";
 import { Db2MigrationOptions } from "../interfaces/db2.interface";
 import { formatDb2Error } from "../utils/db2.utils";
+import { Db2Client } from "src/db/db2-client";
 
 export class Db2MigrationService {
   private logger = new Logger(Db2MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
 
   constructor(
-    private db2Service: Db2Service,
+    private db2Client: Db2Client,
     migrationConfig: Db2MigrationOptions
   ) {
     this.migrationConfig = migrationConfig;
@@ -66,7 +66,7 @@ export class Db2MigrationService {
             this.logger.log(`Executing migration script: ${file}`);
           }
 
-          await this.db2Service.query(script);
+          await this.db2Client.query(script);
 
           if (
             this.migrationConfig.markAsExecuted &&
@@ -77,12 +77,13 @@ export class Db2MigrationService {
 
           this.logger.log(`Migration applied successfully: ${file}`);
         } catch (error) {
-          const formattedError = formatDb2Error(
-            error,
-            `Migration script: ${file}`
-          );
           if (this.migrationConfig.logErrors) {
-            this.logger.error(formattedError);
+            formatDb2Error(
+              error,
+              `Migration script: ${file}`,
+              { file },
+              this.logger
+            );
           }
 
           if (this.migrationConfig.skipOnFail) {
@@ -101,8 +102,7 @@ export class Db2MigrationService {
         }
       }
     } catch (error) {
-      const formattedError = formatDb2Error(error, "Migration process");
-      this.logger.error(formattedError);
+      formatDb2Error(error, "Migration process", {}, this.logger);
       throw error;
     }
   }
@@ -149,9 +149,7 @@ export class Db2MigrationService {
     `;
 
     try {
-      const result = await this.db2Service.query<{ count: number }>(sql, [
-        file,
-      ]);
+      const result = await this.db2Client.query<{ count: number }>(sql, [file]);
       return result.count > 0;
     } catch (error) {
       const formattedError = formatDb2Error(
@@ -184,7 +182,7 @@ export class Db2MigrationService {
     `;
 
     try {
-      await this.db2Service.query(sql, [file]);
+      await this.db2Client.query(sql, [file]);
       this.logger.log(`Migration marked as executed: ${file}`);
     } catch (error) {
       const formattedError = formatDb2Error(
