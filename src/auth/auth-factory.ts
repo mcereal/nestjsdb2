@@ -4,6 +4,7 @@ import { Db2AuthOptions } from "../interfaces/db2.interface";
 import { PasswordAuthStrategy } from "./password-auth.strategy";
 import { KerberosAuthStrategy } from "./kerberos-auth.strategy";
 import { JwtAuthStrategy } from "./jwt-auth.strategy";
+import { LdapAuthStrategy } from "./ldap-auth.strategy";
 import { Db2Client } from "../db/db2-client";
 
 export function createAuthStrategy(
@@ -17,6 +18,8 @@ export function createAuthStrategy(
       return new KerberosAuthStrategy(authConfig, dbClient);
     case "jwt":
       return new JwtAuthStrategy(authConfig, dbClient);
+    case "ldap":
+      return new LdapAuthStrategy(authConfig, dbClient); // Add LDAP case
     default:
       throw new Error(
         `Unsupported authentication type: ${authConfig.authType}`

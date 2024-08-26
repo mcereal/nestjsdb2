@@ -1,31 +1,30 @@
 // src/db/db2-client.ts
 
 import SQL_ATTR_ROWCOUNT_PREFETCH, { Pool, Connection } from "ibm_db";
+import { appendFileSync } from "fs";
+import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import {
   Db2ClientInterface,
   Db2ConfigOptions,
 } from "../interfaces/db2.interface";
 import { Db2ConnectionState } from "../enums/db2.enums";
-import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Db2ConnectionError, Db2Error } from "../errors/db2.error";
-import { appendFileSync } from "fs";
 import { Db2AuthStrategy } from "src/auth/db2-auth.strategy";
 import { createAuthStrategy } from "src/auth/auth-factory";
 import { formatDb2Error } from "src/utils/db2.utils";
-
 export class Db2Client
   implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
 {
-  private pool: Pool;
-  private connection: Connection | null = null;
-  private config: Db2ConfigOptions;
-  private authStrategy: Db2AuthStrategy;
-  private logger = new Logger(Db2Client.name);
-  private state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED;
-  private lastUsed: number = Date.now();
+  protected readonly config: Db2ConfigOptions;
+  protected readonly authStrategy: Db2AuthStrategy;
+  protected readonly logger = new Logger(Db2Client.name);
+  protected readonly pool: Pool;
+  protected connection: Connection | null = null;
+  protected state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED;
+  protected lastUsed: number = Date.now();
+  protected currentReconnectAttempts: number = 0;
   private idleTimeoutInterval: NodeJS.Timeout;
   private connectionLifetimeInterval: NodeJS.Timeout;
-  private currentReconnectAttempts: number = 0;
 
   constructor(config: Db2ConfigOptions) {
     this.config = {
@@ -947,8 +946,6 @@ export class Db2Client
   /**
    * Builds the connection string based on Db2ConfigOptions.
    */
-  // src/db/db2-client.ts
-
   public buildConnectionString(config: Db2ConfigOptions): string {
     const {
       host,
@@ -962,11 +959,20 @@ export class Db2Client
       sslCertificatePath,
     } = config;
 
-    const { username, password } = config.auth || {};
+    const { username, password, authType, krbServiceName } = config.auth || {};
 
     let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
 
-    if (username && password) {
+    if (authType === "kerberos") {
+      // Additional settings for Kerberos authentication
+      if (!krbServiceName) {
+        throw new Error(
+          "Kerberos service name (krbServiceName) is required for Kerberos authentication."
+        );
+      }
+      connStr += `SecurityMechanism=11;ServiceName=${krbServiceName};`;
+    } else if (username && password) {
+      // Default to user/password authentication if no specific auth type is provided
       connStr += `UID=${username};PWD=${password};`;
     }
 

@@ -29,12 +29,11 @@ export class Db2Service
   implements Db2ServiceInterface, OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(Db2Service.name);
+  private options: Db2ConfigOptions;
   private client: Db2Client;
   private cache?: Cache;
   private transactionManager: TransactionManager;
   private migrationService: Db2MigrationService;
-
-  private options: Db2ConfigOptions;
 
   constructor(
     options: Db2ConfigOptions,

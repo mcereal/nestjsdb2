@@ -15,7 +15,7 @@ export interface Db2BasicConnectionOptions {
  * Interface for authentication options.
  */
 export interface Db2AuthOptions {
-  authType: "password" | "kerberos" | "jwt";
+  authType: "password" | "kerberos" | "jwt" | "ldap";
   username?: string;
   password?: string;
   krbServiceName?: string;

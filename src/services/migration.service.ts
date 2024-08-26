@@ -8,7 +8,7 @@ import { formatDb2Error } from "../utils/db2.utils";
 import { Db2Client } from "src/db/db2-client";
 
 export class Db2MigrationService {
-  private logger = new Logger(Db2MigrationService.name);
+  private readonly logger = new Logger(Db2MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
 
   constructor(

@@ -9,16 +9,16 @@ import { Logger } from "@nestjs/common";
 import { verify } from "jsonwebtoken";
 
 export class JwtAuthStrategy extends Db2AuthStrategy {
+  private readonly logger = new Logger(JwtAuthStrategy.name);
   private dbClient: Db2Client;
-  private logger = new Logger(JwtAuthStrategy.name);
 
   constructor(config: Db2AuthOptions, dbClient: Db2Client) {
     super(config);
-    this.dbClient = dbClient; // Injecting the Db2Client instance
+    this.dbClient = dbClient;
   }
 
   async authenticate(): Promise<void> {
-    this.dbClient.setState(Db2ConnectionState.AUTHENTICATING); // Set state to AUTHENTICATING
+    this.dbClient.setState(Db2ConnectionState.AUTHENTICATING);
 
     const { jwtToken, jwtSecret } = this.config;
 
@@ -29,15 +29,13 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
     }
 
     try {
-      // Verify the JWT token
       const decoded = verify(jwtToken, jwtSecret);
       this.logger.log("JWT token successfully verified:", decoded);
 
-      // Assuming some additional steps may be necessary to set up the DB2 connection
-      this.dbClient.setState(Db2ConnectionState.CONNECTED); // Set state to CONNECTED on success
+      this.dbClient.setState(Db2ConnectionState.CONNECTED);
       this.logger.log("Authentication successful using JWT strategy.");
     } catch (error) {
-      this.dbClient.setState(Db2ConnectionState.AUTH_FAILED); // Set state to AUTH_FAILED on failure
+      this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
       this.logger.error("JWT authentication failed:", error.message);
       throw new Db2Error("JWT authentication failed.");
     }
