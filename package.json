@@ -1,5 +1,5 @@
 {
-  "name": "@mcereal/ibm_db2",
+  "name": "@mcereal/nestjsdb2",
   "version": "0.0.1",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "main": "dist/index.js",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcereal/nestjs-ibm-db2.git"
+    "url": "git+https://github.com/mcereal/nestjsdb2.git"
   },
   "keywords": [
     "nestjs",
@@ -34,9 +34,9 @@
   "author": "Michael Curtis <mpbcurtis@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mcereal/nestjs-ibm-db2/issues"
+    "url": "https://github.com/mcereal/nestjsDb/issues"
   },
-  "homepage": "https://github.com/mcereal/nestjs-ibm-db2#readme",
+  "homepage": "https://github.com/mcereal/nestjsdb2#readme",
   "dependencies": {
     "@nestjs/cache-manager": "^2.2.2",
     "@nestjs/common": "^10.4.1",
