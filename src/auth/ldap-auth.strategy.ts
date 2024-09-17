@@ -20,7 +20,7 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
     this.dbClient.setState(Db2ConnectionState.AUTHENTICATING);
 
     try {
-      await this.dbClient.connect();
+      await this.dbClient.openConnection();
       this.dbClient.setState(Db2ConnectionState.CONNECTED);
       this.logger.log("Authentication successful using LDAP strategy.");
     } catch (error) {

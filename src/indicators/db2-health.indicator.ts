@@ -32,7 +32,7 @@ export class Db2HealthIndicator extends HealthIndicator {
 
     try {
       // Check the current connection state
-      const connectionState = this.db2Service.getState();
+      const { connectionState } = this.db2Service.getState();
       if (connectionState !== Db2ConnectionState.CONNECTED) {
         this.logger.warn(
           `Db2 connection state is not CONNECTED: ${connectionState}`

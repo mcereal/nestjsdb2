@@ -1,5 +1,5 @@
 import { Db2AuthStrategy } from "./db2-auth.strategy";
-import { Db2AuthOptions } from "../interfaces/db2.interface";
+import { Db2ConfigOptions } from "../interfaces/db2.interface";
 import { Db2AuthenticationError } from "../errors";
 import { Db2Client } from "../db/db2-client";
 import { Db2ConnectionState } from "../enums/db2.enums";
@@ -9,8 +9,8 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(PasswordAuthStrategy.name);
   private dbClient: Db2Client;
 
-  constructor(config: Db2AuthOptions, dbClient: Db2Client) {
-    super(config);
+  constructor(config: Db2ConfigOptions, dbClient: Db2Client) {
+    super(config.auth);
     this.dbClient = dbClient;
   }
 

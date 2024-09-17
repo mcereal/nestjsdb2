@@ -4,6 +4,7 @@ import { Logger } from "@nestjs/common";
 import { promises as fs } from "fs";
 import { join } from "path";
 import {
+  Db2ConfigOptions,
   Db2MigrationOptions,
   Db2MigrationServiceInterface,
 } from "../interfaces";
@@ -14,6 +15,7 @@ import { EntityMetadataStorage, EntityMetadata } from "../metadata";
 export class Db2MigrationService implements Db2MigrationServiceInterface {
   private readonly logger = new Logger(Db2MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
+  protected readonly config: Db2ConfigOptions;
 
   public constructor(
     private db2Client: Db2Client,
@@ -48,8 +50,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         "Migration process",
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
@@ -93,8 +95,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
               error,
               `Migration script for table: ${metadata.tableName}`,
               {
-                host: this.db2Client.getHost(),
-                database: this.db2Client.getDatabase(),
+                host: this.config.host,
+                database: this.config.database,
               },
               this.logger
             );
@@ -119,8 +121,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         "Migration process",
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
@@ -215,8 +217,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         "Loading migration files",
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
@@ -274,8 +276,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         `Migration script: ${file}`,
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
@@ -312,8 +314,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         "Checking if migration is executed",
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
@@ -346,8 +348,8 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
         error,
         "Marking migration as executed",
         {
-          host: this.db2Client.getHost(),
-          database: this.db2Client.getDatabase(),
+          host: this.config.host,
+          database: this.config.database,
         },
         this.logger
       );
