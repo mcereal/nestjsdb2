@@ -76,8 +76,11 @@ export class Db2Client
 
   public onModuleDestroy() {
     this.drainPool();
+    this.setState(Db2ConnectionState.DISCONNECTED);
+    this.logger.log("Db2 client disconnected and destroyed");
   }
   async drainPool(): Promise<void> {
+    this.setState(Db2ConnectionState.POOL_DRAINING);
     this.logger.log(` Draining the connection pool...`);
 
     try {
@@ -100,7 +103,7 @@ export class Db2Client
           this.logger.error("Error closing DB2 connection pool", err);
           reject(new Db2ConnectionError("Failed to close DB2 connection pool"));
         } else {
-          this.setState(Db2ConnectionState.DISCONNECTED);
+          this.setState(Db2ConnectionState.POOL_DRAINED);
           this.logger.log("DB2 connection pool closed successfully");
           resolve();
         }

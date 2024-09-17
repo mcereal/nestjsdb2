@@ -43,9 +43,6 @@ export interface Db2RetryOptions {
   retryAttempts?: number;
   retryInterval?: number;
   connectionRetries?: number;
-  retryDelay?: number;
-  failoverHost?: string;
-  failoverPort?: number;
   maxReconnectAttempts?: number;
   reconnectInterval?: number;
 }
@@ -56,7 +53,7 @@ export interface Db2RetryOptions {
 export interface Db2MigrationOptions {
   enabled: boolean;
   migrationDir: string;
-  tableName?: string; // Made optional for flexibility
+  tableName?: string;
   fileExtension: string;
   runOnStart: boolean;
   logQueries: boolean;
@@ -122,7 +119,6 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   securityMechanism?: string;
   currentSchema?: string;
   applicationName?: string;
-  tcpKeepAlive?: boolean;
 
   sqlInjectionCheckerOptions?: SqlInjectionCheckerOptions;
 }
