@@ -12,6 +12,7 @@ import {
   Db2CacheOptions,
   Db2ClientState,
   Db2ConfigOptions,
+  Db2HealthDetails,
   Db2ServiceInterface,
 } from "../interfaces";
 import { Db2QueryBuilder, Db2Client, TransactionManager } from "../db";
@@ -227,20 +228,26 @@ export class Db2Service
   public async checkHealth(): Promise<{
     dbHealth: boolean;
     transactionActive: boolean;
+    details?: Db2HealthDetails;
+    error?: string; // Add error at the top level
   }> {
     this.logger.log("Performing service-level health check...");
 
     try {
-      const dbHealth = await this.client.checkHealth();
+      // Get the full health check details from the client
+      const dbHealthDetails = await this.client.checkHealth();
+
+      // Extract the boolean dbHealth status
+      const dbHealth = dbHealthDetails.status;
 
       // Check if a transaction is currently active
-      const transactionActive = this.transactionManager
-        ? this.transactionManager.isTransactionActive()
-        : false;
+      const transactionActive =
+        this.transactionManager?.isTransactionActive?.() ?? false;
 
       return {
-        dbHealth,
-        transactionActive,
+        dbHealth, // Boolean health status
+        transactionActive, // Transaction activity status
+        details: dbHealthDetails.details || undefined, // Set details to undefined if not present
       };
     } catch (error) {
       const options = {
@@ -248,7 +255,14 @@ export class Db2Service
         database: this.options.database,
       };
       handleDb2Error(error, "Service Health Check", options, this.logger);
-      return { dbHealth: false, transactionActive: false };
+
+      // Return false statuses and move the error outside of details
+      return {
+        dbHealth: false,
+        transactionActive: false,
+        details: undefined, // Set details to undefined in case of an error
+        error: error.message, // Move the error to the top level
+      };
     }
   }
 
@@ -274,6 +288,8 @@ export class Db2Service
     timeout?: number
   ): Promise<T> {
     const start = Date.now();
+
+    // Check for cached result
     if (this.cache) {
       const cacheKey = this.generateCacheKey(sql, params);
       const cachedResult = await this.cache.get<T>(cacheKey);
@@ -283,18 +299,23 @@ export class Db2Service
       }
     }
 
-    const result = await this.client.query<T>(sql, params, timeout);
+    // Execute the query via the Db2Client
+    const result = await this.client.query<T>(sql, params, timeout); // Pass timeout
 
+    // Cache the result if needed
     if (this.cache) {
       const cacheKey = this.generateCacheKey(sql, params);
       await this.cache.set(cacheKey, result);
       this.logger.log(`Cache set for query: ${sql}`);
     }
+
     const duration = Date.now() - start;
 
+    // Log query details if logging is enabled
     if (this.options.logging?.logQueries || this.options.logging?.profileSql) {
       this.logQueryDetails(sql, params, duration); // Log query details
     }
+
     return result;
   }
 

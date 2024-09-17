@@ -1,5 +1,5 @@
 import { Db2QueryBuilder } from "../db";
-import { Db2ConnectionState } from "../enums";
+import { Db2ClientState } from "./db2-client.interface";
 
 export interface Db2ServiceInterface {
   // Lifecycle hooks
@@ -12,7 +12,7 @@ export interface Db2ServiceInterface {
   drainPool(): Promise<void>;
 
   // Connection state and health check methods
-  getState(): Db2ConnectionState;
+  getState(): Db2ClientState;
   getActiveConnectionsCount(): number;
   checkHealth(): Promise<{ dbHealth: boolean; transactionActive: boolean }>;
 

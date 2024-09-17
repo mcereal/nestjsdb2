@@ -9,7 +9,7 @@ export interface Db2ClientInterface {
 
   // Connection management methods
   openConnection(): Promise<Connection>;
-  closeConnection(): Promise<Connection>;
+  closeConnection(connection: Connection): Promise<void>;
 
   // Connection pooling methods
   drainPool(): Promise<void>;
@@ -38,10 +38,6 @@ export interface Db2ClientInterface {
   setState(state: Db2ConnectionState): void;
   getState(): Db2ClientState;
 
-  // Configuration methods
-  getConfig(): Db2ConfigOptions;
-  getHost(): string;
-  getDatabase(): string;
   buildConnectionString(config: Db2ConfigOptions): string;
 
   // Pool monitoring
@@ -65,4 +61,39 @@ export interface Db2ClientState {
   recentErrors: string[];
   lastUsed: string;
   poolInitialized: boolean;
+}
+
+export interface Db2HealthDetails {
+  poolStats: Db2PoolStats;
+  connectionStats: Db2ConnectionStats;
+  connectionDetails?: Db2ConnectionDetails; // Optional because it may not always be available
+}
+
+// Define poolStats structure
+export interface Db2PoolStats {
+  activeConnections: number;
+  totalConnections: number;
+  minPoolSize: number;
+  maxPoolSize: number;
+}
+
+// Define connectionStats structure
+export interface Db2ConnectionStats {
+  appName: string;
+  connectionCount: number;
+}
+
+// Define connectionDetails structure
+export interface Db2ConnectionDetails {
+  agentId: string;
+  applicationConnectionTime: string;
+  applicationIdleTime: string;
+  locksHeld: number;
+  agentSystemCpuTimeMs: number;
+  agentUserCpuTimeMs: number;
+  directReads: number;
+  directWrites: number;
+  commitSqlStatements: number;
+  rollbackSqlStatements: number;
+  failedSqlStatements: number;
 }

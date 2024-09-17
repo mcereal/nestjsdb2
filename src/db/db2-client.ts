@@ -6,6 +6,10 @@ import {
   Db2ClientInterface,
   Db2ClientState,
   Db2ConfigOptions,
+  Db2ConnectionDetails,
+  Db2ConnectionStats,
+  Db2HealthDetails,
+  Db2PoolStats,
 } from "../interfaces";
 import { Db2ConnectionState } from "../enums";
 import {
@@ -112,22 +116,20 @@ export class Db2Client
 
       this.pool.open(
         this.buildConnectionString(this.config),
-        (err: Error, connection: Connection) => {
+        async (err: Error, connection: Connection) => {
           clearTimeout(timeout);
           if (err) {
             this.logger.error("DB2 connection failed", err);
+            await this.handleConnectionError(err); // Handle error and retry logic
             reject(new Db2ConnectionError("Failed to open DB2 connection"));
           } else {
             if (!isInitialization) {
-              // Only log for non-initialization connections
               this.logger.log("DB2 connection opened successfully");
             }
             this.connection = connection;
             this.lastUsed = Date.now();
-
-            this.activeConnections.push(connection); // Track active connection
+            this.activeConnections.push(connection);
             this.totalConnections++;
-
             resolve(connection);
           }
         }
@@ -169,6 +171,9 @@ export class Db2Client
       // Start idle timeout and connection lifetime checks for the entire pool
       this.startIdleTimeoutCheck();
       this.startConnectionLifetimeCheck();
+
+      // Start monitoring the pool status
+      this.startPoolMonitoring(); // Add this here
     } catch (error) {
       handleDb2Error(
         error,
@@ -223,27 +228,6 @@ export class Db2Client
       this.connectionLifetimeInterval = undefined;
       this.logger.log("Stopped connection lifetime check.");
     }
-  }
-
-  private async getConnectionFromPool(connStr: string): Promise<Connection> {
-    return new Promise((resolve, reject) => {
-      const timeoutHandle = setTimeout(() => {
-        reject(new Db2PoolError("Acquire connection timeout"));
-      }, this.config.connectionTimeout);
-
-      this.pool.open(connStr, (err, connection) => {
-        clearTimeout(timeoutHandle);
-        if (err) {
-          this.logger.error(
-            "Error acquiring connection from pool:",
-            err.message
-          );
-          reject(new Db2PoolError("Failed to acquire connection from pool"));
-        } else {
-          resolve(connection);
-        }
-      });
-    });
   }
 
   private async handleConnectionError(error: Error): Promise<void> {
@@ -396,6 +380,7 @@ export class Db2Client
       } catch (error) {
         this.logger.error("Reconnection failed:", error);
         this.recentErrors.push(error.message);
+        await this.handleConnectionError(error); // Handle the error and retry
         this.setState(Db2ConnectionState.ERROR);
       }
     }
@@ -407,12 +392,23 @@ export class Db2Client
    * @param params An array of parameters to bind to the query.
    * @returns A promise that resolves with the result of the query.
    */
-  public async query(query: string, params: any[] = []): Promise<any> {
+  public async query<T>(
+    query: string,
+    params: any[] = [],
+    timeout?: number
+  ): Promise<T> {
     const connection = await this.openConnection();
     try {
       this.logger.log(`Executing query: ${query}`);
-      return new Promise<any>((resolve, reject) => {
-        connection.query(query, params, (err: Error, result: any) => {
+
+      return new Promise<T>((resolve, reject) => {
+        // Apply a query timeout if provided
+        const queryTimeout = setTimeout(() => {
+          reject(new Db2ConnectionError("Query execution timed out"));
+        }, timeout || this.config.queryTimeout);
+
+        connection.query(query, params, (err: Error, result: T) => {
+          clearTimeout(queryTimeout); // Clear the timeout once the query resolves
           if (err) {
             this.logger.error("Error executing query", err);
             reject(new Db2ConnectionError("Failed to execute query"));
@@ -430,19 +426,56 @@ export class Db2Client
    * Builds the connection string based on Db2ConfigOptions.
    */
   public buildConnectionString(config: Db2ConfigOptions): string {
-    let connStr = `DATABASE=${config.database};HOSTNAME=${config.host};PORT=${config.port};`;
+    const {
+      host,
+      port,
+      database,
+      characterEncoding,
+      securityMechanism,
+      currentSchema,
+      applicationName,
+      useTls,
+      sslCertificatePath,
+    } = config;
 
-    if (config.characterEncoding) {
-      connStr += `CHARACTERENCODING=${config.characterEncoding};`;
+    const { username, password, authType, krbServiceName } = config.auth || {};
+
+    let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
+
+    if (authType === "kerberos") {
+      // Additional settings for Kerberos authentication
+      if (!krbServiceName) {
+        throw new Error(
+          "Kerberos service name (krbServiceName) is required for Kerberos authentication."
+        );
+      }
+      connStr += `SecurityMechanism=11;ServiceName=${krbServiceName};`;
+    } else if (username && password) {
+      // Default to user/password authentication if no specific auth type is provided
+      connStr += `UID=${username};PWD=${password};`;
     }
-    if (config.securityMechanism) {
-      connStr += `SECURITY=${config.securityMechanism};`;
+
+    if (characterEncoding) {
+      connStr += `CHARACTERENCODING=${characterEncoding};`;
     }
-    if (config.useTls) {
+
+    if (securityMechanism) {
+      connStr += `SECURITY=${securityMechanism};`;
+    }
+
+    if (currentSchema) {
+      connStr += `CURRENTSCHEMA=${currentSchema};`;
+    }
+
+    if (applicationName) {
+      connStr += `APPLICATIONNAME=${applicationName};`;
+    }
+
+    if (useTls) {
       connStr += "SECURITY=SSL;";
-    }
-    if (config.username && config.password) {
-      connStr += `UID=${config.username};PWD=${config.password};`;
+      if (sslCertificatePath) {
+        connStr += `SSLServerCertificate=${sslCertificatePath};`;
+      }
     }
 
     return connStr;
@@ -658,7 +691,7 @@ export class Db2Client
    */
   public getPoolStats() {
     return {
-      activeConnections: this.activeConnections,
+      activeConnections: this.activeConnections.length,
       totalConnections: this.totalConnections,
       minPoolSize: this.config.minPoolSize,
       maxPoolSize: this.config.maxPoolSize,
@@ -670,29 +703,35 @@ export class Db2Client
    */
   public async checkHealth(): Promise<{
     status: boolean;
-    details?: any;
+    details?: Db2HealthDetails;
+    error?: string; // Add error at the top-level
   }> {
     this.logger.log("Performing extended health check...");
+
     try {
-      // Execute a test query
+      // Execute a test query to verify base health check
       await this.query("SELECT 1 FROM SYSIBM.SYSDUMMY1");
       this.logger.log("DB2 base health check passed");
 
-      // Get pool and connection stats
-      const poolStats = this.getPoolStats();
-      const connectionStats = await this.getDbConnectionStats();
+      // Get pool statistics
+      const poolStats: Db2PoolStats = this.getPoolStats();
 
-      // Attempt to get detailed connection info, but don't fail if it doesn't work
-      let connectionDetails: any;
+      // Get connection statistics
+      const connectionStats: Db2ConnectionStats =
+        await this.getDbConnectionStats();
+
+      // Try to get detailed connection information, but don't fail if this part doesn't work
+      let connectionDetails: Db2ConnectionDetails | undefined;
       try {
         connectionDetails = await this.getDbConnectionDetails();
       } catch (error) {
         this.logger.warn(
           "Failed to retrieve detailed connection info, skipping."
         );
-        connectionDetails = { error: "Connection details unavailable" };
+        connectionDetails = { error: "Connection details unavailable" } as any; // Use 'any' type as a fallback for error message
       }
 
+      // Return the full health check details
       return {
         status: true,
         details: {
@@ -703,11 +742,15 @@ export class Db2Client
       };
     } catch (error) {
       this.logger.error("DB2 health check failed:", error);
+      // Return error status and undefined details
       return {
         status: false,
         details: {
-          error: error.message,
+          poolStats: undefined,
+          connectionStats: undefined,
+          connectionDetails: undefined,
         },
+        error: error.message,
       };
     }
   }
