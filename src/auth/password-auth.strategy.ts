@@ -1,5 +1,3 @@
-// src/auth/password-auth.strategy.ts
-
 import { Db2AuthStrategy } from "./db2-auth.strategy";
 import { Db2AuthOptions } from "../interfaces/db2.interface";
 import { Db2AuthenticationError } from "../errors";
@@ -18,10 +16,21 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
 
   async authenticate(): Promise<void> {
     this.dbClient.setState(Db2ConnectionState.AUTHENTICATING);
+    this.logger.log("Starting password authentication...");
+
+    const { username, password } = this.config;
+
+    if (!username || !password) {
+      this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
+      throw new Db2AuthenticationError("Username and password are required.");
+    }
 
     try {
-      // Use the standard connect method for password authentication
-      await this.dbClient.connect();
+      const connectionString = this.dbClient.buildConnectionString(this.config);
+
+      // Establish a connection using the connection string
+      await this.dbClient.getConnectionFromPool(connectionString);
+
       this.dbClient.setState(Db2ConnectionState.CONNECTED);
       this.logger.log("Authentication successful using password strategy.");
     } catch (error) {

@@ -1,35 +1,44 @@
-// src/db/db2-client.ts
-
-import SQL_ATTR_ROWCOUNT_PREFETCH, { Pool, Connection } from "ibm_db";
-import { appendFileSync } from "fs";
+import { Pool, Connection } from "ibm_db";
+import * as ibm_db from "ibm_db";
 import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { Db2ClientInterface, Db2ConfigOptions } from "../interfaces";
+import {
+  Db2AuthOptions,
+  Db2ClientInterface,
+  Db2ClientState,
+  Db2ConfigOptions,
+} from "../interfaces";
 import { Db2ConnectionState } from "../enums";
 import {
-  Db2AuthenticationError,
   Db2ConnectionError,
   Db2Error,
   Db2PoolError,
-  Db2QuerySyntaxError,
-  Db2TimeoutError,
   Db2TransactionError,
   formatDb2Error,
+  handleDb2Error,
 } from "../errors";
 import { Db2AuthStrategy } from "../auth/db2-auth.strategy";
 import { createAuthStrategy } from "../auth/auth-factory";
+
 export class Db2Client
   implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
 {
   protected readonly config: Db2ConfigOptions;
+  protected readonly authConfig: Db2AuthOptions;
   protected readonly authStrategy: Db2AuthStrategy;
   protected readonly logger = new Logger(Db2Client.name);
-  protected readonly pool: Pool;
-  protected connection: Connection | null = null;
-  protected state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED;
-  protected lastUsed: number = Date.now();
-  protected currentReconnectAttempts: number = 0;
-  private idleTimeoutInterval: NodeJS.Timeout;
-  private connectionLifetimeInterval: NodeJS.Timeout;
+  private pool: Pool | null = null; // Mark the pool as nullable
+  protected connection: Connection | null = null; // Mark the connection as nullable
+  protected state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED; // Default state
+  private idleTimeoutInterval: NodeJS.Timeout; // Track idle timeout
+  private connectionLifetimeInterval: NodeJS.Timeout; // Track connection lifetime
+  private activeConnections: Connection[] = []; // Track active connections
+  private totalConnections = 0; // Total number of connections ever opened
+  private reconnectionAttempts = 0; // Track the number of reconnection attempts
+  private recentErrors: string[] = []; // Track recent errors
+  protected lastUsed: number = Date.now(); // Track the last time the connection was used
+  protected poolInitialized = false; // To check if pool is initialized
+  private currentReconnectAttempts: number; // Track current reconnection attempts
+  idleConnections: number;
 
   public constructor(config: Db2ConfigOptions) {
     this.config = {
@@ -39,9 +48,11 @@ export class Db2Client
         reconnectInterval: config.retry?.reconnectInterval ?? 5000, // Default to 5 seconds
       },
       connectionTimeout: config.connectionTimeout ?? 30000, // Default to 30 seconds
+      minPoolSize: config.minPoolSize ?? 1, // Default to 1 connection
+      maxPoolSize: config.maxPoolSize ?? 10, // Default to 10 connections
       idleTimeout: config.idleTimeout ?? 60000, // Default to 1 minute
       maxLifetime: config.maxLifetime ?? 1800000, // Default to 30 minutes
-      autoCommit: config.autoCommit ?? true, // Default to true
+      autoCommit: config.autoCommit ?? true, // Default to auto-commit
       fetchSize: config.fetchSize ?? 100, // Default to 100 rows
       queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
       prefetchSize: config.prefetchSize ?? 10, // Default to 10 rows
@@ -51,71 +62,255 @@ export class Db2Client
         logErrors: config.logging?.logErrors ?? true, // Default to true
         profileSql: config.logging?.profileSql ?? false, // Default to false
       },
-      sqlInjectionCheckerOptions: {
-        enableStrictMode:
-          config.sqlInjectionCheckerOptions?.enableStrictMode ?? false, // Less restrictive by default
-        whitelistedPatterns:
-          config.sqlInjectionCheckerOptions?.whitelistedPatterns || [], // No whitelist by default
-        logWarnings: config.sqlInjectionCheckerOptions?.logWarnings ?? true, // Log warnings instead of throwing errors by default
-      },
     };
     this.authStrategy = createAuthStrategy(config.auth, this);
-    this.pool = new Pool({
-      minPoolSize: config.minPoolSize || 1, // Default to 1 if not set
-      maxPoolSize: config.maxPoolSize || 10, // Default to 10 if not set
-    });
   }
 
-  public onModuleInit() {
-    // Start idle timeout checks when the module initializes
-    this.startIdleTimeoutCheck();
-    // Start pool monitoring
-    this.startPoolMonitoring();
+  public async onModuleInit() {
+    await this.initializePool();
   }
 
   public onModuleDestroy() {
-    // Clear the idle timeout check interval when the module is destroyed
-    this.stopIdleTimeoutCheck();
-    // Close all connections in the pool
-    this.pool.closeAll();
-    this.logger.log("All connections in the pool have been closed.");
+    this.drainPool();
+  }
+  async drainPool(): Promise<void> {
+    this.logger.log(` Draining the connection pool...`);
+
+    try {
+      this.stopIdleTimeoutCheck();
+      this.stopConnectionLifetimeCheck();
+      await this.closePool();
+    } catch (error) {
+      this.logger.error("Error during shutdown:", error.message);
+    }
+  }
+
+  public async closePool(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.logger.log("Closing DB2 connection pool...");
+      this.setState(Db2ConnectionState.DISCONNECTING);
+
+      this.pool.close((err) => {
+        if (err) {
+          this.setState(Db2ConnectionState.ERROR);
+          this.logger.error("Error closing DB2 connection pool", err);
+          reject(new Db2ConnectionError("Failed to close DB2 connection pool"));
+        } else {
+          this.setState(Db2ConnectionState.DISCONNECTED);
+          this.logger.log("DB2 connection pool closed successfully");
+          resolve();
+        }
+      });
+    });
+  }
+
+  public openConnection(isInitialization = false): Promise<Connection> {
+    return new Promise<Connection>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Db2ConnectionError("Connection attempt timed out"));
+      }, this.config.connectionTimeout);
+
+      this.pool.open(
+        this.buildConnectionString(this.config),
+        (err: Error, connection: Connection) => {
+          clearTimeout(timeout);
+          if (err) {
+            this.logger.error("DB2 connection failed", err);
+            reject(new Db2ConnectionError("Failed to open DB2 connection"));
+          } else {
+            if (!isInitialization) {
+              // Only log for non-initialization connections
+              this.logger.log("DB2 connection opened successfully");
+            }
+            this.connection = connection;
+            this.lastUsed = Date.now();
+
+            this.activeConnections.push(connection); // Track active connection
+            this.totalConnections++;
+
+            resolve(connection);
+          }
+        }
+      );
+    });
   }
 
   /**
-   * Establishes a connection to the Db2 database using the connection pool.
+   * Initialize the connection pool with configurable options, including `minPoolSize`
    */
-  public async connect(): Promise<void> {
-    if (this.state === Db2ConnectionState.CONNECTED) {
-      this.logger.warn("Already connected to the Db2 database.");
-      return;
+  private async initializePool(): Promise<void> {
+    try {
+      this.logger.log("Initializing DB2 connection pool...");
+
+      this.setState(Db2ConnectionState.CONNECTING);
+
+      this.logger.log(
+        `Connecting to DB2 at ${this.config.host}:${this.config.port}/${this.config.database}`
+      );
+
+      this.pool = new ibm_db.Pool();
+      this.pool.init(
+        this.config.maxPoolSize,
+        this.buildConnectionString(this.config)
+      );
+
+      // Pre-populate the pool with minPoolSize connections
+      for (let i = 0; i < this.config.minPoolSize; i++) {
+        const connection = await this.openConnection(true); // Initialization flag to suppress logging
+        await this.closeConnection(connection);
+      }
+
+      this.poolInitialized = true;
+      this.setState(Db2ConnectionState.CONNECTED);
+      this.logger.log(
+        `DB2 connection pool initialized with at least ${this.config.minPoolSize} active connections`
+      );
+
+      // Start idle timeout and connection lifetime checks for the entire pool
+      this.startIdleTimeoutCheck();
+      this.startConnectionLifetimeCheck();
+    } catch (error) {
+      handleDb2Error(
+        error,
+        "Failed to initialize connection pool",
+        {
+          host: this.config.host,
+          database: this.config.database,
+        },
+        this.logger
+      );
+      throw new Db2ConnectionError("Failed to initialize DB2 connection pool");
+    }
+  }
+
+  /**
+   * Set the DB2 connection state
+   */
+  public setState(state: Db2ConnectionState): void {
+    this.state = state;
+    this.logger.log(`Db2 connection state changed to: ${state}`);
+  }
+
+  /**
+   * Get the DB2 connection state
+   */
+  public getState(): Db2ClientState {
+    return {
+      connectionState: this.state,
+      activeConnections: this.activeConnections.length,
+      totalConnections: this.totalConnections,
+      reconnectionAttempts: this.reconnectionAttempts,
+      recentErrors: this.recentErrors,
+      lastUsed: new Date(this.lastUsed).toISOString(),
+      poolInitialized: this.poolInitialized,
+    };
+  }
+
+  private startConnectionLifetimeCheck(): void {
+    const maxLifetime = 1800000; // 30 minutes in milliseconds
+    this.connectionLifetimeInterval = setInterval(async () => {
+      if (this.connection && Date.now() - this.lastUsed > maxLifetime) {
+        this.logger.log("Max connection lifetime reached, cycling connection.");
+        await this.disconnect();
+        this.connection = await this.openConnection;
+      }
+    }, maxLifetime);
+  }
+
+  private stopConnectionLifetimeCheck(): void {
+    if (this.connectionLifetimeInterval) {
+      clearInterval(this.connectionLifetimeInterval);
+      this.connectionLifetimeInterval = undefined;
+      this.logger.log("Stopped connection lifetime check.");
+    }
+  }
+
+  private async getConnectionFromPool(connStr: string): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      const timeoutHandle = setTimeout(() => {
+        reject(new Db2PoolError("Acquire connection timeout"));
+      }, this.config.connectionTimeout);
+
+      this.pool.open(connStr, (err, connection) => {
+        clearTimeout(timeoutHandle);
+        if (err) {
+          this.logger.error(
+            "Error acquiring connection from pool:",
+            err.message
+          );
+          reject(new Db2PoolError("Failed to acquire connection from pool"));
+        } else {
+          resolve(connection);
+        }
+      });
+    });
+  }
+
+  private async handleConnectionError(error: Error): Promise<void> {
+    this.logger.error(`Connection error: ${error.message}`);
+    this.currentReconnectAttempts++;
+
+    if (
+      this.currentReconnectAttempts > this.config.retry?.maxReconnectAttempts
+    ) {
+      this.logger.error("Maximum reconnect attempts reached.");
+      throw new Db2ConnectionError("All reconnection attempts failed.");
     }
 
-    this.logger.log("Connecting to Db2 database using the connection pool...");
-    this.state = Db2ConnectionState.CONNECTING;
+    await this.sleep(this.config.retry?.reconnectInterval || 5000);
+    await this.openConnection;
+  }
 
-    const connStr = this.buildConnectionString(this.config);
-    const connectionTimeout = this.config.connectionTimeout || 30000; // Default to 30 seconds if not set
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
-    try {
-      await this.authStrategy.authenticate();
-      this.connection = await Promise.race([
-        this.withRetry(() => this.getConnectionFromPool(connStr)),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => {
-            this.state = Db2ConnectionState.CONNECTION_TIMEOUT;
-            reject(new Db2ConnectionError("Connection timed out"));
-          }, connectionTimeout)
-        ),
-      ]);
+  // Additional methods (e.g., disconnect, query, etc.) remain unchanged
 
-      this.connection.setAutoCommit(this.config.autoCommit ?? true);
-      this.state = Db2ConnectionState.CONNECTED;
-      this.logger.log("Successfully connected to Db2 database.");
+  private startIdleTimeoutCheck() {
+    const idleTimeoutCheckInterval = 10000; // Check every 10 seconds
+    this.idleTimeoutInterval = setInterval(() => {
+      this.checkIdleTimeout();
+    }, idleTimeoutCheckInterval);
+    this.logger.log("Started idle timeout checks.");
+  }
 
-      this.startConnectionLifetimeCheck();
-      this.currentReconnectAttempts = 0;
-    } catch (error) {
-      this.handleConnectionError(error);
+  private stopIdleTimeoutCheck() {
+    if (this.idleTimeoutInterval) {
+      clearInterval(this.idleTimeoutInterval);
+      this.logger.log("Stopped idle timeout checks.");
+    }
+  }
+
+  private async checkIdleTimeout(): Promise<void> {
+    const { idleTimeout } = this.config;
+    const now = Date.now();
+
+    if (this.connection && now - this.lastUsed > idleTimeout) {
+      this.logger.warn(
+        `Idle timeout reached (${idleTimeout} ms), closing connection...`
+      );
+
+      try {
+        await this.disconnect();
+        this.logger.log("Connection closed due to idle timeout.");
+
+        this.logger.log("Attempting to reconnect after idle timeout...");
+        await this.reconnect();
+        this.logger.log("Reconnection successful after idle timeout.");
+      } catch (error) {
+        const errorMessage = formatDb2Error(error, "Idle Timeout Check", {
+          host: this.config.host,
+          database: this.config.database,
+          idleTimeout,
+        });
+        this.logger.error(
+          `Failed to handle idle timeout properly: ${errorMessage}`
+        );
+        throw new Db2Error(
+          "Failed to handle idle timeout. Check logs for details."
+        );
+      }
     }
   }
 
@@ -123,21 +318,22 @@ export class Db2Client
    * Closes the connection to the Db2 database and releases it back to the pool.
    */
   public async disconnect(): Promise<void> {
-    if (
-      this.state === Db2ConnectionState.CONNECTED ||
-      this.state === Db2ConnectionState.ERROR
-    ) {
-      this.state = Db2ConnectionState.CONNECTION_CLOSED;
+    if (this.connection) {
       try {
-        await this.closeConnection(); // Attempt to close the connection (release to pool)
-        this.state = Db2ConnectionState.DISCONNECTED;
-        this.logger.log(
-          "Db2 database connection closed and released back to the pool."
-        );
-        // Stop connection lifetime check
+        this.logger.log("Disconnecting from DB2 database...");
+        await this.closeConnection(this.connection);
+
+        // Ensure the connection is properly set to null
+        this.connection = null;
+        this.setState(Db2ConnectionState.DISCONNECTED);
+
+        this.logger.log("Db2 database connection closed and reset to null.");
+
+        // Stop the idle timeout and lifetime checks after disconnection
+        this.stopIdleTimeoutCheck();
         this.stopConnectionLifetimeCheck();
       } catch (error) {
-        this.state = Db2ConnectionState.ERROR;
+        this.setState(Db2ConnectionState.ERROR);
         this.logError("Error disconnecting from Db2 database", error);
         throw new Db2ConnectionError("Failed to disconnect from Db2 database");
       }
@@ -147,342 +343,61 @@ export class Db2Client
   }
 
   /**
-   * Reconnect logic for the Db2 client.
-   * Attempts to re-establish a connection using the existing configuration.
+   * Close the individual connection
    */
-  private async reconnect(): Promise<void> {
-    this.logger.log("Attempting to reconnect to Db2 database...");
-    this.state = Db2ConnectionState.RECONNECTING;
-
-    try {
-      await this.disconnect();
-      await this.connect();
-      this.logger.log("Reconnection successful.");
-    } catch (error) {
-      this.state = Db2ConnectionState.ERROR;
-      this.logger.error("Reconnection failed:", error.message);
-      throw new Db2ConnectionError("Failed to reconnect to Db2 database");
-    }
-  }
-
-  /**
-   * Acquire a connection from the pool.
-   * @param connStr The connection string for the Db2 database.
-   * @returns A promise that resolves to a connection from the pool.
-   */
-  private async getConnectionFromPool(connStr: string): Promise<Connection> {
-    return new Promise((resolve, reject) => {
-      const acquireTimeout = this.config.acquireTimeoutMillis || 30000; // Default to 30 seconds
-
-      const timeoutHandle = setTimeout(() => {
-        reject(
-          new Db2PoolError("Acquire connection timeout", {
-            connStr,
-            timeout: acquireTimeout,
-          })
-        );
-      }, acquireTimeout);
-
-      this.pool.open(connStr, (err, connection) => {
-        clearTimeout(timeoutHandle);
-        if (err) {
-          this.logger.error(
-            "Error acquiring connection from pool:",
-            err.message
-          );
-          reject(
-            new Db2PoolError("Failed to acquire connection from pool", {
-              connStr,
-              error: err.message,
-            })
-          );
-        } else {
-          resolve(connection);
-        }
-      });
-    });
-  }
-
-  public async releaseConnection(connection: Connection): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.state = Db2ConnectionState.DISCONNECTING;
-      this.pool.close(connection, (err) => {
-        if (err) {
-          this.state = Db2ConnectionState.ERROR;
-          this.logger.error("Error releasing connection:", err.message);
-          reject(
-            new Db2PoolError("Failed to release connection back to the pool", {
-              error: err.message,
-            })
-          );
-        } else {
-          this.state = Db2ConnectionState.DISCONNECTED;
-          this.logger.log("Connection successfully released back to the pool.");
-          resolve();
-        }
-      });
-    });
-  }
-
-  /**
-   * Releases the current connection back to the pool.
-   */
-  private closeConnection(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.connection) {
-        this.pool.close(this.connection, (err) => {
+  public async closeConnection(connection: Connection): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (connection) {
+        this.logger.log("Closing DB2 connection...");
+        connection.close((err) => {
           if (err) {
-            reject(err);
+            this.logger.error("Error closing DB2 connection", err);
+            reject(new Db2ConnectionError("Failed to close DB2 connection"));
           } else {
-            this.connection = null; // Clear the connection
+            this.logger.log("DB2 connection closed successfully");
+
+            // Remove the connection from the array
+            const index = this.activeConnections.indexOf(connection);
+            if (index > -1) {
+              this.activeConnections.splice(index, 1);
+            } else {
+              this.logger.warn(
+                "Attempted to close a connection that was not in the active connections array"
+              );
+            }
+
             resolve();
           }
         });
       } else {
+        this.logger.warn("No connection to close");
         resolve();
       }
     });
   }
 
   /**
-   * Drains the connection pool by closing all active connections.
-   * If a specific connection is open, it closes that first and then clears the entire pool.
+   * Reconnect logic for the Db2 client.
+   * Attempts to re-establish a connection using the existing configuration.
    */
-  public async drainPool(): Promise<void> {
-    try {
-      this.logger.log("Draining the connection pool...");
-
-      // Check and close the current connection
-      if (this.connection) {
-        this.logger.log(
-          "Closing current active connection before draining the pool."
-        );
-        await this.disconnect();
+  private async reconnect(): Promise<void> {
+    if (
+      this.state !== Db2ConnectionState.CONNECTED &&
+      this.state !== Db2ConnectionState.RECONNECTING
+    ) {
+      try {
+        this.logger.log("Attempting to reconnect to DB2...");
+        this.setState(Db2ConnectionState.RECONNECTING);
+        this.reconnectionAttempts += 1;
+        const connection = await this.openConnection();
+        await this.closeConnection(connection);
+        this.logger.log("Reconnection successful");
+        this.setState(Db2ConnectionState.CONNECTED);
+      } catch (error) {
+        this.logger.error("Reconnection failed:", error);
+        this.recentErrors.push(error.message);
+        this.setState(Db2ConnectionState.ERROR);
       }
-
-      // Close all connections in the pool
-      this.pool.closeAll((err) => {
-        if (err) {
-          this.logger.error(
-            "Error while draining the connection pool:",
-            err.message
-          );
-          throw new Db2PoolError("Failed to drain the connection pool.", {
-            error: err.message,
-          });
-        } else {
-          this.logger.log(
-            "All connections in the pool have been successfully drained."
-          );
-        }
-      });
-    } catch (error) {
-      this.logger.error("Error during pool draining operation:", error.message);
-      throw new Db2PoolError(
-        "An error occurred while draining the connection pool.",
-        {
-          error: error.message,
-        }
-      );
-    }
-  }
-
-  private startConnectionLifetimeCheck() {
-    const maxLifetime = this.config.maxLifetime || 1800000; // Default to 30 minutes
-    setInterval(async () => {
-      if (this.connection && Date.now() - this.lastUsed > maxLifetime) {
-        this.logger.log("Max connection lifetime reached, cycling connection.");
-        await this.disconnect();
-        await this.connect();
-      }
-    }, maxLifetime);
-  }
-
-  private stopConnectionLifetimeCheck() {
-    if (this.connectionLifetimeInterval) {
-      clearInterval(this.connectionLifetimeInterval);
-      this.logger.log("Stopped connection lifetime check.");
-    }
-  }
-
-  public setState(state: Db2ConnectionState): void {
-    this.state = state;
-    this.logger.log(`Db2 connection state changed to: ${state}`);
-  }
-
-  /**
-   * Returns the current state of the connection.
-   * @returns The current connection state.
-   */
-  public getState(): Db2ConnectionState {
-    return this.state;
-  }
-
-  public getConfig(): Db2ConfigOptions {
-    return this.config;
-  }
-
-  // Getter method for host
-  public getHost(): string {
-    return this.config.host;
-  }
-
-  // Getter method for database
-  public getDatabase(): string {
-    return this.config.database;
-  }
-
-  /**
-   * Builds the connection string based on Db2ConfigOptions.
-   */
-  public buildConnectionString(config: Db2ConfigOptions): string {
-    const {
-      host,
-      port,
-      database,
-      characterEncoding,
-      securityMechanism,
-      currentSchema,
-      applicationName,
-      useTls,
-      sslCertificatePath,
-    } = config;
-
-    const { username, password, authType, krbServiceName } = config.auth || {};
-
-    let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
-
-    if (authType === "kerberos") {
-      // Additional settings for Kerberos authentication
-      if (!krbServiceName) {
-        throw new Error(
-          "Kerberos service name (krbServiceName) is required for Kerberos authentication."
-        );
-      }
-      connStr += `SecurityMechanism=11;ServiceName=${krbServiceName};`;
-    } else if (username && password) {
-      // Default to user/password authentication if no specific auth type is provided
-      connStr += `UID=${username};PWD=${password};`;
-    }
-
-    if (characterEncoding) {
-      connStr += `CHARACTERENCODING=${characterEncoding};`;
-    }
-
-    if (securityMechanism) {
-      connStr += `SECURITY=${securityMechanism};`;
-    }
-
-    if (currentSchema) {
-      connStr += `CURRENTSCHEMA=${currentSchema};`;
-    }
-
-    if (applicationName) {
-      connStr += `APPLICATIONNAME=${applicationName};`;
-    }
-
-    if (useTls) {
-      connStr += "SECURITY=SSL;";
-      if (sslCertificatePath) {
-        connStr += `SSLServerCertificate=${sslCertificatePath};`;
-      }
-    }
-
-    return connStr;
-  }
-
-  /**
-   * Begins a database transaction.
-   * @throws Db2Error if no active connection is available or transaction initiation fails.
-   */
-  public async beginTransaction(): Promise<void> {
-    if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.error("Cannot begin transaction. No active connection.");
-      throw new Db2Error("Cannot begin transaction. No active connection.");
-    }
-
-    this.logger.log("Beginning transaction...");
-
-    try {
-      // Initiate the transaction by sending the SQL command to start it
-      await this.query("BEGIN");
-
-      // Log success and state change
-      this.logger.log("Transaction started successfully.");
-    } catch (error) {
-      // Log the error with detailed context and rethrow a Db2Error
-      const errorMessage = formatDb2Error(error, "Begin Transaction", {
-        host: this.config.host,
-        database: this.config.database,
-      });
-      this.logger.error(`Failed to begin transaction: ${errorMessage}`);
-      throw new Db2TransactionError(
-        "Failed to begin transaction. Check logs for details."
-      );
-    }
-  }
-
-  /**
-   * Commits the current transaction.
-   * @throws Db2Error if no active connection is available or the commit operation fails.
-   */
-  public async commitTransaction(): Promise<void> {
-    if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.error("Cannot commit transaction. No active connection.");
-      throw new Db2Error("Cannot commit transaction. No active connection.");
-    }
-
-    this.logger.log("Committing transaction...");
-
-    try {
-      // Execute the commit command
-      await this.query("COMMIT");
-
-      // Log success
-      this.logger.log("Transaction committed successfully.");
-    } catch (error) {
-      // Log the error with detailed context and rethrow a Db2Error
-      const errorMessage = formatDb2Error(error, "Commit Transaction", {
-        host: this.config.host,
-        database: this.config.database,
-      });
-      this.logger.error(`Failed to commit transaction: ${errorMessage}`);
-      throw new Db2TransactionError(
-        "Failed to commit transaction. Check logs for details."
-      );
-    }
-  }
-
-  /**
-   * Rolls back the current transaction.
-   * @throws Db2Error if no active connection is available or the rollback operation fails.
-   */
-  public async rollbackTransaction(): Promise<void> {
-    if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.error("Cannot rollback transaction. No active connection.");
-      throw new Db2TransactionError(
-        "Cannot rollback transaction. No active connection."
-      );
-    }
-
-    this.logger.log("Rolling back transaction...");
-
-    try {
-      // Execute the rollback command
-      await this.query("ROLLBACK");
-
-      // Log success
-      this.logger.log("Transaction rolled back successfully.");
-    } catch (error) {
-      // Log the error with detailed context and rethrow a Db2Error
-      const errorMessage = formatDb2Error(error, "Rollback Transaction", {
-        host: this.config.host,
-        database: this.config.database,
-      });
-      this.logger.error(`Failed to rollback transaction: ${errorMessage}`);
-      throw new Db2Error(
-        "Failed to rollback transaction. Check logs for details."
-      );
     }
   }
 
@@ -490,77 +405,73 @@ export class Db2Client
    * Executes a SQL query against the Db2 database.
    * @param sql The SQL query string to execute.
    * @param params An array of parameters to bind to the query.
-   * @param timeout The query timeout in milliseconds (optional).
    * @returns A promise that resolves with the result of the query.
    */
-  public async query<T>(
-    sql: string,
-    params: any[] = [],
-    timeout?: number
-  ): Promise<T> {
-    this.lastUsed = Date.now();
-    if (this.state !== Db2ConnectionState.CONNECTED) {
-      this.logger.warn("No active connection. Attempting to reconnect...");
-      await this.reconnect(); // Attempt to reconnect
-    }
-
-    this.logQuery(`Executing query: ${sql}`, params);
-    return new Promise<T>((resolve, reject) => {
-      try {
-        const stmt = this.connection.prepareSync(sql);
-
-        if (timeout) {
-          stmt.setQueryTimeout(timeout / 1000); // Convert milliseconds to seconds
-        }
-
-        const prefetchSize = this.config.prefetchSize || 10; // Default to 10 rows if not specified
-        stmt.setAttr(SQL_ATTR_ROWCOUNT_PREFETCH, prefetchSize);
-
-        const startTime = Date.now();
-        stmt.execute(params, (error, result) => {
-          if (error) {
-            this.state = Db2ConnectionState.ERROR;
-            this.logError("Query error", error);
-
-            // Check if the error is related to query syntax
-            if (error.message.toLowerCase().includes("syntax")) {
-              reject(
-                new Db2QuerySyntaxError("Query syntax error", {
-                  sql,
-                  params,
-                  error: error.message,
-                })
-              );
-            } else {
-              reject(new Db2Error("Query execution failed", error, params));
-            }
+  public async query(query: string, params: any[] = []): Promise<any> {
+    const connection = await this.openConnection();
+    try {
+      this.logger.log(`Executing query: ${query}`);
+      return new Promise<any>((resolve, reject) => {
+        connection.query(query, params, (err: Error, result: any) => {
+          if (err) {
+            this.logger.error("Error executing query", err);
+            reject(new Db2ConnectionError("Failed to execute query"));
           } else {
-            const duration = Date.now() - startTime;
-            if (this.config.logging?.profileSql) {
-              this.logger.debug(`Query executed in ${duration}ms: ${sql}`);
-            }
             resolve(result);
           }
-          stmt.closeSync(); // Close the statement after execution
         });
-      } catch (error) {
-        this.state = Db2ConnectionState.ERROR;
-        this.logError("Error preparing query", error);
+      });
+    } finally {
+      await this.closeConnection(connection);
+    }
+  }
 
-        // Check if the error is related to query syntax
-        if (error.message.toLowerCase().includes("syntax")) {
-          reject(
-            new Db2QuerySyntaxError("Query syntax error", {
-              sql,
-              params,
-              error: error.message,
-            })
-          );
-        } else {
-          reject(new Db2Error("Failed to prepare or execute the query"));
-        }
-      }
-    });
+  /**
+   * Builds the connection string based on Db2ConfigOptions.
+   */
+  public buildConnectionString(config: Db2ConfigOptions): string {
+    let connStr = `DATABASE=${config.database};HOSTNAME=${config.host};PORT=${config.port};`;
+
+    if (config.characterEncoding) {
+      connStr += `CHARACTERENCODING=${config.characterEncoding};`;
+    }
+    if (config.securityMechanism) {
+      connStr += `SECURITY=${config.securityMechanism};`;
+    }
+    if (config.useTls) {
+      connStr += "SECURITY=SSL;";
+    }
+    if (config.username && config.password) {
+      connStr += `UID=${config.username};PWD=${config.password};`;
+    }
+
+    return connStr;
+  }
+
+  /**
+   * Executes a batch insert operation on the Db2 database.
+   * @param tableName The name of the table to insert into.
+   * @param columns The columns to insert data into.
+   * @param valuesArray An array of value arrays, each containing values for a single row.
+   * @returns A promise that resolves when the batch insert is complete.
+   */
+  public async batchInsert(
+    tableName: string,
+    columns: string[],
+    valuesArray: any[][]
+  ): Promise<void> {
+    this.logger.log(`Starting batch insert into table: ${tableName}`);
+
+    const columnsString = columns.join(", ");
+    const placeholders = columns.map(() => "?").join(", ");
+    const sql = `INSERT INTO ${tableName} (${columnsString}) VALUES (${placeholders})`;
+
+    const stmt = this.connection.prepareSync(sql);
+    for (const values of valuesArray) {
+      stmt.executeSync(values);
+    }
+    stmt.closeSync();
+    this.logger.log(`Batch insert completed for table: ${tableName}`);
   }
 
   /**
@@ -585,18 +496,7 @@ export class Db2Client
       this.connection.prepare(sql, (err, stmt) => {
         if (err) {
           this.logger.error("Error preparing statement:", err.message);
-
-          // Check if the error is related to query syntax
-          if (err.message.toLowerCase().includes("syntax")) {
-            reject(
-              new Db2QuerySyntaxError("Prepared statement syntax error", {
-                sql,
-                error: err.message,
-              })
-            );
-          } else {
-            reject(new Db2Error("Failed to prepare statement"));
-          }
+          reject(new Db2Error("Failed to prepare statement"));
           return;
         }
 
@@ -606,22 +506,7 @@ export class Db2Client
               "Error executing prepared statement:",
               error.message
             );
-
-            // Check if the error is related to query syntax
-            if (error.message.toLowerCase().includes("syntax")) {
-              reject(
-                new Db2QuerySyntaxError(
-                  "Prepared statement execution syntax error",
-                  {
-                    sql,
-                    params,
-                    error: error.message,
-                  }
-                )
-              );
-            } else {
-              reject(new Db2Error("Prepared statement execution failed"));
-            }
+            reject(new Db2Error("Prepared statement execution failed"));
           } else {
             resolve(result);
             stmt.closeSync();
@@ -632,53 +517,55 @@ export class Db2Client
   }
 
   /**
-   * Executes a batch insert operation on the Db2 database.
-   * @param tableName The name of the table to insert into.
-   * @param columns The columns to insert data into.
-   * @param valuesArray An array of value arrays, each containing values for a single row.
-   * @returns A promise that resolves when the batch insert is complete.
+   * Executes a transaction.
+   * @param callback The function to execute within the transaction.
    */
-  public async batchInsert(
-    tableName: string,
-    columns: string[],
-    valuesArray: any[][]
+  public async executeTransaction(
+    callback: () => Promise<void>
   ): Promise<void> {
-    this.logger.log(`Starting batch insert into table: ${tableName}`);
-
-    if (!this.connection) {
-      this.logger.warn(
-        "No active connection to perform batch insert. Attempting to reconnect..."
-      );
-      await this.reconnect(); // Attempt to reconnect before batch insert
-    }
-
-    const columnsString = columns.join(", ");
-    const placeholders = columns.map(() => "?").join(", "); // Generate placeholders (?, ?, ...)
-    const sql = `INSERT INTO ${tableName} (${columnsString}) VALUES (${placeholders})`;
-
+    await this.beginTransaction();
     try {
-      const stmt = this.connection.prepareSync(sql); // Prepare the statement
-
-      for (const values of valuesArray) {
-        stmt.executeSync(values); // Execute each row
-      }
-
-      stmt.closeSync(); // Close the statement after execution
-      this.logger.log(`Batch insert completed for table: ${tableName}`);
+      await callback();
+      await this.commitTransaction();
     } catch (error) {
-      this.logError("Batch insert error", error);
-      throw new Db2TransactionError("Batch insert failed");
+      await this.rollbackTransaction();
+      throw error; // Rethrow the error after rollback
     }
   }
 
   /**
-   * Executes a batch update operation on the Db2 database.
-   * @param tableName The name of the table to update.
-   * @param columns The columns to update.
-   * @param valuesArray An array of value arrays, each containing values for a single row update.
-   * @param whereClause A string representing the WHERE clause for the update.
-   * @returns A promise that resolves when the batch update is complete.
+   * Begins a transaction.
    */
+  public async beginTransaction(): Promise<void> {
+    if (this.state !== Db2ConnectionState.CONNECTED) {
+      throw new Db2Error("Cannot begin transaction. No active connection.");
+    }
+    await this.query("BEGIN");
+    this.logger.log("Transaction started successfully.");
+  }
+
+  /**
+   * Commits the current transaction.
+   */
+  public async commitTransaction(): Promise<void> {
+    if (this.state !== Db2ConnectionState.CONNECTED) {
+      throw new Db2Error("Cannot commit transaction. No active connection.");
+    }
+    await this.query("COMMIT");
+    this.logger.log("Transaction committed successfully.");
+  }
+
+  /**
+   * Rolls back the current transaction.
+   */
+  public async rollbackTransaction(): Promise<void> {
+    if (this.state !== Db2ConnectionState.CONNECTED) {
+      throw new Db2Error("Cannot rollback transaction. No active connection.");
+    }
+    await this.query("ROLLBACK");
+    this.logger.log("Transaction rolled back successfully.");
+  }
+
   public async batchUpdate(
     tableName: string,
     columns: string[],
@@ -712,101 +599,25 @@ export class Db2Client
     }
   }
 
-  /**
-   * Dynamically sets the minimum and maximum pool size for the database connections.
-   * Validates the inputs and ensures that the pool is adjusted accordingly.
-   * @param minPoolSize The minimum number of connections in the pool.
-   * @param maxPoolSize The maximum number of connections in the pool.
-   * @throws Db2Error if the provided pool sizes are invalid.
-   */
-  public setPoolSize(minPoolSize: number, maxPoolSize: number): void {
-    try {
-      // Validate pool sizes
-      if (minPoolSize < 1) {
-        throw new Db2Error("Minimum pool size must be at least 1.");
-      }
-      if (maxPoolSize < minPoolSize) {
-        throw new Db2Error(
-          "Maximum pool size must be greater than or equal to the minimum pool size."
-        );
-      }
-
-      // Log current pool sizes for comparison
-      const currentMinSize = this.pool.minPoolSize || "default";
-      const currentMaxSize = this.pool.maxPoolSize || "default";
-
-      this.logger.log(
-        `Adjusting connection pool size: current min=${currentMinSize}, current max=${currentMaxSize}, ` +
-          `new min=${minPoolSize}, new max=${maxPoolSize}`
-      );
-
-      // Update the pool configuration
-      this.pool.setMaxPoolSize(maxPoolSize);
-      this.pool.setMinPoolSize(minPoolSize);
-
-      // Confirm the update
-      this.logger.log(
-        `Connection pool size updated successfully: min=${minPoolSize}, max=${maxPoolSize}`
-      );
-    } catch (error) {
-      this.logger.error("Failed to set pool size:", error.message);
-      throw new Db2Error("An error occurred while setting the pool size.");
+  private logError(message: string, error: Error) {
+    const logMessage = `${message}: ${error.message}`;
+    this.logger.error(logMessage);
+    this.recentErrors.push(logMessage); // Add to recent errors
+    if (this.recentErrors.length > 10) {
+      // Limit recent errors to the last 10
+      this.recentErrors.shift();
     }
   }
 
-  /**
-   * Adjusts the connection pool size dynamically based on the current load.
-   * @param activeConnectionsThreshold The threshold for active connections to trigger pool resizing.
-   * @param minPoolSize The new minimum pool size if the threshold is exceeded.
-   * @param maxPoolSize The new maximum pool size if the threshold is exceeded.
-   */
-  public async adjustPoolSizeBasedOnLoad(
-    activeConnectionsThreshold: number,
-    minPoolSize: number,
-    maxPoolSize: number
-  ): Promise<void> {
-    // Validate input parameters
-    if (minPoolSize < 1 || maxPoolSize < minPoolSize) {
+  public getActiveConnectionsCount(): number {
+    try {
+      const activeConnections = this.activeConnections?.length || 0;
+      this.logger.log(`Active connections: ${activeConnections}`);
+      return activeConnections;
+    } catch (error) {
       this.logger.error(
-        `Invalid pool size configuration: minPoolSize=${minPoolSize}, maxPoolSize=${maxPoolSize}`
-      );
-      throw new Db2Error("Invalid pool size configuration.");
-    }
-
-    const activeConnections = this.getActiveConnectionsCount();
-
-    this.logger.log(
-      `Checking pool load: ${activeConnections} active connections.`
-    );
-
-    // Check if the active connections exceed the threshold
-    if (activeConnections > activeConnectionsThreshold) {
-      // Log the decision before making changes
-      this.logger.warn(
-        `Active connections (${activeConnections}) exceeded threshold (${activeConnectionsThreshold}). Adjusting pool size: min=${minPoolSize}, max=${maxPoolSize}`
-      );
-
-      try {
-        // Gracefully drain the current pool
-        await this.drainPool();
-
-        this.setPoolSize(minPoolSize, maxPoolSize);
-
-        // Reconnect the pool
-        await this.connect(); // Reconnect with new settings
-        this.logger.log(
-          `Successfully adjusted pool size and reconnected: min=${minPoolSize}, max=${maxPoolSize}`
-        );
-      } catch (error) {
-        this.logger.error(
-          "Failed to adjust pool size or reconnect dynamically:",
-          error.message
-        );
-        throw new Db2Error("Failed to adjust pool size dynamically.");
-      }
-    } else {
-      this.logger.log(
-        `Active connections (${activeConnections}) within acceptable limits. No pool size adjustment necessary.`
+        "Failed to get active connections count:",
+        error.message
       );
     }
   }
@@ -816,11 +627,8 @@ export class Db2Client
    */
   public logPoolStatus(): void {
     const activeConnections = this.getActiveConnectionsCount();
-    const totalConnections = this.getTotalConnectionsCount();
 
-    this.logger.log(
-      `Connection Pool Status: Active=${activeConnections}, Total=${totalConnections}`
-    );
+    this.logger.log(`Connection Pool Status: Active=${activeConnections}`);
   }
 
   /**
@@ -833,388 +641,138 @@ export class Db2Client
       this.logPoolStatus();
 
       const activeConnections = this.getActiveConnectionsCount();
-      const totalConnections = this.getTotalConnectionsCount();
+
       const maxPoolSize = this.config.maxPoolSize || 10;
 
       // Generate warnings if pool is near capacity
-      if (totalConnections >= maxPoolSize * 0.9) {
+      if (activeConnections >= maxPoolSize * 0.9) {
         this.logger.warn(
-          `Connection pool usage is at 90% of its capacity (${totalConnections}/${maxPoolSize}). Consider increasing the pool size.`
-        );
-      }
-
-      // Dynamically adjust the pool size if active connections exceed a threshold
-      const activeConnectionsThreshold = 5;
-      const newMinPoolSize = Math.min(10, activeConnections + 2);
-      const newMaxPoolSize = Math.min(20, activeConnections + 5);
-
-      if (activeConnections > activeConnectionsThreshold) {
-        this.adjustPoolSizeBasedOnLoad(
-          activeConnectionsThreshold,
-          newMinPoolSize,
-          newMaxPoolSize
+          `Connection pool usage is at 90% of its capacity (${activeConnections}/${maxPoolSize}). Consider increasing the pool size.`
         );
       }
     }, interval);
   }
 
   /**
-   * Checks the health status of the Db2 connection.
-   * @returns A promise that resolves with a boolean indicating the health of the connection.
+   * Get connection pool statistics
    */
-  public async checkHealth(): Promise<boolean> {
+  public getPoolStats() {
+    return {
+      activeConnections: this.activeConnections,
+      totalConnections: this.totalConnections,
+      minPoolSize: this.config.minPoolSize,
+      maxPoolSize: this.config.maxPoolSize,
+    };
+  }
+
+  /**
+   * Check the health status of the DB2 connection, including pool and connection stats
+   */
+  public async checkHealth(): Promise<{
+    status: boolean;
+    details?: any;
+  }> {
     this.logger.log("Performing extended health check...");
+    try {
+      // Execute a test query
+      await this.query("SELECT 1 FROM SYSIBM.SYSDUMMY1");
+      this.logger.log("DB2 base health check passed");
+
+      // Get pool and connection stats
+      const poolStats = this.getPoolStats();
+      const connectionStats = await this.getDbConnectionStats();
+
+      // Attempt to get detailed connection info, but don't fail if it doesn't work
+      let connectionDetails: any;
+      try {
+        connectionDetails = await this.getDbConnectionDetails();
+      } catch (error) {
+        this.logger.warn(
+          "Failed to retrieve detailed connection info, skipping."
+        );
+        connectionDetails = { error: "Connection details unavailable" };
+      }
+
+      return {
+        status: true,
+        details: {
+          poolStats,
+          connectionStats,
+          connectionDetails,
+        },
+      };
+    } catch (error) {
+      this.logger.error("DB2 health check failed:", error);
+      return {
+        status: false,
+        details: {
+          error: error.message,
+        },
+      };
+    }
+  }
+
+  public async getDbConnectionStats(): Promise<any> {
+    const query = `
+      SELECT
+        SUBSTR(APPLICATION_NAME, 1, 40) AS APP_NAME,
+        COUNT(*) AS CONNECTION_COUNT
+      FROM SYSIBMADM.MON_CURRENT_SQL
+      GROUP BY APPLICATION_NAME
+    `;
 
     try {
-      // Step 1: Check the connection state and attempt to reconnect if necessary
-      if (this.state !== Db2ConnectionState.CONNECTED) {
-        this.logger.warn("No active connection. Attempting to reconnect...");
-        await this.reconnect();
-      }
-
-      // Step 2: Perform a simple test query to validate the connection
-      const testQuery =
-        this.config.connectionTestQuery || "SELECT 1 FROM SYSIBM.SYSDUMMY1";
-      await this.query(testQuery);
-
-      // Step 3: Check the state of the connection pool
-      const activeConnections = this.getActiveConnectionsCount();
-      const totalConnections = this.getTotalConnectionsCount();
-
-      if (activeConnections > totalConnections * 0.9) {
-        this.logger.warn(
-          `Connection pool usage is high: ${activeConnections}/${totalConnections} active connections.`
-        );
-      }
-
-      this.logger.log("Health check passed.");
-      return true;
+      const result = await this.query(query);
+      return result;
     } catch (error) {
-      // Step 4: Handle different error types based on error message or type
-      if (error instanceof Db2TimeoutError) {
-        this.logger.error(
-          "Health check failed due to a timeout:",
-          error.toString()
-        );
-      } else if (error instanceof Db2ConnectionError) {
-        this.logger.error(
-          "Health check failed due to a connection error:",
-          error.toString()
-        );
-      } else if (error instanceof Db2AuthenticationError) {
-        this.logger.error(
-          "Health check failed due to an authentication error:",
-          error.toString()
-        );
-      } else if (error instanceof Db2QuerySyntaxError) {
-        this.logger.error(
-          "Health check failed due to a query syntax error:",
-          error.toString()
-        );
-      } else if (error instanceof Db2TransactionError) {
-        this.logger.error(
-          "Health check failed due to a transaction error:",
-          error.toString()
-        );
-      } else if (error instanceof Db2PoolError) {
-        this.logger.error(
-          "Health check failed due to a pool error:",
-          error.toString()
-        );
-      } else if (error instanceof Db2Error) {
-        this.logger.error(
-          "Health check failed due to a Db2-related error:",
-          error.toString()
-        );
-      } else {
-        // Fallback for any other unhandled errors
-        this.logger.error(
-          "Health check failed due to an unknown error:",
-          error.toString()
-        );
-      }
-
-      // Step 5: Attempt to reconnect if the error indicates a connection issue
-      if (
-        error instanceof Db2ConnectionError ||
-        error instanceof Db2TimeoutError ||
-        error instanceof Db2PoolError
-      ) {
-        try {
-          this.logger.log(
-            "Attempting to reconnect after health check failure..."
-          );
-          await this.reconnect();
-        } catch (reconnectError) {
-          this.logger.error(
-            "Reconnection failed after health check error:",
-            reconnectError.toString()
-          );
-          this.state = Db2ConnectionState.ERROR;
-          return false; // Return false if reconnection fails
-        }
-      } else {
-        this.state = Db2ConnectionState.ERROR;
-        return false; // Return false for other types of errors
-      }
-
-      this.logger.log("Reconnection successful after health check error.");
-      return true; // Return true if reconnection is successful
+      this.logger.error("Failed to get DB connection stats:", error);
+      throw new Db2Error("Failed to get DB connection stats");
     }
   }
 
   /**
-   * Checks if the connection has been idle for too long and closes it if necessary.
-   * If the connection is closed due to inactivity, it attempts to reconnect.
+   * Get DB2 connection details from the system catalog
    */
-  private async checkIdleTimeout(): Promise<void> {
-    const idleTimeout = this.config.idleTimeout || 60000; // Default to 60 seconds
-    const now = Date.now();
+  public async getDbConnectionDetails(): Promise<any> {
+    this.logger.log("Getting DB connection details...");
 
-    if (this.connection && now - this.lastUsed > idleTimeout) {
-      this.logger.warn(
-        `Idle timeout reached (${idleTimeout} ms), closing connection...`
-      );
+    const query = `
+        SELECT 
+          AGENT_ID,
+          APPL_CON_TIME,
+          APPL_IDLE_TIME,
+          LOCKS_HELD,
+          AGENT_SYS_CPU_TIME_MS,
+          AGENT_USR_CPU_TIME_MS,
+          DIRECT_READS,
+          DIRECT_WRITES,
+          COMMIT_SQL_STMTS,
+          ROLLBACK_SQL_STMTS,
+          FAILED_SQL_STMTS
+        FROM SYSIBMADM.SNAPAPPL
+        WHERE AGENT_ID IS NOT NULL
+      `;
 
-      try {
-        await this.disconnect();
-        this.logger.log("Connection closed due to idle timeout.");
+    try {
+      const connection = await this.openConnection();
+      this.logger.log("Executing query: " + query);
 
-        // Attempt to reconnect after disconnecting
-        this.logger.log("Attempting to reconnect after idle timeout...");
-        await this.reconnect();
-        this.logger.log("Reconnection successful after idle timeout.");
-      } catch (error) {
-        const errorMessage = formatDb2Error(error, "Idle Timeout Check", {
-          host: this.config.host,
-          database: this.config.database,
-          idleTimeout,
+      return new Promise<any>((resolve, reject) => {
+        connection.query(query, (err: Error, result: any) => {
+          if (err) {
+            this.logger.error("Error executing query", err);
+            reject(new Db2ConnectionError("Failed to execute query"));
+          } else {
+            this.logger.log("DB2 connection details retrieved successfully");
+            resolve(result);
+          }
         });
-        this.logger.error(
-          `Failed to handle idle timeout properly: ${errorMessage}`
-        );
-        throw new Db2Error(
-          "Failed to handle idle timeout. Check logs for details."
-        );
-      }
-    }
-  }
-
-  private async handleConnectionError(error: Error): Promise<void> {
-    // Log the error
-    this.logger.error("Connection error:", error.message);
-
-    // Set the state based on the error message
-    if (error.message.includes("refused")) {
-      this.state = Db2ConnectionState.CONNECTION_REFUSED;
-    } else {
-      this.state = Db2ConnectionState.ERROR;
-    }
-
-    // Increment the reconnect attempt count
-    this.currentReconnectAttempts++;
-
-    // Log reconnect attempts
-    const maxReconnectAttempts = this.config.retry?.maxReconnectAttempts || 3;
-    const reconnectInterval = this.config.retry?.reconnectInterval || 5000;
-
-    if (this.currentReconnectAttempts <= maxReconnectAttempts) {
-      this.logger.warn(
-        `Reconnect attempt ${this.currentReconnectAttempts}/${maxReconnectAttempts} in ${reconnectInterval}ms...`
-      );
-      await this.sleep(reconnectInterval);
-      await this.reconnect(); // Attempt to reconnect
-    } else {
-      // Attempt failover to secondary host if configured
-      if (this.config.retry?.failoverHost) {
-        this.logger.warn("Failing over to secondary database host...");
-        const originalHost = this.config.host;
-        const originalPort = this.config.port;
-
-        // Update config to use failover host
-        this.config.host = this.config.retry?.failoverHost;
-        this.config.port = this.config.retry?.failoverPort || this.config.port;
-
-        try {
-          await this.reconnect(); // Attempt to connect to failover host
-        } catch (failoverError) {
-          // Restore original config if failover also fails
-          this.config.host = originalHost;
-          this.config.port = originalPort;
-          this.logger.error("Failover failed:", failoverError.message);
-          throw new Db2ConnectionError(
-            "Failed to connect to primary and failover hosts"
-          );
-        }
-      } else {
-        throw new Db2ConnectionError(
-          "All reconnection attempts failed. No failover host configured."
-        );
-      }
-    }
-  }
-
-  /**
-   * Retries a database operation based on the configured retry policy.
-   * @param operation The operation to retry.
-   * @returns A promise that resolves with the result of the operation.
-   */
-  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
-    const retryPolicy = this.config.retry?.retryPolicy || "none";
-    const retryAttempts =
-      this.config.retry?.connectionRetries ||
-      this.config.retry?.retryAttempts ||
-      3;
-    const retryInterval =
-      this.config.retry?.retryDelay || this.config.retry?.retryInterval || 1000;
-
-    for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-      try {
-        return await operation(); // Try to perform the operation
-      } catch (error) {
-        if (retryPolicy === "none" || attempt === retryAttempts) {
-          throw error; // No retry or maximum attempts reached, throw error
-        }
-
-        this.logger.warn(
-          `Attempt ${attempt} failed. Retrying in ${retryInterval}ms...`,
-          error.message
-        );
-
-        if (retryPolicy === "simple") {
-          await this.sleep(retryInterval);
-        } else if (retryPolicy === "exponentialBackoff") {
-          await this.sleep(retryInterval * Math.pow(2, attempt - 1)); // Exponential backoff
-        }
-      }
-    }
-
-    throw new Db2Error("Operation failed after maximum retry attempts.");
-  }
-
-  /**
-   * Sleeps for a specified duration.
-   * @param ms The duration in milliseconds.
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Start the periodic idle timeout check.
-   */
-  private startIdleTimeoutCheck() {
-    const idleTimeoutCheckInterval = 10000; // Check every 10 seconds
-    this.idleTimeoutInterval = setInterval(() => {
-      this.checkIdleTimeout();
-    }, idleTimeoutCheckInterval);
-    this.logger.log("Started idle timeout checks.");
-  }
-
-  /**
-   * Stop the periodic idle timeout check.
-   */
-  private stopIdleTimeoutCheck() {
-    if (this.idleTimeoutInterval) {
-      clearInterval(this.idleTimeoutInterval);
-      this.logger.log("Stopped idle timeout checks.");
-    }
-  }
-
-  /**
-   * Logs SQL queries if logging is enabled.
-   * @param message The message to log.
-   * @param params The query parameters to log.
-   */
-  private logQuery(message: string, params: any[]) {
-    if (this.config.logging?.logQueries) {
-      const logMessage = `${message} | Params: ${JSON.stringify(params)}`;
-      this.logger.log(logMessage);
-      this.writeTraceLog(logMessage);
-    }
-  }
-
-  /**
-   * Logs errors if logging is enabled.
-   * @param message The message to log.
-   * @param error The error object to log.
-   */
-  private logError(message: string, error: Error) {
-    if (this.config.logging?.logErrors) {
-      const logMessage = `${message}: ${error.message}`;
-      this.logger.error(logMessage);
-      this.writeTraceLog(logMessage);
-    }
-  }
-
-  /**
-   * Writes trace logs to a file if a trace file path is configured.
-   * @param message The trace message to write.
-   */
-  private writeTraceLog(message: string) {
-    if (this.config.logging?.traceFilePath) {
-      try {
-        appendFileSync(
-          this.config.logging?.traceFilePath,
-          `${new Date().toISOString()} - ${message}\n`
-        );
-      } catch (err) {
-        this.logger.error("Failed to write to trace file:", err.message);
-      }
-    }
-  }
-
-  public getActiveConnectionsCount(): number {
-    try {
-      // Check if the pool has a method to get active connections count
-      if (typeof this.pool.getPoolStatus === "function") {
-        const poolStatus = this.pool.getPoolStatus();
-        const activeConnections = poolStatus?.availablePoolSize || 0;
-
-        this.logger.debug(`Current active connections: ${activeConnections}`);
-        return activeConnections;
-      }
-
-      this.logger.warn(
-        "Active connections count could not be determined. Falling back to default logic."
-      );
-
-      // Manual tracking of active connections if pool method is not available
-      return this.connection ? 1 : 0;
+      });
     } catch (error) {
-      this.logger.error(
-        "Failed to get active connections count:",
-        error.message
-      );
-      throw new Db2Error("Error retrieving the number of active connections.");
-    }
-  }
-
-  /**
-   * Returns the total number of connections in the pool.
-   * Logs the total connection count for monitoring purposes.
-   * @returns The total number of connections in the pool.
-   */
-  public getTotalConnectionsCount(): number {
-    try {
-      // Safely check for pool and connections before accessing their properties
-      const activeConnections = this.pool?.activeConnections?.length || 0;
-      const idleConnections = this.pool?.idleConnections?.length || 0;
-      const totalConnections = activeConnections + idleConnections;
-
-      this.logger.log(
-        `Total connections in the pool: ${totalConnections} (Active: ${activeConnections}, Idle: ${idleConnections})`
-      );
-
-      return totalConnections;
-    } catch (error) {
-      this.logger.error(
-        "Error retrieving total connections count:",
-        error.message
-      );
-
-      // Return 0 as a fallback in case of error
-      return 0;
+      this.logger.error("Failed to get DB connection details:", error);
+      throw new Db2Error("Failed to get DB connection details");
+    } finally {
+      await this.closeConnection(this.connection);
     }
   }
 }

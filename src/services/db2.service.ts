@@ -10,10 +10,10 @@ import {
 } from "@nestjs/common";
 import {
   Db2CacheOptions,
+  Db2ClientState,
   Db2ConfigOptions,
   Db2ServiceInterface,
 } from "../interfaces";
-import { Db2ConnectionState } from "../enums";
 import { Db2QueryBuilder, Db2Client, TransactionManager } from "../db";
 import { handleDb2Error } from "../errors";
 import { Cache, caching } from "cache-manager";
@@ -139,7 +139,7 @@ export class Db2Service
 
   public async connect(): Promise<void> {
     try {
-      await this.client.connect();
+      await this.client.openConnection();
     } catch (error) {
       const options = {
         host: this.options.host,
@@ -173,7 +173,7 @@ export class Db2Service
     }
   }
 
-  public getState(): Db2ConnectionState {
+  public getState(): Db2ClientState {
     return this.client.getState();
   }
 

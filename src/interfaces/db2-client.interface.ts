@@ -8,11 +8,10 @@ export interface Db2ClientInterface {
   onModuleDestroy(): void;
 
   // Connection management methods
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
+  openConnection(): Promise<Connection>;
+  closeConnection(): Promise<Connection>;
 
   // Connection pooling methods
-  releaseConnection(connection: Connection): Promise<void>;
   drainPool(): Promise<void>;
 
   // Transaction management methods
@@ -37,7 +36,7 @@ export interface Db2ClientInterface {
 
   // Connection state management
   setState(state: Db2ConnectionState): void;
-  getState(): Db2ConnectionState;
+  getState(): Db2ClientState;
 
   // Configuration methods
   getConfig(): Db2ConfigOptions;
@@ -45,21 +44,25 @@ export interface Db2ClientInterface {
   getDatabase(): string;
   buildConnectionString(config: Db2ConfigOptions): string;
 
-  // Pool size management
-  setPoolSize(minPoolSize: number, maxPoolSize: number): void;
-  adjustPoolSizeBasedOnLoad(
-    activeConnectionsThreshold: number,
-    minPoolSize: number,
-    maxPoolSize: number
-  ): Promise<void>;
-
   // Pool monitoring
   logPoolStatus(): void;
 
   // Health check
-  checkHealth(): Promise<boolean>;
+  checkHealth(): Promise<{
+    status: boolean;
+    details?: any;
+  }>;
 
   // Connection pool status
   getActiveConnectionsCount(): number;
-  getTotalConnectionsCount(): number;
+}
+
+export interface Db2ClientState {
+  connectionState: Db2ConnectionState;
+  activeConnections: number;
+  totalConnections: number;
+  reconnectionAttempts: number;
+  recentErrors: string[];
+  lastUsed: string;
+  poolInitialized: boolean;
 }
