@@ -38,8 +38,6 @@ export interface IDb2Client {
   setState(state: Partial<Db2ClientState>): void;
   getState(): Db2ClientState;
 
-  buildConnectionString(config: IDb2ConfigOptions): string;
-
   // Pool monitoring
   logPoolStatus(): void;
 

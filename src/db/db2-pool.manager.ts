@@ -117,18 +117,21 @@ export class Db2PoolManager implements IPoolManager {
   }
 
   public async getConnection(): Promise<Connection> {
-    if (!this.poolInitialized) {
-      this.logger.error("Connection pool is not initialized.");
-      throw new Error("Connection pool is not initialized.");
+    if (!this.poolInitialized || !this.pool) {
+      this.logger.error("DB2 connection pool is not initialized.");
+      throw new Error("DB2 connection pool is not initialized.");
+    } else {
+      this.logger.log("DB2 connection pool is already initialized.");
     }
 
     try {
+      this.logger.log("Db2PoolManager: Acquiring connection from pool...");
       const connection = await this.pool.acquire();
-      this.logger.log("Connection acquired from pool.");
+      this.logger.log("Db2PoolManager: Connection acquired from pool.");
       return connection;
     } catch (error) {
       this.logger.error(
-        "Failed to acquire connection from pool.",
+        "Db2PoolManager: Failed to acquire connection from pool.",
         error.message
       );
       throw error;

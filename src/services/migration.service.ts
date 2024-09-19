@@ -7,8 +7,8 @@ import {
   IDb2ConfigOptions,
   Db2MigrationOptions,
   IDb2MigrationService,
+  IDb2Client,
 } from "../interfaces";
-import { Db2Client } from "../db";
 import { handleDb2Error } from "../errors";
 import { EntityMetadataStorage, EntityMetadata } from "../metadata";
 
@@ -18,7 +18,7 @@ export class Db2MigrationService implements IDb2MigrationService {
   protected readonly config: IDb2ConfigOptions;
 
   public constructor(
-    private db2Client: Db2Client,
+    private db2Client: IDb2Client,
     migrationConfig: Db2MigrationOptions
   ) {
     this.migrationConfig = migrationConfig;

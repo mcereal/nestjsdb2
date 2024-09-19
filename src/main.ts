@@ -7,6 +7,7 @@ async function bootstrap() {
   const logger = new Logger("Bootstrap");
 
   try {
+    logger.log("Starting the application...");
     await app.listen(3000);
     logger.log("Application is running on: http://localhost:3000");
   } catch (error) {

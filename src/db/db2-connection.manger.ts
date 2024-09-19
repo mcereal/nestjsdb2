@@ -43,7 +43,7 @@ export class Db2ConnectionManager implements IConnectionManager {
       this.state.poolInitialized = true;
       this.state.connectionState = Db2ConnectionState.CONNECTED;
       this.logger.log(
-        "DB2 connection pool is already initialized and connected."
+        "Connection Manager initialized successfully. Connection pool is ready."
       );
     } else {
       this.logger.error("DB2 connection pool is not initialized.");
@@ -71,6 +71,7 @@ export class Db2ConnectionManager implements IConnectionManager {
   /**
    * Acquire a connection from the pool.
    */
+
   public async getConnection(): Promise<Connection> {
     if (!this.poolManager.getPool) {
       this.logger.error("Connection pool is not initialized.");
@@ -83,15 +84,19 @@ export class Db2ConnectionManager implements IConnectionManager {
     }
 
     try {
-      this.logger.log("Acquiring connection from pool...");
+      this.logger.log(
+        "Db2ConnectionManager: Acquiring connection from pool..."
+      );
       const connection = await this.poolManager.getConnection();
       this.activeConnections.push(connection);
       this.setState({ activeConnections: this.activeConnections.length });
-      this.logger.log("Connection acquired successfully.");
+      this.logger.log(
+        "Db2ConnectionManager: Connection acquired successfully."
+      );
       return connection;
     } catch (error: any) {
       this.logger.error(
-        "Failed to acquire connection from pool:",
+        "Db2ConnectionManager: Failed to acquire connection from pool:",
         error.message
       );
       this.setState({
@@ -196,52 +201,6 @@ export class Db2ConnectionManager implements IConnectionManager {
       });
       throw error; // Rethrow to allow upstream handling
     }
-  }
-
-  /**
-   * Build the DB2 connection string based on the configuration.
-   */
-  public buildConnectionString(config: IDb2ConfigOptions): string {
-    const { host, port, database } = config;
-    let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
-
-    switch (config.auth.authType) {
-      case "password": {
-        const { username, password } = config.auth;
-        connStr += `UID=${username};PWD=${password};`;
-        break;
-      }
-      case "kerberos": {
-        const { username } = config.auth;
-        const krbServiceName = (config.auth as Db2KerberosAuthOptions)
-          .krbServiceName;
-        connStr += `UID=${username};KRB_SERVICE_NAME=${krbServiceName};`;
-        break;
-      }
-      case "jwt": {
-        const { jwtToken, jwtSecret } = config.auth as Db2JwtAuthOptions;
-        connStr += `TOKEN=${jwtToken};JWT_SECRET=${jwtSecret};`;
-        break;
-      }
-      case "ldap": {
-        const { username, password } = config.auth;
-        const ldapUrl = (config.auth as Db2LdapAuthOptions).ldapUrl;
-        connStr += `UID=${username};PWD=${password};LDAPURL=${ldapUrl};`;
-        break;
-      }
-      default:
-        throw new Error(`Unsupported authentication type: ${config.auth}`);
-    }
-
-    if (config.useTls) {
-      connStr += "SECURITY=SSL;";
-      if (config.sslCertificatePath) {
-        connStr += `SSLServerCertificate=${config.sslCertificatePath};`;
-      }
-    }
-
-    this.logger.log(`Connection string built: ${connStr}`);
-    return connStr;
   }
 
   /**

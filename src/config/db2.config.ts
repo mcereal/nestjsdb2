@@ -2,7 +2,7 @@
 
 import { registerAs } from "@nestjs/config";
 import { IDb2ConfigOptions } from "../interfaces";
-import { Db2AuthType } from "src/enums";
+import { Db2AuthType } from "../enums";
 
 export default registerAs(
   "db2",

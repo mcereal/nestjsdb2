@@ -15,5 +15,4 @@ export interface IPoolManager {
   closeConnection(connection: Connection): Promise<void>;
   drainPool(): Promise<void>;
   releaseConnection(connection: Connection): Promise<void>;
-  // Add other methods as needed
 }

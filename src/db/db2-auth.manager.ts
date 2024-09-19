@@ -32,9 +32,16 @@ export class Db2AuthManager {
    */
   public async authenticate(): Promise<void> {
     this.logger.log(
-      `Authenticating using ${this.config.auth?.authType} strategy...`
+      `Db2AuthManager: Authenticating using ${this.config.auth?.authType} strategy...`
     );
-    await this.authStrategy.authenticate();
+
+    try {
+      await this.authStrategy.authenticate();
+      this.logger.log("Db2AuthManager: Authentication successful.");
+    } catch (error) {
+      this.logger.error("Db2AuthManager: Authentication failed.", error);
+      throw error;
+    }
   }
 
   /**

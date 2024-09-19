@@ -8,10 +8,6 @@ import {
   Db2ConnectionDetails,
   Db2ConnectionStats,
   Db2HealthDetails,
-  Db2JwtAuthOptions,
-  Db2KerberosAuthOptions,
-  Db2LdapAuthOptions,
-  Db2PasswordAuthOptions,
   Db2PoolStats,
   IPoolManager,
 } from "../interfaces";
@@ -29,6 +25,7 @@ import { Db2AuthManager } from "./db2-auth.manager";
 import { IConnectionManager } from "../interfaces/connection-mannager.interface";
 import { Db2PoolManager } from "./db2-pool.manager";
 import { DB2_CONFIG } from "../constants/injection-token.constant";
+import { buildConnectionString } from "../utils/buildConnectionString";
 
 export class Db2Client
   implements IConnectionManager, IDb2Client, OnModuleInit, OnModuleDestroy
@@ -50,7 +47,6 @@ export class Db2Client
     poolInitialized: false,
   };
   private idleTimeoutInterval: NodeJS.Timeout;
-  private connectionLifetimeInterval: NodeJS.Timeout;
   private activeConnectionsList: Connection[] = [];
   private totalConnections = 0;
   private reconnectionAttempts = 0;
@@ -167,7 +163,7 @@ export class Db2Client
       await this.authManager.authenticate();
 
       this.pool.open(
-        this.buildConnectionString(this.config),
+        buildConnectionString(this.config),
         async (err: Error, connection: Connection) => {
           clearTimeout(timeout);
           if (err) {
@@ -374,125 +370,6 @@ export class Db2Client
     } finally {
       await this.closeConnection(connection);
     }
-  }
-
-  /**
-   * Builds the connection string based on Db2ConfigOptions.
-   */
-  public buildConnectionString(config: IDb2ConfigOptions): string {
-    const {
-      host,
-      port,
-      database,
-      characterEncoding,
-      securityMechanism,
-      currentSchema,
-      applicationName,
-      useTls,
-      sslCertificatePath,
-    } = config;
-
-    const { authType, ...authConfig } = config.auth || {};
-
-    let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
-
-    // Handle the authentication section based on authType
-    connStr += this.buildAuthSection(authType, authConfig);
-
-    // Optional configurations
-    if (characterEncoding) {
-      connStr += `CHARACTERENCODING=${characterEncoding};`;
-    }
-
-    if (securityMechanism) {
-      connStr += `SECURITY=${securityMechanism};`;
-    }
-
-    if (currentSchema) {
-      connStr += `CURRENTSCHEMA=${currentSchema};`;
-    }
-
-    if (applicationName) {
-      connStr += `APPLICATIONNAME=${applicationName};`;
-    }
-
-    if (useTls) {
-      connStr += "SECURITY=SSL;";
-      if (sslCertificatePath) {
-        connStr += `SSLServerCertificate=${sslCertificatePath};`;
-      }
-    }
-
-    return connStr;
-  }
-
-  /**
-   * Builds the authentication part of the connection string based on authType.
-   */
-  private buildAuthSection(authType: string, authConfig: any): string {
-    switch (authType) {
-      case "password":
-        return this.buildPasswordAuth(authConfig);
-      case "kerberos":
-        return this.buildKerberosAuth(authConfig);
-      case "jwt":
-        return this.buildJwtAuth(authConfig);
-      case "ldap":
-        return this.buildLdapAuth(authConfig);
-      default:
-        throw new Error(`Unsupported authentication type: ${authType}`);
-    }
-  }
-
-  /**
-   * Handles password-based authentication string construction.
-   */
-  private buildPasswordAuth({
-    username,
-    password,
-  }: Db2PasswordAuthOptions): string {
-    if (!username || !password) {
-      throw new Error(
-        "Username and password are required for password authentication."
-      );
-    }
-    return `UID=${username};PWD=${password};`;
-  }
-
-  /**
-   * Handles Kerberos-based authentication string construction.
-   */
-  private buildKerberosAuth({
-    krbServiceName,
-  }: Db2KerberosAuthOptions): string {
-    if (!krbServiceName) {
-      throw new Error(
-        "Kerberos service name (krbServiceName) is required for Kerberos authentication."
-      );
-    }
-    return `SecurityMechanism=11;ServiceName=${krbServiceName};`;
-  }
-
-  /**
-   * Handles JWT-based authentication string construction.
-   */
-  private buildJwtAuth({ jwtToken }: Db2JwtAuthOptions): string {
-    if (!jwtToken) {
-      throw new Error("JWT token is required for JWT authentication.");
-    }
-    return `AUTHENTICATION=jwt;Token=${jwtToken};`;
-  }
-
-  /**
-   * Handles LDAP-based authentication string construction.
-   */
-  private buildLdapAuth({ username, password }: Db2LdapAuthOptions): string {
-    if (!username || !password) {
-      throw new Error(
-        "Username and password are required for LDAP authentication."
-      );
-    }
-    return `UID=${username};PWD=${password};AUTHENTICATION=ldap;`;
   }
 
   /**

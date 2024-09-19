@@ -1,5 +1,5 @@
 import { Db2ClientState } from "./db2-client.interface";
-import { IDb2ConfigOptions } from "./db2-config-options.interface";
+
 import { Connection } from "ibm_db";
 
 export interface IConnectionManager {
@@ -9,7 +9,6 @@ export interface IConnectionManager {
   closeConnection(connection: Connection): Promise<void>;
   disconnect(): Promise<void>;
   getConnectionFromPool(connectionString: string): Promise<void>;
-  buildConnectionString(config: IDb2ConfigOptions): string;
   drainPool(): Promise<void>;
   logPoolStatus(): void;
   checkHealth(): Promise<{ status: boolean; details?: any }>;

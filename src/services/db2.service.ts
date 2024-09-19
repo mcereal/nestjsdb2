@@ -12,8 +12,9 @@ import {
   IDb2ConfigOptions,
   Db2HealthDetails,
   Db2ServiceInterface,
+  IDb2Client,
 } from "../interfaces";
-import { Db2Client, Db2QueryBuilder } from "../db";
+import { Db2QueryBuilder } from "../db";
 import { handleDb2Error } from "../errors/db2.error";
 import { Cache, caching } from "cache-manager";
 import { Db2MigrationService } from "../services";
@@ -29,7 +30,7 @@ export class Db2Service
 {
   private readonly logger = new Logger(Db2Service.name);
   private cache?: Cache;
-  private client: Db2Client;
+  private client: IDb2Client;
 
   constructor(
     @Inject(DB2_CONFIG) private readonly options: IDb2ConfigOptions,
@@ -37,7 +38,7 @@ export class Db2Service
     private readonly transactionManager: TransactionManager,
     private readonly migrationService: Db2MigrationService,
     private readonly connectionManager: IConnectionManager,
-    @Inject(Db2Client) db2Client: Db2Client
+    db2Client: IDb2Client
   ) {
     // Initialize cache if enabled
     if (this.options.cache?.enabled && this.cacheManager) {
@@ -55,15 +56,27 @@ export class Db2Service
 
   public async onModuleInit(): Promise<void> {
     this.logger.log("Initializing Db2Service...");
+
+    // Validate configuration
     this.validateConfig(this.options);
+    this.logger.log("Configuration validated.");
+
     try {
+      // Connect to DB2
+      this.logger.log("Connecting to DB2...");
       await this.connect();
+      this.logger.log("Connected to DB2 successfully.");
 
       // Run migrations if enabled
       if (this.options.migration?.enabled) {
+        this.logger.log("Migrations are enabled. Running migrations...");
         await this.migrationService.runMigrations();
         this.logger.log("Migrations completed successfully.");
+      } else {
+        this.logger.log("Migrations are disabled. Skipping migration step.");
       }
+
+      this.logger.log("Db2Service initialization complete.");
     } catch (error) {
       const options = {
         host: this.options.host,

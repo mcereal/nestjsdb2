@@ -1,7 +1,8 @@
 // src/modules/db2.module.ts
-import { Module, DynamicModule, Provider, Global } from "@nestjs/common";
+
+import { Module, DynamicModule, Global } from "@nestjs/common";
 import { Db2Service } from "../services/db2.service";
-import { Db2Client } from "../db";
+import { Db2Client } from "../db/db2-client";
 import { TransactionManager } from "../db/transaction-manager";
 import { Db2MigrationService } from "../services/migration.service";
 import { Db2PoolManager } from "../db/db2-pool.manager";
@@ -10,6 +11,7 @@ import {
   IDb2ConfigOptions,
   IConnectionManager,
   IPoolManager,
+  IDb2Client,
 } from "../interfaces";
 import {
   CACHE_MANAGER,
@@ -32,10 +34,12 @@ export class Db2Module {
     return {
       module: Db2Module,
       imports: [
+        // Import Db2ConfigModule with provided options
         Db2ConfigModule.forRoot(options),
+        // Register CacheModule asynchronously
         CacheModule.registerAsync({
-          imports: [Db2ConfigModule],
-          inject: [DB2_CONFIG],
+          imports: [Db2ConfigModule], // Import Db2ConfigModule to access DB2_CONFIG
+          inject: [DB2_CONFIG], // Inject DB2_CONFIG into the useFactory
           useFactory: (config: IDb2ConfigOptions): CacheModuleOptions => {
             if (config.cache?.enabled) {
               const cacheConfig: CacheModuleOptions = {
@@ -57,7 +61,7 @@ export class Db2Module {
               return cacheConfig;
             }
 
-            return {}; // default cache config
+            return {}; // Default cache configuration if caching is disabled
           },
         }),
       ],
@@ -99,7 +103,7 @@ export class Db2Module {
         // TransactionManager Provider
         {
           provide: TransactionManager,
-          useFactory: (db2Client: Db2Client) =>
+          useFactory: (db2Client: IDb2Client) =>
             new TransactionManager(db2Client),
           inject: [Db2Client],
         },
@@ -107,7 +111,7 @@ export class Db2Module {
         {
           provide: Db2MigrationService,
           useFactory: (
-            db2Client: Db2Client,
+            db2Client: IDb2Client,
             migrationConfig: IDb2ConfigOptions["migration"]
           ) => new Db2MigrationService(db2Client, migrationConfig),
           inject: [Db2Client],
@@ -121,7 +125,7 @@ export class Db2Module {
             transactionManager: TransactionManager,
             migrationService: Db2MigrationService,
             connectionManager: IConnectionManager,
-            db2Client: Db2Client
+            db2Client: IDb2Client
           ) =>
             new Db2Service(
               config, // Pass the config directly
@@ -145,16 +149,22 @@ export class Db2Module {
     };
   }
 
-  static async forRootAsync(options: {
+  static forRootAsync(options: {
+    imports?: any[];
     useFactory: (
       ...args: any[]
     ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
     inject?: any[];
-  }): Promise<DynamicModule> {
+  }): DynamicModule {
     return {
       module: Db2Module,
       imports: [
-        Db2ConfigModule.forRootAsync(options),
+        ...(options.imports || []),
+        Db2ConfigModule.forRootAsync({
+          useFactory: options.useFactory,
+          inject: options.inject || [],
+        }),
+
         CacheModule.registerAsync({
           imports: [Db2ConfigModule],
           inject: [DB2_CONFIG],
@@ -179,7 +189,7 @@ export class Db2Module {
               return cacheConfig;
             }
 
-            return {}; // default cache config
+            return {}; // Default cache configuration if caching is disabled
           },
         }),
       ],
@@ -221,7 +231,7 @@ export class Db2Module {
         // TransactionManager Provider
         {
           provide: TransactionManager,
-          useFactory: (db2Client: Db2Client) =>
+          useFactory: (db2Client: IDb2Client) =>
             new TransactionManager(db2Client),
           inject: [Db2Client],
         },
@@ -229,7 +239,7 @@ export class Db2Module {
         {
           provide: Db2MigrationService,
           useFactory: (
-            db2Client: Db2Client,
+            db2Client: IDb2Client,
             migrationConfig: IDb2ConfigOptions["migration"]
           ) => new Db2MigrationService(db2Client, migrationConfig),
           inject: [Db2Client],
@@ -243,10 +253,10 @@ export class Db2Module {
             transactionManager: TransactionManager,
             migrationService: Db2MigrationService,
             connectionManager: IConnectionManager,
-            db2Client: Db2Client
+            db2Client: IDb2Client
           ) =>
             new Db2Service(
-              config, // Pass the config directly
+              config,
               cacheManager,
               transactionManager,
               migrationService,
