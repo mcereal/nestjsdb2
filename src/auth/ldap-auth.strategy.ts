@@ -1,18 +1,21 @@
 import { Db2AuthStrategy } from "./db2-auth.strategy";
-import { Db2ConfigOptions, Db2LdapAuthOptions } from "../interfaces";
+import {
+  IDb2ConfigOptions,
+  IConnectionManager,
+  Db2LdapAuthOptions,
+} from "../interfaces";
 import { Db2AuthenticationError } from "../errors";
 import { Db2Client } from "../db/db2-client";
 import { Db2ConnectionState } from "../enums";
 import { Logger } from "@nestjs/common";
 import * as ldap from "ldapjs"; // Import ldapjs for LDAP authentication
-import { IConnectionManager } from "../interfaces";
 
 export class LdapAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
   private dbClient: Db2Client;
 
   constructor(
-    config: Db2ConfigOptions,
+    config: IDb2ConfigOptions,
     dbClient: Db2Client,
     connectionManager: IConnectionManager
   ) {
@@ -24,12 +27,10 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
    * Perform the LDAP authentication process.
    * Binds to an LDAP server and attempts to authenticate with the DB2 server.
    */
-  /**
-   * Perform the LDAP authentication process.
-   * Binds to an LDAP server and attempts to authenticate with the DB2 server.
-   */
   async authenticate(): Promise<void> {
-    this.dbClient.setState(Db2ConnectionState.AUTHENTICATING);
+    this.dbClient.setState({
+      connectionState: Db2ConnectionState.AUTHENTICATING,
+    });
     this.logger.log("Starting LDAP authentication...");
 
     // Ensure the authType is 'ldap' and cast config.auth to Db2LdapAuthOptions
@@ -37,7 +38,9 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       const { username, password } = this.config.auth as Db2LdapAuthOptions;
 
       if (!username || !password) {
-        this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
+        this.dbClient.setState({
+          connectionState: Db2ConnectionState.AUTH_FAILED,
+        });
         throw new Db2AuthenticationError(
           "LDAP username and password are required."
         );
@@ -46,15 +49,21 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       try {
         // Perform LDAP bind (authentication)
         await this.ldapBind(username, password);
-        this.dbClient.setState(Db2ConnectionState.CONNECTED);
+        this.dbClient.setState({
+          connectionState: Db2ConnectionState.CONNECTED,
+        });
         this.logger.log("LDAP authentication successful.");
       } catch (error) {
-        this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
+        this.dbClient.setState({
+          connectionState: Db2ConnectionState.AUTH_FAILED,
+        });
         this.logger.error("LDAP authentication failed:", error.message);
         throw new Db2AuthenticationError("LDAP authentication failed.");
       }
     } else {
-      this.dbClient.setState(Db2ConnectionState.AUTH_FAILED);
+      this.dbClient.setState({
+        connectionState: Db2ConnectionState.AUTH_FAILED,
+      });
       throw new Db2AuthenticationError(
         "Invalid authentication type for LDAP strategy."
       );

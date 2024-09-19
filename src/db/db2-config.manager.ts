@@ -1,20 +1,20 @@
 import {
-  Db2ConfigOptions,
+  IDb2ConfigOptions,
   Db2RetryOptions,
   Db2LoggingOptions,
 } from "../interfaces";
 
 export class Db2ConfigManager {
-  private config: Db2ConfigOptions;
+  private config: IDb2ConfigOptions;
 
-  constructor(config: Db2ConfigOptions) {
+  constructor(config: IDb2ConfigOptions) {
     this.config = this.applyDefaults(config);
   }
 
   /**
    * Applies default values to the provided configuration if missing.
    */
-  private applyDefaults(config: Db2ConfigOptions): Db2ConfigOptions {
+  private applyDefaults(config: IDb2ConfigOptions): IDb2ConfigOptions {
     return {
       ...config,
       retry: this.applyRetryDefaults(config.retry),
@@ -61,7 +61,7 @@ export class Db2ConfigManager {
   /**
    * Get the fully merged configuration with defaults.
    */
-  public getConfig(): Db2ConfigOptions {
+  public getConfig(): IDb2ConfigOptions {
     return this.config;
   }
 }

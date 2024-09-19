@@ -2,14 +2,12 @@
 
 import { Db2Service } from "src/services/db2.service";
 import { Logger } from "@nestjs/common";
-import { SqlInjectionChecker } from "../utils/sql-injection-checker";
 
 export const Db2Query = (
   query: string,
   executeQuery: boolean = true
 ): MethodDecorator => {
   const logger = new Logger("Db2QueryDecorator");
-  const sqlInjectionChecker = new SqlInjectionChecker();
 
   return (
     _target: Object,
@@ -29,10 +27,6 @@ export const Db2Query = (
       let queryResult;
       if (executeQuery) {
         try {
-          sqlInjectionChecker.validateParams(args);
-          logger.log(
-            `Executing query: ${query} with args: ${JSON.stringify(args)}`
-          );
           queryResult = await db2Service.query(query, args);
           logger.log(`Query executed successfully: ${query}`);
         } catch (error) {

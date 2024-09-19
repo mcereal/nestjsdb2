@@ -1,6 +1,6 @@
 import { Db2IsolationLevel } from "../";
 
-export interface TransactionManagerInterface {
+export interface ITransactionManager {
   /**
    * Begin a transaction with an optional isolation level.
    * @param isolationLevel The isolation level for the transaction (optional).

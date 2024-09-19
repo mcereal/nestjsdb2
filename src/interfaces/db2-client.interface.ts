@@ -1,8 +1,8 @@
 import { Db2ConnectionState } from "../enums";
 import { Connection } from "ibm_db";
-import { Db2ConfigOptions } from "./";
+import { IDb2ConfigOptions } from "./db2-config-options.interface";
 
-export interface Db2ClientInterface {
+export interface IDb2Client {
   // Lifecycle hooks
   onModuleInit(): void;
   onModuleDestroy(): void;
@@ -35,10 +35,10 @@ export interface Db2ClientInterface {
   ): Promise<void>;
 
   // Connection state management
-  setState(state: Db2ConnectionState): void;
+  setState(state: Partial<Db2ClientState>): void;
   getState(): Db2ClientState;
 
-  buildConnectionString(config: Db2ConfigOptions): string;
+  buildConnectionString(config: IDb2ConfigOptions): string;
 
   // Pool monitoring
   logPoolStatus(): void;

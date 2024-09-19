@@ -1,4 +1,4 @@
-import { Db2ConfigOptions } from "../interfaces/db2.interface";
+import { IDb2ConfigOptions } from "../interfaces";
 import { PasswordAuthStrategy } from "./password-auth.strategy";
 import { KerberosAuthStrategy } from "./kerberos-auth.strategy";
 import { JwtAuthStrategy } from "./jwt-auth.strategy";
@@ -8,7 +8,7 @@ import { IConnectionManager } from "../interfaces/connection-mannager.interface"
 import { Db2Client } from "../";
 
 export function createAuthStrategy(
-  config: Db2ConfigOptions,
+  config: IDb2ConfigOptions,
   connectionManager: IConnectionManager,
   dbClient: Db2Client
 ) {
@@ -22,8 +22,6 @@ export function createAuthStrategy(
     case Db2AuthType.LDAP:
       return new LdapAuthStrategy(config, dbClient, connectionManager);
     default:
-      throw new Error(
-        `Unsupported authentication type: ${config.auth?.authType}`
-      );
+      throw new Error(`Unsupported authentication type: ${config.auth}`);
   }
 }

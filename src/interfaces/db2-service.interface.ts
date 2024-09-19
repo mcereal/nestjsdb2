@@ -1,5 +1,6 @@
 import { Db2QueryBuilder } from "../db";
 import { Db2ClientState } from "./db2-client.interface";
+import { Connection } from "ibm_db";
 
 export interface Db2ServiceInterface {
   // Lifecycle hooks
@@ -8,7 +9,7 @@ export interface Db2ServiceInterface {
 
   // Connection management methods
   connect(): Promise<void>;
-  disconnect(): Promise<void>;
+  disconnect(connection: Connection): Promise<void>;
   drainPool(): Promise<void>;
 
   // Connection state and health check methods

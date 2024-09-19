@@ -20,6 +20,13 @@
  * @exports TransactionManager
  * @exports Db2QueryBuilder
  * @exports Db2MigrationService
+ * @exports ConnectionManager
+ * @exports IPoolManager
+ * @exports IConnectionManager
+ * @exports ITransactionManager
+ * @exports IDb2MigrationService
+ * @exports IDb2Client
+ * @exports IDb2ConfigOptions
  */
 
 export * from "./db2.interface";
@@ -29,3 +36,6 @@ export * from "./transaction-manager.interface";
 export * from "./db2-query-builder.interface";
 export * from "./db2-migration-service.interface";
 export * from "./connection-mannager.interface";
+export * from "./pool-manager.interface";
+export * from "./transaction-manager.interface";
+export * from "./db2-config-options.interface";

@@ -1,12 +1,8 @@
 // src/indicators/db2-health.indicator.ts
 
 import { Injectable, Logger } from "@nestjs/common";
-import {
-  HealthIndicator,
-  HealthIndicatorResult,
-  HealthCheckError,
-} from "@nestjs/terminus";
-import { Db2Service } from "../services";
+import { HealthIndicatorResult, HealthCheckError } from "@nestjs/terminus";
+import { Db2Service } from "../services/db2.service";
 import { Db2ConnectionState } from "../enums";
 
 /**
@@ -15,19 +11,18 @@ import { Db2ConnectionState } from "../enums";
  * @public
  */
 @Injectable()
-export class Db2HealthIndicator extends HealthIndicator {
+export class Db2HealthIndicator {
   private readonly logger = new Logger(Db2HealthIndicator.name);
 
-  constructor(private readonly db2Service: Db2Service) {
-    super();
-  }
+  constructor(private readonly db2Service: Db2Service) {}
 
   /**
    * Checks the health of the Db2 connection and returns detailed status.
+   * @param key Optional key name for the health indicator.
    * @returns A promise that resolves to a HealthIndicatorResult indicating the health status.
    * @throws HealthCheckError if the health check fails.
    */
-  async isHealthy(key: string = "db2"): Promise<HealthIndicatorResult> {
+  async checkHealth(key: string = "db2"): Promise<HealthIndicatorResult> {
     this.logger.log("Performing Db2 health check...");
 
     try {
@@ -72,5 +67,21 @@ export class Db2HealthIndicator extends HealthIndicator {
         healthStatus
       );
     }
+  }
+
+  /**
+   * Utility method to format the health status.
+   */
+  private getStatus(
+    key: string,
+    isHealthy: boolean,
+    details: Record<string, any>
+  ): HealthIndicatorResult {
+    return {
+      [key]: {
+        status: isHealthy ? "up" : "down",
+        ...details,
+      },
+    };
   }
 }

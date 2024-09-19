@@ -44,6 +44,7 @@ interface IndexMetadata {
 }
 
 interface ManyToManyOptions {
+  propertyKey: string | symbol;
   target: Function; // Target entity class
   joinTable?: string; // Optional join table name
   cascade?: boolean; // Cascade operations
@@ -57,6 +58,7 @@ interface ManyToManyMetadata {
 }
 
 interface ManyToOneOptions {
+  propertyKey: string | symbol;
   target: Function; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
@@ -68,6 +70,7 @@ interface ManyToOneMetadata {
 }
 
 interface OneToManyOptions {
+  propertyKey: string | symbol;
   target: Function; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
@@ -79,6 +82,7 @@ interface OneToManyMetadata {
 }
 
 interface OneToOneOptions {
+  propertyKey: string | symbol;
   target: Function; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }

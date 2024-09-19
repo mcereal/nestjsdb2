@@ -1,6 +1,8 @@
 // decorators/one-to-one.decorator.ts
 
 import "reflect-metadata";
+import { OneToOneMetadata } from "../metadata";
+import { OneToOneOptions, ONE_TO_ONE_RELATIONS_METADATA_KEY } from "../types";
 
 export function OneToOne(options: OneToOneOptions): PropertyDecorator {
   // Validate the provided options
@@ -15,16 +17,20 @@ export function OneToOne(options: OneToOneOptions): PropertyDecorator {
 
     // Retrieve existing one-to-one relations metadata or initialize if none exists
     const oneToOneRelations: OneToOneMetadata[] =
-      Reflect.getMetadata("oneToOneRelations", constructor) || [];
+      Reflect.getMetadata(ONE_TO_ONE_RELATIONS_METADATA_KEY, constructor) || [];
 
     // Check if the relation already exists to avoid duplicates
     const existingRelation = oneToOneRelations.find(
-      (relation) => relation.propertyKey === propertyKey
+      (relation) => relation.oneToOneOptions.propertyKey === propertyKey
     );
 
     if (!existingRelation) {
       // Add new one-to-one relation metadata
-      oneToOneRelations.push({ propertyKey, ...options });
+      oneToOneRelations.push({
+        propertyKey,
+        ...options,
+        oneToOneOptions: options,
+      });
 
       // Define or update metadata with the new one-to-one relations
       Reflect.defineMetadata(

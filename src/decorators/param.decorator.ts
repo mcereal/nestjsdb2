@@ -5,7 +5,6 @@ import {
   ExecutionContext,
   BadRequestException,
 } from "@nestjs/common";
-import { SqlInjectionChecker } from "../utils/sql-injection-checker"; // Import the SqlInjectionChecker
 
 /**
  * @function Db2Param
@@ -37,7 +36,6 @@ import { SqlInjectionChecker } from "../utils/sql-injection-checker"; // Import 
  */
 export const Db2Param = createParamDecorator(
   (data: string | number | undefined, ctx: ExecutionContext) => {
-    const sqlInjectionChecker = new SqlInjectionChecker();
     const args = ctx.getArgs();
 
     let paramValue: any;
@@ -62,7 +60,12 @@ export const Db2Param = createParamDecorator(
     }
 
     try {
-      sqlInjectionChecker.validateParams([paramValue]);
+      // Attempt to parse the parameter value as JSON if it is a string
+      if (typeof paramValue === "string") {
+        paramValue = JSON.parse(paramValue);
+      } else {
+        paramValue = paramValue;
+      }
     } catch (error) {
       throw new BadRequestException(`Invalid parameter: ${error.message}`);
     }

@@ -58,7 +58,7 @@ export const CheckDb2ConnectionState = (
       const currentState = db2Service.getState();
 
       // Check if the current state is one of the required states
-      if (!requiredStatesArray.includes(currentState)) {
+      if (!requiredStatesArray.includes(currentState.connectionState)) {
         const errorMessage = `DB2 connection state must be one of [${requiredStatesArray.join(
           ", "
         )}] but is currently ${currentState}`;

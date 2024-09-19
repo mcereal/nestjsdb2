@@ -1,6 +1,7 @@
-// decorators/default.decorator.ts
+// src/decorators/default.decorator.ts
 
 import "reflect-metadata";
+import { DefaultMetadata } from "../types";
 
 export function Default(value: any): PropertyDecorator {
   return (target: Object, propertyKey: string | symbol) => {

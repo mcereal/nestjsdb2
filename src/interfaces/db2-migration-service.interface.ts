@@ -1,6 +1,6 @@
 // src/interfaces/db2-migration-service.interface.ts
 
-export interface Db2MigrationServiceInterface {
+export interface IDb2MigrationService {
   /**
    * Runs database migrations based on the configuration.
    */

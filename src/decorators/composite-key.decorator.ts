@@ -1,6 +1,7 @@
-// decorators/composite-key.decorator.ts
+// src/decorators/composite-key.decorator.ts
 
 import "reflect-metadata";
+import { CompositeKeyMetadata } from "../types";
 
 export function CompositeKey(keys: string[]): ClassDecorator {
   if (!Array.isArray(keys) || keys.length === 0) {

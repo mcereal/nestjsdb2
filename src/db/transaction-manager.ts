@@ -1,15 +1,15 @@
 import { Logger } from "@nestjs/common";
-import { Db2ClientInterface, TransactionManagerInterface } from "../interfaces";
+import { IDb2Client, ITransactionManager } from "../interfaces";
 import { Db2Error } from "../errors";
 import { Db2IsolationLevel } from "../enums";
 
-export class TransactionManager implements TransactionManagerInterface {
+export class TransactionManager implements ITransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
   private transactionActive: boolean = false;
   private isolationLevel: Db2IsolationLevel | null = null;
 
   public constructor(
-    private client: Db2ClientInterface,
+    private client: IDb2Client,
     private defaultIsolationLevel?: Db2IsolationLevel
   ) {}
 

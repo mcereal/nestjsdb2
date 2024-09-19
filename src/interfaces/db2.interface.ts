@@ -1,4 +1,4 @@
-import { Db2IsolationLevel } from "../enums";
+import { Db2AuthType } from "../enums";
 
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
@@ -13,14 +13,13 @@ export interface Db2BasicConnectionOptions {
  * Authentication base interface.
  */
 interface Db2BaseAuthOptions {
-  authType: "password" | "kerberos" | "jwt" | "ldap";
+  authType: Db2AuthType;
 }
 
 /**
  * Interface for password-based authentication options.
  */
 export interface Db2PasswordAuthOptions extends Db2BaseAuthOptions {
-  authType: "password";
   username: string;
   password: string;
 }
@@ -29,7 +28,7 @@ export interface Db2PasswordAuthOptions extends Db2BaseAuthOptions {
  * Interface for Kerberos authentication options.
  */
 export interface Db2KerberosAuthOptions extends Db2BaseAuthOptions {
-  authType: "kerberos";
+  authType: Db2AuthType.KERBEROS;
   username: string;
   krbServiceName: string; // Service name for Kerberos
   krb5Config?: string; // Optional path to the krb5.conf file
@@ -40,7 +39,7 @@ export interface Db2KerberosAuthOptions extends Db2BaseAuthOptions {
  * Interface for JWT-based authentication options.
  */
 export interface Db2JwtAuthOptions extends Db2BaseAuthOptions {
-  authType: "jwt";
+  authType: Db2AuthType.JWT;
   jwtToken: string;
   jwtSecret: string; // Secret or public key to verify the token
 }
@@ -49,7 +48,7 @@ export interface Db2JwtAuthOptions extends Db2BaseAuthOptions {
  * Interface for LDAP-based authentication options.
  */
 export interface Db2LdapAuthOptions extends Db2BaseAuthOptions {
-  authType: "ldap";
+  authType: Db2AuthType.LDAP;
   username: string;
   password: string;
   ldapUrl: string; // URL for the LDAP server
@@ -118,40 +117,4 @@ export interface Db2CacheOptions {
   redisPort?: number; // For Redis configuration
   redisPassword?: string; // For Redis configuration
   resetOnDestroy?: boolean; // Reset cache on service destroy
-}
-
-/**
- * Comprehensive configuration options for setting up a Db2 connection.
- */
-export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
-  useTls?: boolean;
-  sslCertificatePath?: string;
-
-  auth: Db2AuthOptions; // Authentication section (now a union of multiple auth types)
-  logging?: Db2LoggingOptions;
-  retry?: Db2RetryOptions;
-  migration?: Db2MigrationOptions;
-  cache?: Db2CacheOptions;
-
-  defaultIsolationLevel?: Db2IsolationLevel;
-
-  connectionTimeout?: number;
-  idleTimeout?: number;
-  maxPoolSize?: number;
-  minPoolSize?: number;
-  acquireTimeoutMillis?: number;
-  maxLifetime?: number;
-  connectionTestQuery?: string;
-  maxIdleConnections?: number;
-
-  fetchSize?: number;
-  queryTimeout?: number;
-  autoCommit?: boolean;
-  statementCacheSize?: number;
-  prefetchSize?: number;
-
-  characterEncoding?: string;
-  securityMechanism?: string;
-  currentSchema?: string;
-  applicationName?: string;
 }

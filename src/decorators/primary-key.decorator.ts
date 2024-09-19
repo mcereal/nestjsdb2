@@ -1,14 +1,16 @@
 // decorators/primary-key.decorator.ts
 
 import "reflect-metadata";
+import { PrimaryKeyMetadata } from "../metadata";
+import { primeKeyOptions, PRIMARY_KEYS_METADATA_KEY } from "../types";
 
-export function PrimaryKey(): PropertyDecorator {
+export function PrimaryKey(options?: primeKeyOptions): PropertyDecorator {
   return (target: Object, propertyKey: string | symbol) => {
     const constructor = target.constructor;
 
     // Retrieve existing primary keys metadata or initialize if none exists
     const primaryKeys: PrimaryKeyMetadata[] =
-      Reflect.getMetadata("primaryKeys", constructor) || [];
+      Reflect.getMetadata(PRIMARY_KEYS_METADATA_KEY, constructor) || [];
 
     // Check if the property key is already marked as a primary key
     const existingKey = primaryKeys.find(
@@ -17,10 +19,17 @@ export function PrimaryKey(): PropertyDecorator {
 
     if (!existingKey) {
       // Add new primary key metadata
-      primaryKeys.push({ propertyKey });
+      primaryKeys.push({
+        propertyKey,
+        primeKeyOptions: options || {},
+      });
 
       // Define or update metadata with the new primary keys
-      Reflect.defineMetadata("primaryKeys", primaryKeys, constructor);
+      Reflect.defineMetadata(
+        PRIMARY_KEYS_METADATA_KEY,
+        primaryKeys,
+        constructor
+      );
     }
   };
 }

@@ -1,7 +1,17 @@
-// decorators/many-to-many.decorator.ts
+// src/decorators/many-to-many.decorator.ts
 
 import "reflect-metadata";
+import { ManyToManyMetadata } from "../metadata";
+import {
+  ManyToManyOptions,
+  MANY_TO_MANY_RELATIONS_METADATA_KEY,
+} from "../types";
 
+/**
+ * @ManyToMany decorator to define a many-to-many relationship between entities.
+ * @param options - Configuration options for the relationship.
+ * @returns PropertyDecorator
+ */
 export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
   // Validate the provided options
   if (typeof options.target !== "function") {
@@ -21,20 +31,23 @@ export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
 
     // Retrieve existing many-to-many relations metadata or initialize if none exists
     const manyToManyRelations: ManyToManyMetadata[] =
-      Reflect.getMetadata("manyToManyRelations", constructor) || [];
+      Reflect.getMetadata(MANY_TO_MANY_RELATIONS_METADATA_KEY, constructor) ||
+      [];
 
     // Check for existing relation for the same property key to avoid duplicates
-    const existingRelation = manyToManyRelations.find(
-      (relation) => relation.propertyKey === propertyKey
+    const isAlreadyRelated = manyToManyRelations.some(
+      (relation) => relation.manyToManyOptions.propertyKey === propertyKey
     );
 
-    if (!existingRelation) {
+    if (!isAlreadyRelated) {
       // Add new many-to-many relation metadata
-      manyToManyRelations.push({ propertyKey, ...options });
+      manyToManyRelations.push({
+        manyToManyOptions: { propertyKey, ...options },
+      });
 
       // Define or update metadata with the new many-to-many relations
       Reflect.defineMetadata(
-        "manyToManyRelations",
+        MANY_TO_MANY_RELATIONS_METADATA_KEY,
         manyToManyRelations,
         constructor
       );

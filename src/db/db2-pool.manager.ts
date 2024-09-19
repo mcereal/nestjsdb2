@@ -1,94 +1,170 @@
-import { Pool, Connection } from "ibm_db";
+import { Connection } from "ibm_db";
 import { Logger } from "@nestjs/common";
-import { Db2ConfigOptions } from "../interfaces";
+import { IDb2ConfigOptions, IPoolManager } from "../interfaces";
+import { Pool, createPool } from "generic-pool";
 import * as ibm_db from "ibm_db";
 
-export class Db2PoolManager {
+export class Db2PoolManager implements IPoolManager {
   private readonly logger = new Logger(Db2PoolManager.name);
-  private pool: Pool;
-  private activeConnections: Connection[] = [];
+  private pool: Pool<Connection>;
+  protected poolInitialized = false;
 
-  constructor(private config: Db2ConfigOptions) {
-    this.pool = new ibm_db.Pool();
-    this.initializePool();
+  constructor(private config: IDb2ConfigOptions) {}
+
+  public async init(): Promise<void> {
+    this.validateConfig(this.config);
+    await this.initializePool();
   }
 
-  private initializePool(): void {
-    try {
-      this.logger.log("Initializing DB2 connection pool...");
-      const connectionString = this.buildConnectionString(this.config);
-      this.pool.init(this.config.maxPoolSize, connectionString);
-      this.logger.log("DB2 connection pool initialized successfully");
-    } catch (error) {
-      this.logger.error("Failed to initialize connection pool", error.message);
+  public async initializePool(): Promise<void> {
+    this.validateConfig(this.config);
+    this.pool = createPool(
+      {
+        create: () => {
+          return new Promise<Connection>((resolve, reject) => {
+            const connectionString = this.buildConnectionString(this.config);
+            ibm_db.open(connectionString, (err, connection) => {
+              if (err) {
+                this.logger.error(
+                  "Failed to create DB2 connection",
+                  err.message
+                );
+                reject(err);
+              } else {
+                this.logger.log("New DB2 connection created");
+                resolve(connection);
+              }
+            });
+          });
+        },
+        destroy: (connection: Connection) => {
+          return new Promise<void>((resolve, reject) => {
+            connection.close((err) => {
+              if (err) {
+                this.logger.error(
+                  "Failed to close DB2 connection",
+                  err.message
+                );
+                reject(err);
+              } else {
+                this.logger.log("DB2 connection closed");
+                resolve();
+              }
+            });
+          });
+        },
+      },
+      {
+        max: this.config.maxPoolSize || 10,
+        min: this.config.minPoolSize || 1,
+        idleTimeoutMillis: 30000, // 30 seconds
+        evictionRunIntervalMillis: 15000, // 15 seconds
+      }
+    );
+
+    this.poolInitialized = true;
+    this.logger.log("Connection pool initialized successfully.");
+  }
+
+  private validateConfig(config: IDb2ConfigOptions): void {
+    if (!config.host || !config.port || !config.auth || !config.database) {
+      throw new Error(
+        "Invalid configuration: Host, port, auth, and database are required."
+      );
+    }
+    if (config.useTls && !config.sslCertificatePath) {
+      throw new Error(
+        "TLS is enabled, but no SSL certificate path is provided."
+      );
+    }
+    if (
+      config.auth.authType === "jwt" &&
+      "jwtToken" in config.auth &&
+      !config.auth.jwtToken
+    ) {
+      throw new Error("JWT authentication requires a valid JWT token.");
+    }
+    if (
+      config.auth.authType === "kerberos" &&
+      "krbServiceName" in config.auth &&
+      !config.auth.krbServiceName
+    ) {
+      throw new Error("Kerberos authentication requires a service name.");
+    }
+    // Add more validations as needed
+  }
+
+  public static async create(
+    config: IDb2ConfigOptions
+  ): Promise<Db2PoolManager> {
+    const manager = new Db2PoolManager(config);
+    await manager.init();
+    return manager;
+  }
+
+  public get getPool(): Pool<Connection> {
+    if (!this.poolInitialized || !this.pool) {
+      this.logger.error("DB2 connection pool is not initialized.");
+      throw new Error("DB2 connection pool is not initialized.");
+    } else {
+      this.logger.log("DB2 connection pool already initialized.");
+      return this.pool;
     }
   }
 
-  public get getPool(): Pool {
-    if (!this.pool) {
-      this.initializePool();
-    }
-    return this.pool;
+  public get isPoolInitialized(): boolean {
+    return this.poolInitialized;
   }
 
   public async getConnection(): Promise<Connection> {
-    return new Promise((resolve, reject) => {
-      this.pool.open(
-        this.buildConnectionString(this.config),
-        (err, connection) => {
-          if (err) {
-            this.logger.error(
-              "Failed to get connection from pool",
-              err.message
-            );
-            reject(err);
-          } else {
-            this.logger.log("Connection acquired from pool");
-            this.activeConnections.push(connection);
-            resolve(connection);
-          }
-        }
+    if (!this.poolInitialized) {
+      this.logger.error("Connection pool is not initialized.");
+      throw new Error("Connection pool is not initialized.");
+    }
+
+    try {
+      const connection = await this.pool.acquire();
+      this.logger.log("Connection acquired from pool.");
+      return connection;
+    } catch (error) {
+      this.logger.error(
+        "Failed to acquire connection from pool.",
+        error.message
       );
-    });
+      throw error;
+    }
   }
 
   public async closeConnection(connection: Connection): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      if (connection) {
-        connection.close((err) => {
-          if (err) {
-            this.logger.error("Error closing DB2 connection", err.message);
-            reject(err);
-          } else {
-            this.logger.log("DB2 connection closed successfully");
-            const index = this.activeConnections.indexOf(connection);
-            if (index > -1) {
-              this.activeConnections.splice(index, 1);
-            }
-            resolve();
-          }
-        });
-      } else {
-        resolve();
-      }
-    });
+    if (this.poolInitialized) {
+      await this.pool.release(connection);
+      this.logger.log("Connection released back to pool.");
+    }
   }
 
   public async drainPool(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.pool.close((err) => {
-        if (err) {
-          this.logger.error("Error closing DB2 pool", err.message);
-          reject(err);
-        } else {
-          this.logger.log("DB2 pool drained successfully");
-          resolve();
-        }
-      });
-    });
+    try {
+      await this.pool.drain();
+      await this.pool.clear();
+      this.poolInitialized = false;
+      this.logger.log("Connection pool drained and cleared.");
+    } catch (error) {
+      this.logger.error("Failed to drain connection pool.", error.message);
+      throw error;
+    }
   }
 
-  private buildConnectionString(config: Db2ConfigOptions): string {
+  /**
+   * Releases a connection back to the pool.
+   */
+  public async releaseConnection(connection: Connection): Promise<void> {
+    if (this.poolInitialized) {
+      await this.pool.release(connection);
+      this.logger.log("Connection released back to custom pool.");
+    }
+  }
+
+  private buildConnectionString(config: IDb2ConfigOptions): string {
     const { host, port, database, auth, useTls, sslCertificatePath } = config;
     let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
     switch (auth.authType) {
@@ -96,7 +172,9 @@ export class Db2PoolManager {
         connStr += `UID=${auth.username};PWD=${auth.password};`;
         break;
       case "jwt":
-        connStr += `TOKEN=${auth.jwtToken};`;
+        if ("jwtToken" in auth) {
+          connStr += `TOKEN=${auth.jwtToken};`;
+        }
         break;
       // Handle other auth types...
     }

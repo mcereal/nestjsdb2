@@ -1,7 +1,14 @@
-// decorators/foreign-key.decorator.ts
+// src/decorators/foreign-key.decorator.ts
 
 import "reflect-metadata";
+import { ForeignKeyMetadata, ForeignKeyOptions } from "../metadata";
+import { FOREIGN_KEYS_METADATA_KEY } from "../types";
 
+/**
+ * @ForeignKey decorator to define a foreign key relationship.
+ * @param options - Configuration options for the foreign key.
+ * @returns PropertyDecorator
+ */
 export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
   // Validate options
   if (
@@ -28,12 +35,12 @@ export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
 
     // Retrieve existing foreign keys metadata or initialize if none exists
     const foreignKeys: ForeignKeyMetadata[] =
-      Reflect.getMetadata("foreignKeys", constructor) || [];
+      Reflect.getMetadata(FOREIGN_KEYS_METADATA_KEY, constructor) || [];
 
     // Add new foreign key metadata
-    foreignKeys.push({ propertyKey, ...options });
+    foreignKeys.push({ propertyKey, foreignKeyOptions: options });
 
     // Define or update metadata with the new foreign keys array
-    Reflect.defineMetadata("foreignKeys", foreignKeys, constructor);
+    Reflect.defineMetadata(FOREIGN_KEYS_METADATA_KEY, foreignKeys, constructor);
   };
 }

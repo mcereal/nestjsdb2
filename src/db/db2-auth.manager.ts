@@ -1,6 +1,6 @@
 import {
   Db2AuthOptions,
-  Db2ConfigOptions,
+  IDb2ConfigOptions,
   Db2JwtAuthOptions,
   Db2KerberosAuthOptions,
   Db2LdapAuthOptions,
@@ -17,7 +17,7 @@ export class Db2AuthManager {
   private readonly logger = new Logger(Db2AuthManager.name);
 
   constructor(
-    private config: Db2ConfigOptions,
+    private config: IDb2ConfigOptions,
     private connectionManager: IConnectionManager,
     private dbClient: Db2Client
   ) {

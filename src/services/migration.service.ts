@@ -4,18 +4,18 @@ import { Logger } from "@nestjs/common";
 import { promises as fs } from "fs";
 import { join } from "path";
 import {
-  Db2ConfigOptions,
+  IDb2ConfigOptions,
   Db2MigrationOptions,
-  Db2MigrationServiceInterface,
+  IDb2MigrationService,
 } from "../interfaces";
 import { Db2Client } from "../db";
 import { handleDb2Error } from "../errors";
 import { EntityMetadataStorage, EntityMetadata } from "../metadata";
 
-export class Db2MigrationService implements Db2MigrationServiceInterface {
+export class Db2MigrationService implements IDb2MigrationService {
   private readonly logger = new Logger(Db2MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
-  protected readonly config: Db2ConfigOptions;
+  protected readonly config: IDb2ConfigOptions;
 
   public constructor(
     private db2Client: Db2Client,
@@ -174,10 +174,10 @@ export class Db2MigrationService implements Db2MigrationServiceInterface {
     if (metadata.foreignKeys.length) {
       metadata.foreignKeys.forEach((fk) => {
         sql += `, FOREIGN KEY (${String(fk.propertyKey)}) REFERENCES ${
-          fk.reference
+          fk.foreignKeyOptions.reference
         }`;
-        if (fk.onDelete) {
-          sql += ` ON DELETE ${fk.onDelete}`;
+        if (fk.foreignKeyOptions.onDelete) {
+          sql += ` ON DELETE ${fk.foreignKeyOptions.onDelete}`;
         }
       });
     }

@@ -8,6 +8,8 @@
  * @requires Db2Module from "./db2.module"
  *
  * @exports Db2Module
+ * @exports Db2ConfigModule
  */
 
 export * from "./db2.module"; // Export the main Db2Module
+export * from "./db2-config.module"; // Export the Db2ConfigModule

@@ -1,6 +1,9 @@
-// decorators/check.decorator.ts
+// src/decorators/check.decorator.ts
 
-import "reflect-metadata";
+import "reflect-metadata"; // Ensure reflect-metadata is imported
+// Remove the incorrect import
+// import CheckConstraintMetadata from "reflect-metadata";
+import { CheckConstraintMetadata } from "../types";
 
 export function Check(constraint: string): PropertyDecorator {
   if (typeof constraint !== "string" || constraint.trim().length === 0) {
@@ -10,11 +13,11 @@ export function Check(constraint: string): PropertyDecorator {
   return (target: Object, propertyKey: string | symbol) => {
     const constructor = target.constructor;
 
-    // Get existing check constraints or initialize a new array
+    // Retrieve existing constraints or initialize an empty array
     const existingConstraints: CheckConstraintMetadata[] =
       Reflect.getMetadata("checkConstraints", constructor) || [];
 
-    // Add the new check constraint
+    // Add the new constraint
     existingConstraints.push({ propertyKey, constraint });
 
     // Define or update the metadata with the new constraints array

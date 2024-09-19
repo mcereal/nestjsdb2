@@ -1,6 +1,8 @@
 // decorators/many-to-one.decorator.ts
 
 import "reflect-metadata";
+import { ManyToOneMetadata } from "../metadata";
+import { ManyToOneOptions, MANY_TO_ONE_RELATIONS_METADATA_KEY } from "../types";
 
 export function ManyToOne(options: ManyToOneOptions): PropertyDecorator {
   // Validate the provided options
@@ -15,16 +17,19 @@ export function ManyToOne(options: ManyToOneOptions): PropertyDecorator {
 
     // Retrieve existing many-to-one relations metadata or initialize if none exists
     const manyToOneRelations: ManyToOneMetadata[] =
-      Reflect.getMetadata("manyToOneRelations", constructor) || [];
+      Reflect.getMetadata(MANY_TO_ONE_RELATIONS_METADATA_KEY, constructor) ||
+      [];
 
     // Check for existing relation for the same property key to avoid duplicates
     const existingRelation = manyToOneRelations.find(
-      (relation) => relation.propertyKey === propertyKey
+      (relation) => relation.manyToOneOptions.propertyKey === propertyKey
     );
 
     if (!existingRelation) {
       // Add new many-to-one relation metadata
-      manyToOneRelations.push({ propertyKey, ...options });
+      manyToOneRelations.push({
+        manyToOneOptions: { propertyKey, ...options },
+      });
 
       // Define or update metadata with the new many-to-one relations
       Reflect.defineMetadata(

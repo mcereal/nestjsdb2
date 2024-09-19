@@ -1,7 +1,16 @@
-// decorators/entity.decorator.ts
+// src/decorators/entity.decorator.ts
 
 import "reflect-metadata";
+import { EntityMetadata } from "../metadata/entity-metadata.storage";
 
+// Define a unique metadata key to store all entities
+const ENTITIES_METADATA_KEY = Symbol("entities");
+
+/**
+ * Db2Entity decorator to mark a class as a database entity with a specified table name.
+ * @param tableName - The name of the table in the database.
+ * @returns ClassDecorator
+ */
 export function Db2Entity(tableName: string): ClassDecorator {
   if (typeof tableName !== "string" || tableName.trim().length === 0) {
     throw new Error(
@@ -11,18 +20,20 @@ export function Db2Entity(tableName: string): ClassDecorator {
 
   return (target: Function) => {
     // Define metadata for the table name on the class
-    const entityMetadata: EntityMetadata = { tableName };
-    Reflect.defineMetadata("entityMetadata", entityMetadata, target);
+    Reflect.defineMetadata("tableName", tableName, target);
 
-    // Retrieve existing entities or initialize if none exist
-    const entities: Function[] = Reflect.getMetadata("entities", Reflect) || [];
+    // Retrieve existing entities metadata or initialize if none exists
+    const existingEntities: Function[] =
+      Reflect.getMetadata(ENTITIES_METADATA_KEY, globalThis) || [];
 
     // Avoid duplicate registrations by checking if the target already exists
-    if (!entities.includes(target)) {
-      entities.push(target);
+    if (!existingEntities.includes(target)) {
+      existingEntities.push(target);
+      Reflect.defineMetadata(
+        ENTITIES_METADATA_KEY,
+        existingEntities,
+        globalThis
+      );
     }
-
-    // Update the entities metadata
-    Reflect.defineMetadata("entities", entities, Reflect);
   };
 }
