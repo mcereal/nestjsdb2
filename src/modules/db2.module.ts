@@ -8,13 +8,16 @@ import {
   CacheModuleOptions,
 } from "@nestjs/cache-manager";
 import { redisStore } from "cache-manager-redis-yet";
+import { Db2ConnectionManager } from "../db";
 
 @Module({})
 export class Db2Module {
   static forRoot(options: Db2ConfigOptions): DynamicModule {
+    const connectionManager = new Db2ConnectionManager(options); // Pass options if needed
+
     const db2ClientProvider: Provider = {
       provide: Db2Client,
-      useFactory: () => new Db2Client(options),
+      useFactory: () => new Db2Client(options, connectionManager), // Pass connectionManager
     };
 
     const transactionManagerProvider: Provider = {
@@ -41,7 +44,8 @@ export class Db2Module {
           options,
           cacheManager,
           transactionManager,
-          migrationService
+          migrationService,
+          connectionManager // Ensure the same connection manager is passed here
         ),
       inject: [CACHE_MANAGER, TransactionManager, Db2MigrationService],
     };
@@ -67,13 +71,25 @@ export class Db2Module {
     ) => Promise<Db2ConfigOptions> | Db2ConfigOptions;
     inject?: any[];
   }): DynamicModule {
-    const db2ClientProvider: Provider = {
-      provide: Db2Client,
+    const connectionManagerProvider: Provider = {
+      provide: Db2ConnectionManager,
       useFactory: async (...args: any[]) => {
         const db2Config = await options.useFactory(...args);
-        return new Db2Client(db2Config);
+        return new Db2ConnectionManager(db2Config); // Initialize connection manager with async config
       },
       inject: options.inject || [],
+    };
+
+    const db2ClientProvider: Provider = {
+      provide: Db2Client,
+      useFactory: async (
+        connectionManager: Db2ConnectionManager,
+        ...args: any[]
+      ) => {
+        const db2Config = await options.useFactory(...args);
+        return new Db2Client(db2Config, connectionManager); // Use the connection manager here
+      },
+      inject: [Db2ConnectionManager, ...(options.inject || [])],
     };
 
     const transactionManagerProvider: Provider = {
@@ -93,7 +109,10 @@ export class Db2Module {
 
     const db2ServiceProvider: Provider = {
       provide: Db2Service,
-      useFactory: async (...args: any[]) => {
+      useFactory: async (
+        connectionManager: Db2ConnectionManager,
+        ...args: any[]
+      ) => {
         const db2Config = await options.useFactory(...args);
         const cacheManager = db2Config.cache?.enabled
           ? args.shift()
@@ -105,10 +124,12 @@ export class Db2Module {
           db2Config,
           cacheManager,
           transactionManager,
-          migrationService
+          migrationService,
+          connectionManager // Pass connection manager here
         );
       },
       inject: [
+        Db2ConnectionManager,
         CACHE_MANAGER,
         TransactionManager,
         Db2MigrationService,
@@ -129,6 +150,7 @@ export class Db2Module {
       module: Db2Module,
       imports: [CacheModule],
       providers: [
+        connectionManagerProvider,
         db2ClientProvider,
         transactionManagerProvider,
         db2MigrationServiceProvider,

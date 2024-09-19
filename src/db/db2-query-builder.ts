@@ -1,4 +1,5 @@
-import { SqlInjectionChecker } from "../utils/sql-injection-checker";
+// src/modules/db2/query-builder.ts
+
 import { Db2QueryBuilderInterface } from "../interfaces";
 
 export class Db2QueryBuilder implements Db2QueryBuilderInterface {
@@ -7,16 +8,13 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
   private hasWhereClause: boolean;
   private namedParamsCounter: number;
   private schema: string;
-  private sqlInjectionChecker: SqlInjectionChecker;
-
   public constructor() {
-    this.sqlInjectionChecker = new SqlInjectionChecker();
     this.reset();
   }
 
   public reset(): Db2QueryBuilder {
     this.query = "";
-    this.params = {};
+    this.params = [];
     this.hasWhereClause = false;
     this.namedParamsCounter = 0;
     return this;
@@ -59,7 +57,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
   }
 
   public from(table: string, alias?: string): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([table]);
     const schemaPrefix = this.schema ? `${this.schema}.` : "";
     this.query += `FROM ${schemaPrefix}${table} ${alias ? `AS ${alias} ` : ""}`;
     return this;
@@ -71,7 +68,7 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
         "WHERE clause already exists. Use and() or or() to add more conditions."
       );
     }
-    this.sqlInjectionChecker.validateParams(params);
+
     this.query += `WHERE ${condition} `;
     params.forEach((param) => this.addParam(param));
     this.hasWhereClause = true;
@@ -82,7 +79,7 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use AND without a preceding WHERE clause.");
     }
-    this.sqlInjectionChecker.validateParams(params);
+
     this.query += `AND ${condition} `;
     params.forEach((param) => this.addParam(param));
     return this;
@@ -92,7 +89,7 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     if (!this.hasWhereClause) {
       throw new Error("Cannot use OR without a preceding WHERE clause.");
     }
-    this.sqlInjectionChecker.validateParams(params);
+
     this.query += `OR ${condition} `;
     params.forEach((param) => this.addParam(param));
     return this;
@@ -102,19 +99,16 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     column: string,
     direction: "ASC" | "DESC" = "ASC"
   ): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([column, direction]);
     this.query += `ORDER BY ${column} ${direction} `;
     return this;
   }
 
   public limit(limit: number): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([limit]);
     this.query += `LIMIT ${limit} `;
     return this;
   }
 
   public offset(offset: number): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([offset]);
     this.query += `OFFSET ${offset} `;
     return this;
   }
@@ -124,20 +118,18 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     condition: string,
     type: "INNER" | "LEFT" | "RIGHT" | "FULL" | "NATURAL" | "CROSS" = "INNER"
   ): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([table, condition, type]);
     this.query += `${type} JOIN ${table} ON ${condition} `;
     return this;
   }
 
   public groupBy(columns: string | string[]): Db2QueryBuilder {
     const cols = Array.isArray(columns) ? columns.join(", ") : columns;
-    this.sqlInjectionChecker.validateParams([cols]);
+
     this.query += `GROUP BY ${cols} `;
     return this;
   }
 
   public having(condition: string, params: any[] = []): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams(params);
     this.query += `HAVING ${condition} `;
     params.forEach((param) => {
       const paramName = this.addParam(param);
@@ -147,7 +139,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
   }
 
   public count(column: string = "*", alias?: string): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([column]);
     this.query += `COUNT(${column}) ${alias ? `AS ${alias} ` : ""}`;
     return this;
   }
@@ -157,7 +148,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     columns: string[],
     values: any[][]
   ): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([table, ...columns, ...values]);
     const placeholders = columns.map(() => "?").join(", ");
     this.query += `INSERT INTO ${table} (${columns.join(", ")}) VALUES `;
     this.query += values.map(() => `(${placeholders})`).join(", ");
@@ -171,13 +161,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     where: string,
     whereParams: any[]
   ): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([
-      table,
-      ...Object.keys(updates),
-      ...Object.values(updates),
-      where,
-      ...whereParams,
-    ]);
     const setClause = Object.keys(updates)
       .map((key) => `${key} = ?`)
       .join(", ");
@@ -187,7 +170,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
   }
 
   public deleteFrom(table: string): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([table]);
     this.query += `DELETE FROM ${table} `;
     return this;
   }
@@ -200,23 +182,57 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
     updateColumns: string[],
     updateValues: any[]
   ): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([
-      table,
-      ...insertColumns,
-      ...insertValues.flat(),
-      conflictTarget,
-      ...updateColumns,
-      ...updateValues,
-    ]);
-    const insertPlaceholder = insertColumns.map(() => "?").join(", ");
-    const updatePlaceholder = updateColumns
-      .map((col) => `${col} = EXCLUDED.${col}`)
+    // Flatten the insert values
+    const insertPlaceholder = insertColumns
+      .map(
+        (col, index) =>
+          `CAST(? AS ${this.getDb2ColumnType(insertValues[0][index])})`
+      )
       .join(", ");
-    this.query += `INSERT INTO ${table} (${insertColumns.join(", ")}) VALUES `;
-    this.query += insertValues.map(() => `(${insertPlaceholder})`).join(", ");
-    this.query += ` ON CONFLICT (${conflictTarget}) DO UPDATE SET ${updatePlaceholder}`;
-    this.params.push(...insertValues.flat(), ...updateValues);
+
+    // Build the VALUES part of the query with explicit casting
+    const insertQuery = `VALUES (${insertPlaceholder})`;
+
+    // Build the update part of the query for when there is a conflict
+    const updatePlaceholder = updateColumns
+      .map(
+        (col, index) =>
+          `${col} = CAST(? AS ${this.getDb2ColumnType(updateValues[index])})`
+      )
+      .join(", ");
+
+    // Create the MERGE query for DB2
+    this.query = `
+      MERGE INTO ${table} AS target
+      USING (${insertQuery}) AS source (${insertColumns.join(", ")})
+      ON target.${conflictTarget} = source.${conflictTarget}
+      WHEN MATCHED THEN
+        UPDATE SET ${updatePlaceholder}
+      WHEN NOT MATCHED THEN
+        INSERT (${insertColumns.join(", ")})
+        VALUES (${insertPlaceholder});
+    `;
+
+    // Combine parameters for USING, UPDATE, and INSERT clauses correctly
+    this.params = [
+      ...insertValues.flat(), // for VALUES (USING clause)
+      ...updateValues, // for UPDATE
+    ];
+
     return this;
+  }
+
+  // Helper function to get DB2 column type based on the value
+  private getDb2ColumnType(value: any): string {
+    if (typeof value === "string") {
+      return "VARCHAR(255)";
+    } else if (typeof value === "number") {
+      return "INT";
+    } else if (value instanceof Date) {
+      return "TIMESTAMP";
+    }
+    // Add more cases as needed
+    return "VARCHAR(255)"; // Default to string if no specific type found
   }
 
   public subquery(subquery: Db2QueryBuilder, alias: string): Db2QueryBuilder {
@@ -227,7 +243,6 @@ export class Db2QueryBuilder implements Db2QueryBuilderInterface {
   }
 
   public useFunction(func: string, alias?: string): Db2QueryBuilder {
-    this.sqlInjectionChecker.validateParams([func]);
     this.query += `${func} ${alias ? `AS ${alias} ` : ""}`;
     return this;
   }

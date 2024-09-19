@@ -1,6 +1,5 @@
-// src/interfaces/db2.interface.ts
-
 import { Db2IsolationLevel } from "../enums";
+
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
  */
@@ -11,18 +10,59 @@ export interface Db2BasicConnectionOptions {
 }
 
 /**
- * Interface for authentication options.
+ * Authentication base interface.
  */
-export interface Db2AuthOptions {
+interface Db2BaseAuthOptions {
   authType: "password" | "kerberos" | "jwt" | "ldap";
-  username?: string;
-  password?: string;
-  krbServiceName?: string;
-  krb5Config?: string;
-  krbKeytab?: string;
-  jwtToken?: string;
-  jwtSecret?: string;
 }
+
+/**
+ * Interface for password-based authentication options.
+ */
+export interface Db2PasswordAuthOptions extends Db2BaseAuthOptions {
+  authType: "password";
+  username: string;
+  password: string;
+}
+
+/**
+ * Interface for Kerberos authentication options.
+ */
+export interface Db2KerberosAuthOptions extends Db2BaseAuthOptions {
+  authType: "kerberos";
+  username: string;
+  krbServiceName: string; // Service name for Kerberos
+  krb5Config?: string; // Optional path to the krb5.conf file
+  krbKeytab?: string; // Optional path to the keytab file
+}
+
+/**
+ * Interface for JWT-based authentication options.
+ */
+export interface Db2JwtAuthOptions extends Db2BaseAuthOptions {
+  authType: "jwt";
+  jwtToken: string;
+  jwtSecret: string; // Secret or public key to verify the token
+}
+
+/**
+ * Interface for LDAP-based authentication options.
+ */
+export interface Db2LdapAuthOptions extends Db2BaseAuthOptions {
+  authType: "ldap";
+  username: string;
+  password: string;
+  ldapUrl: string; // URL for the LDAP server
+}
+
+/**
+ * Union of all possible authentication options.
+ */
+export type Db2AuthOptions =
+  | Db2PasswordAuthOptions
+  | Db2KerberosAuthOptions
+  | Db2JwtAuthOptions
+  | Db2LdapAuthOptions;
 
 /**
  * Interface for logging options.
@@ -80,12 +120,6 @@ export interface Db2CacheOptions {
   resetOnDestroy?: boolean; // Reset cache on service destroy
 }
 
-export interface SqlInjectionCheckerOptions {
-  enableStrictMode?: boolean; // Enable strict mode for production
-  whitelistedPatterns?: RegExp[]; // Allow certain patterns
-  logWarnings?: boolean; // Log warnings instead of throwing errors
-}
-
 /**
  * Comprehensive configuration options for setting up a Db2 connection.
  */
@@ -93,7 +127,7 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   useTls?: boolean;
   sslCertificatePath?: string;
 
-  auth?: Db2AuthOptions;
+  auth: Db2AuthOptions; // Authentication section (now a union of multiple auth types)
   logging?: Db2LoggingOptions;
   retry?: Db2RetryOptions;
   migration?: Db2MigrationOptions;
@@ -108,6 +142,7 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   acquireTimeoutMillis?: number;
   maxLifetime?: number;
   connectionTestQuery?: string;
+  maxIdleConnections?: number;
 
   fetchSize?: number;
   queryTimeout?: number;
@@ -119,6 +154,4 @@ export interface Db2ConfigOptions extends Db2BasicConnectionOptions {
   securityMechanism?: string;
   currentSchema?: string;
   applicationName?: string;
-
-  sqlInjectionCheckerOptions?: SqlInjectionCheckerOptions;
 }

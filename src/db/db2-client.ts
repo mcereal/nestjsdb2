@@ -9,29 +9,40 @@ import {
   Db2ConnectionDetails,
   Db2ConnectionStats,
   Db2HealthDetails,
+  Db2JwtAuthOptions,
+  Db2KerberosAuthOptions,
+  Db2LdapAuthOptions,
+  Db2PasswordAuthOptions,
   Db2PoolStats,
 } from "../interfaces";
 import { Db2ConnectionState } from "../enums";
 import {
   Db2ConnectionError,
   Db2Error,
-  Db2PoolError,
   Db2TransactionError,
   formatDb2Error,
   handleDb2Error,
 } from "../errors";
 import { Db2AuthStrategy } from "../auth/db2-auth.strategy";
-import { createAuthStrategy } from "../auth/auth-factory";
+import { Db2ConfigManager } from "./db2-config.manager";
+import { Db2AuthManager } from "./db2-auth.manager";
+import { IConnectionManager } from "../interfaces/connection-mannager.interface";
+import { Db2PoolManager } from "./db2-pool.manager";
 
 export class Db2Client
-  implements Db2ClientInterface, OnModuleInit, OnModuleDestroy
+  implements
+    IConnectionManager,
+    Db2ClientInterface,
+    OnModuleInit,
+    OnModuleDestroy
 {
   protected readonly config: Db2ConfigOptions;
   protected readonly authConfig: Db2AuthOptions;
   protected readonly authStrategy: Db2AuthStrategy;
+  protected readonly authManager: Db2AuthManager; // Declare authManager property
   protected readonly logger = new Logger(Db2Client.name);
-  private pool: Pool | null = null; // Mark the pool as nullable
-  protected connection: Connection | null = null; // Mark the connection as nullable
+  private pool: Pool;
+  protected connection?: Connection;
   protected state: Db2ConnectionState = Db2ConnectionState.DISCONNECTED; // Default state
   private idleTimeoutInterval: NodeJS.Timeout; // Track idle timeout
   private connectionLifetimeInterval: NodeJS.Timeout; // Track connection lifetime
@@ -42,54 +53,53 @@ export class Db2Client
   protected lastUsed: number = Date.now(); // Track the last time the connection was used
   protected poolInitialized = false; // To check if pool is initialized
   private currentReconnectAttempts: number; // Track current reconnection attempts
-  idleConnections: number;
+  private idleConnections: number;
+  private poolManager: Db2PoolManager;
 
-  public constructor(config: Db2ConfigOptions) {
-    this.config = {
-      ...config,
-      retry: {
-        maxReconnectAttempts: config.retry?.maxReconnectAttempts ?? 3, // Default to 3 attempts
-        reconnectInterval: config.retry?.reconnectInterval ?? 5000, // Default to 5 seconds
-      },
-      connectionTimeout: config.connectionTimeout ?? 30000, // Default to 30 seconds
-      minPoolSize: config.minPoolSize ?? 1, // Default to 1 connection
-      maxPoolSize: config.maxPoolSize ?? 10, // Default to 10 connections
-      idleTimeout: config.idleTimeout ?? 60000, // Default to 1 minute
-      maxLifetime: config.maxLifetime ?? 1800000, // Default to 30 minutes
-      autoCommit: config.autoCommit ?? true, // Default to auto-commit
-      fetchSize: config.fetchSize ?? 100, // Default to 100 rows
-      queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
-      prefetchSize: config.prefetchSize ?? 10, // Default to 10 rows
-      characterEncoding: config.characterEncoding ?? "UTF-8", // Default to UTF-8
-      logging: {
-        logQueries: config.logging?.logQueries ?? false, // Default to false
-        logErrors: config.logging?.logErrors ?? true, // Default to true
-        profileSql: config.logging?.profileSql ?? false, // Default to false
-      },
-    };
-    this.authStrategy = createAuthStrategy(config.auth, this);
+  public constructor(
+    config: Db2ConfigOptions,
+    connectionManager: IConnectionManager
+  ) {
+    const configManager = new Db2ConfigManager(config);
+    this.config = configManager.getConfig();
+
+    // Log the configuration to verify it's correct
+    this.logger.debug(`DB2 Config: ${JSON.stringify(this.config)}`);
+
+    this.idleConnections = 0;
+    this.authManager = new Db2AuthManager(this.config, connectionManager, this);
+    this.poolManager = new Db2PoolManager(this.config);
   }
 
-  public async onModuleInit() {
-    await this.initializePool();
+  public async onModuleInit(): Promise<void> {
+    try {
+      await this.poolManager.getPool; // Use PoolManager to initialize the pool
+      this.logger.log("Db2 client module initialized successfully.");
+    } catch (error) {
+      this.logger.error("Error during Db2 client initialization:", error);
+    }
   }
 
-  public onModuleDestroy() {
+  public onModuleDestroy(): void {
     this.drainPool();
     this.setState(Db2ConnectionState.DISCONNECTED);
     this.logger.log("Db2 client disconnected and destroyed");
   }
-  async drainPool(): Promise<void> {
+
+  public async drainPool(): Promise<void> {
     this.setState(Db2ConnectionState.POOL_DRAINING);
-    this.logger.log(` Draining the connection pool...`);
+    this.logger.log("Draining the connection pool...");
 
     try {
       this.stopIdleTimeoutCheck();
-      this.stopConnectionLifetimeCheck();
-      await this.closePool();
+      await this.poolManager.drainPool(); // Use PoolManager to drain the pool
     } catch (error) {
       this.logger.error("Error during shutdown:", error.message);
     }
+  }
+
+  public async getConnection(): Promise<Connection> {
+    return this.poolManager.getConnection();
   }
 
   public async closePool(): Promise<void> {
@@ -111,11 +121,33 @@ export class Db2Client
     });
   }
 
+  public async getConnectionFromPool(connectionString: string): Promise<void> {
+    if (!this.pool) {
+      throw new Db2ConnectionError("Connection pool is not initialized");
+    }
+
+    this.connection = await new Promise<Connection>((resolve, reject) => {
+      this.pool?.open(connectionString, (err, connection) => {
+        if (err) {
+          reject(new Db2ConnectionError("Failed to get connection from pool"));
+        } else {
+          this.idleConnections--; // Decrease idle connections count
+          resolve(connection);
+        }
+      });
+    });
+
+    this.logger.log("Connection successfully retrieved from pool");
+  }
+
   public openConnection(isInitialization = false): Promise<Connection> {
-    return new Promise<Connection>((resolve, reject) => {
+    return new Promise<Connection>(async (resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Db2ConnectionError("Connection attempt timed out"));
       }, this.config.connectionTimeout);
+
+      // Authenticate before opening the connection
+      await this.authManager.authenticate();
 
       this.pool.open(
         this.buildConnectionString(this.config),
@@ -141,57 +173,6 @@ export class Db2Client
   }
 
   /**
-   * Initialize the connection pool with configurable options, including `minPoolSize`
-   */
-  private async initializePool(): Promise<void> {
-    try {
-      this.logger.log("Initializing DB2 connection pool...");
-
-      this.setState(Db2ConnectionState.CONNECTING);
-
-      this.logger.log(
-        `Connecting to DB2 at ${this.config.host}:${this.config.port}/${this.config.database}`
-      );
-
-      this.pool = new ibm_db.Pool();
-      this.pool.init(
-        this.config.maxPoolSize,
-        this.buildConnectionString(this.config)
-      );
-
-      // Pre-populate the pool with minPoolSize connections
-      for (let i = 0; i < this.config.minPoolSize; i++) {
-        const connection = await this.openConnection(true); // Initialization flag to suppress logging
-        await this.closeConnection(connection);
-      }
-
-      this.poolInitialized = true;
-      this.setState(Db2ConnectionState.CONNECTED);
-      this.logger.log(
-        `DB2 connection pool initialized with at least ${this.config.minPoolSize} active connections`
-      );
-
-      // Start idle timeout and connection lifetime checks for the entire pool
-      this.startIdleTimeoutCheck();
-      this.startConnectionLifetimeCheck();
-
-      // Start monitoring the pool status
-      this.startPoolMonitoring(); // Add this here
-    } catch (error) {
-      handleDb2Error(
-        error,
-        "Failed to initialize connection pool",
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger
-      );
-      throw new Db2ConnectionError("Failed to initialize DB2 connection pool");
-    }
-  }
-
-  /**
    * Set the DB2 connection state
    */
   public setState(state: Db2ConnectionState): void {
@@ -212,25 +193,6 @@ export class Db2Client
       lastUsed: new Date(this.lastUsed).toISOString(),
       poolInitialized: this.poolInitialized,
     };
-  }
-
-  private startConnectionLifetimeCheck(): void {
-    const maxLifetime = 1800000; // 30 minutes in milliseconds
-    this.connectionLifetimeInterval = setInterval(async () => {
-      if (this.connection && Date.now() - this.lastUsed > maxLifetime) {
-        this.logger.log("Max connection lifetime reached, cycling connection.");
-        await this.disconnect();
-        this.connection = await this.openConnection;
-      }
-    }, maxLifetime);
-  }
-
-  private stopConnectionLifetimeCheck(): void {
-    if (this.connectionLifetimeInterval) {
-      clearInterval(this.connectionLifetimeInterval);
-      this.connectionLifetimeInterval = undefined;
-      this.logger.log("Stopped connection lifetime check.");
-    }
   }
 
   private async handleConnectionError(error: Error): Promise<void> {
@@ -318,7 +280,6 @@ export class Db2Client
 
         // Stop the idle timeout and lifetime checks after disconnection
         this.stopIdleTimeoutCheck();
-        this.stopConnectionLifetimeCheck();
       } catch (error) {
         this.setState(Db2ConnectionState.ERROR);
         this.logError("Error disconnecting from Db2 database", error);
@@ -342,17 +303,11 @@ export class Db2Client
             reject(new Db2ConnectionError("Failed to close DB2 connection"));
           } else {
             this.logger.log("DB2 connection closed successfully");
-
-            // Remove the connection from the array
             const index = this.activeConnections.indexOf(connection);
             if (index > -1) {
               this.activeConnections.splice(index, 1);
-            } else {
-              this.logger.warn(
-                "Attempted to close a connection that was not in the active connections array"
-              );
+              this.idleConnections--; // Decrement idle connections
             }
-
             resolve();
           }
         });
@@ -441,23 +396,14 @@ export class Db2Client
       sslCertificatePath,
     } = config;
 
-    const { username, password, authType, krbServiceName } = config.auth || {};
+    const { authType, ...authConfig } = config.auth || {};
 
     let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
 
-    if (authType === "kerberos") {
-      // Additional settings for Kerberos authentication
-      if (!krbServiceName) {
-        throw new Error(
-          "Kerberos service name (krbServiceName) is required for Kerberos authentication."
-        );
-      }
-      connStr += `SecurityMechanism=11;ServiceName=${krbServiceName};`;
-    } else if (username && password) {
-      // Default to user/password authentication if no specific auth type is provided
-      connStr += `UID=${username};PWD=${password};`;
-    }
+    // Handle the authentication section based on authType
+    connStr += this.buildAuthSection(authType, authConfig);
 
+    // Optional configurations
     if (characterEncoding) {
       connStr += `CHARACTERENCODING=${characterEncoding};`;
     }
@@ -482,6 +428,75 @@ export class Db2Client
     }
 
     return connStr;
+  }
+
+  /**
+   * Builds the authentication part of the connection string based on authType.
+   */
+  private buildAuthSection(authType: string, authConfig: any): string {
+    switch (authType) {
+      case "password":
+        return this.buildPasswordAuth(authConfig);
+      case "kerberos":
+        return this.buildKerberosAuth(authConfig);
+      case "jwt":
+        return this.buildJwtAuth(authConfig);
+      case "ldap":
+        return this.buildLdapAuth(authConfig);
+      default:
+        throw new Error(`Unsupported authentication type: ${authType}`);
+    }
+  }
+
+  /**
+   * Handles password-based authentication string construction.
+   */
+  private buildPasswordAuth({
+    username,
+    password,
+  }: Db2PasswordAuthOptions): string {
+    if (!username || !password) {
+      throw new Error(
+        "Username and password are required for password authentication."
+      );
+    }
+    return `UID=${username};PWD=${password};`;
+  }
+
+  /**
+   * Handles Kerberos-based authentication string construction.
+   */
+  private buildKerberosAuth({
+    krbServiceName,
+  }: Db2KerberosAuthOptions): string {
+    if (!krbServiceName) {
+      throw new Error(
+        "Kerberos service name (krbServiceName) is required for Kerberos authentication."
+      );
+    }
+    return `SecurityMechanism=11;ServiceName=${krbServiceName};`;
+  }
+
+  /**
+   * Handles JWT-based authentication string construction.
+   */
+  private buildJwtAuth({ jwtToken }: Db2JwtAuthOptions): string {
+    if (!jwtToken) {
+      throw new Error("JWT token is required for JWT authentication.");
+    }
+    return `AUTHENTICATION=jwt;Token=${jwtToken};`;
+  }
+
+  /**
+   * Handles LDAP-based authentication string construction.
+   */
+  private buildLdapAuth({ username, password }: Db2LdapAuthOptions): string {
+    if (!username || !password) {
+      throw new Error(
+        "Username and password are required for LDAP authentication."
+      );
+    }
+    return `UID=${username};PWD=${password};AUTHENTICATION=ldap;`;
   }
 
   /**
@@ -663,30 +678,11 @@ export class Db2Client
    */
   public logPoolStatus(): void {
     const activeConnections = this.getActiveConnectionsCount();
+    const idleConnections = this.idleConnections;
 
-    this.logger.log(`Connection Pool Status: Active=${activeConnections}`);
-  }
-
-  /**
-   * Periodically checks the connection pool status and logs it.
-   * Dynamically adjusts the pool size based on active connection thresholds.
-   * @param interval The interval in milliseconds at which to check the pool status.
-   */
-  private startPoolMonitoring(interval: number = 10000): void {
-    setInterval(() => {
-      this.logPoolStatus();
-
-      const activeConnections = this.getActiveConnectionsCount();
-
-      const maxPoolSize = this.config.maxPoolSize || 10;
-
-      // Generate warnings if pool is near capacity
-      if (activeConnections >= maxPoolSize * 0.9) {
-        this.logger.warn(
-          `Connection pool usage is at 90% of its capacity (${activeConnections}/${maxPoolSize}). Consider increasing the pool size.`
-        );
-      }
-    }, interval);
+    this.logger.log(
+      `Connection Pool Status: Active=${activeConnections}, Idle=${idleConnections}`
+    );
   }
 
   /**

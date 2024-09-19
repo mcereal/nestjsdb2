@@ -1,12 +1,13 @@
-// src/auth/db2-auth.strategy.ts
-
-import { Db2AuthOptions } from "../interfaces/db2.interface";
+import { IConnectionManager } from "../interfaces";
+import { Db2ConfigOptions } from "src/interfaces";
 
 export abstract class Db2AuthStrategy {
-  protected config: Db2AuthOptions;
+  protected config: Db2ConfigOptions;
+  protected connectionManager: IConnectionManager;
 
-  constructor(config: Db2AuthOptions) {
+  constructor(config: Db2ConfigOptions, connectionManager: IConnectionManager) {
     this.config = config;
+    this.connectionManager = connectionManager;
   }
 
   abstract authenticate(): Promise<void>;

@@ -23,9 +23,9 @@
  */
 
 export * from "./db2.interface";
-export * from "./sql-injection-checker.interface";
 export * from "./db2-client.interface";
 export * from "./db2-service.interface";
 export * from "./transaction-manager.interface";
 export * from "./db2-query-builder.interface";
 export * from "./db2-migration-service.interface";
+export * from "./connection-mannager.interface";

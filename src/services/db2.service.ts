@@ -21,10 +21,16 @@ import { Cache, caching } from "cache-manager";
 import { redisStore } from "cache-manager-redis-yet";
 import { Db2MigrationService } from "./";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { IConnectionManager } from "../interfaces/connection-mannager.interface";
+import { Db2ConnectionState } from "src/enums";
 
 @Injectable()
 export class Db2Service
-  implements Db2ServiceInterface, OnModuleInit, OnModuleDestroy
+  implements
+    Db2ServiceInterface,
+    IConnectionManager,
+    OnModuleInit,
+    OnModuleDestroy
 {
   private readonly logger = new Logger(Db2Service.name);
   private options: Db2ConfigOptions;
@@ -37,7 +43,8 @@ export class Db2Service
     options: Db2ConfigOptions,
     @Optional() @Inject(CACHE_MANAGER) cacheManager: Cache,
     transactionManager: TransactionManager,
-    migrationService: Db2MigrationService
+    migrationService: Db2MigrationService,
+    private connectionManager: IConnectionManager
   ) {
     this.options = options;
     this.transactionManager = transactionManager;
@@ -47,16 +54,26 @@ export class Db2Service
       this.cache = cacheManager;
       this.logger.log("Cache manager initialized.");
     } else {
-      this.logger.log("Caching is disabled.");
+      this.logger.debug("Caching is disabled.");
     }
 
-    this.client = new Db2Client(this.options);
+    // Pass both options and connectionManager to Db2Client
+    this.client = new Db2Client(this.options, this.connectionManager);
 
     if (options.cache?.enabled) {
       this.initializeCache(options.cache);
     } else {
       this.logger.log("Caching is disabled.");
     }
+  }
+  setState(state: Db2ConnectionState): void {
+    throw new Error("Method not implemented.");
+  }
+  getConnectionFromPool(connectionString: string): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+  buildConnectionString(config: Db2ConfigOptions): string {
+    throw new Error("Method not implemented.");
   }
 
   public async onModuleInit(): Promise<void> {
@@ -483,8 +500,8 @@ export class Db2Service
     if (
       !options.host ||
       !options.port ||
-      !options.auth.username ||
-      !options.auth.password ||
+      !options.auth ||
+      !options.auth ||
       !options.database
     ) {
       throw new Error(
