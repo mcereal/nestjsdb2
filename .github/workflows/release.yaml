@@ -23,12 +23,12 @@ jobs:
       name: production
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -43,28 +43,31 @@ jobs:
       - name: Build the package
         run: npm run build
 
-      - name: Bump version and set output
-        id: bump
-        run: |
-          new_version=$(npm version ${{ github.event.inputs.bump || 'patch' }} --no-git-tag-version)
-          echo "new_version=$new_version" >> $GITHUB_ENV
+      - name: Run semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name == 'workflow_dispatch'
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
 
-      - name: Commit version bump
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git commit -am "ci: bump version"
-          git push origin main
+  publish-gpr:
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
 
-      - name: Create GitHub release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          tag_name: v${{ steps.bump.outputs.new_version }}
-          release_name: Release ${{ steps.bump.outputs.new_version }}
-          draft: false
-          prerelease: false
+          node-version: '20'
+          registry-url: https://npm.pkg.github.com/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
