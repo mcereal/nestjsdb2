@@ -1,4 +1,4 @@
-# IBM DB2 Module for NestJS
+# IBM DB2 Module for NestJS [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2)
 
 [![npm version](https://badge.fury.io/js/ibm_db2.svg)](https://badge.fury.io/js/ibm_db2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -46,17 +46,17 @@ npm install ibm_db2 --save
 To get started, import the Db2Module into your NestJS application and configure it using the provided options.
 
 ```typescript
-import { Module } from "@nestjs/common";
-import { Db2Module } from "ibm_db2";
+import { Module } from '@nestjs/common';
+import { Db2Module } from 'ibm_db2';
 
 @Module({
   imports: [
     Db2Module.forRoot({
-      host: "localhost",
+      host: 'localhost',
       port: 50000,
-      username: "db2user",
-      password: "password",
-      database: "sampledb",
+      username: 'db2user',
+      password: 'password',
+      database: 'sampledb',
     }),
   ],
 })
@@ -71,13 +71,13 @@ The Db2Module can be configured either synchronously or asynchronously:
 
 ```typescript
 Db2Module.forRoot({
-  host: "localhost",
+  host: 'localhost',
   port: 50000,
-  username: "db2user",
-  password: "password",
-  database: "sampledb",
+  username: 'db2user',
+  password: 'password',
+  database: 'sampledb',
   useTls: true, // Optional
-  sslCertificatePath: "/path/to/certificate.pem", // Optional
+  sslCertificatePath: '/path/to/certificate.pem', // Optional
   cacheEnabled: true, // Optional
 });
 ```
@@ -87,11 +87,11 @@ Db2Module.forRoot({
 ```typescript
 Db2Module.forRootAsync({
   useFactory: async (configService: ConfigService) => ({
-    host: configService.get<string>("DB_HOST"),
-    port: configService.get<number>("DB_PORT"),
-    username: configService.get<string>("DB_USER"),
-    password: configService.get<string>("DB_PASS"),
-    database: configService.get<string>("DB_NAME"),
+    host: configService.get<string>('DB_HOST'),
+    port: configService.get<number>('DB_PORT'),
+    username: configService.get<string>('DB_USER'),
+    password: configService.get<string>('DB_PASS'),
+    database: configService.get<string>('DB_NAME'),
   }),
   inject: [ConfigService],
 });
@@ -104,15 +104,15 @@ Db2Module.forRootAsync({
 Inject the Db2Service into your service or controller to interact with the DB2 database:
 
 ```typescript
-import { Injectable } from "@nestjs/common";
-import { Db2Service } from "ibm_db2";
+import { Injectable } from '@nestjs/common';
+import { Db2Service } from 'ibm_db2';
 
 @Injectable()
 export class UserService {
   constructor(private readonly db2Service: Db2Service) {}
 
   async getUserData(userId: string) {
-    return this.db2Service.query("SELECT * FROM users WHERE id = ?", [userId]);
+    return this.db2Service.query('SELECT * FROM users WHERE id = ?', [userId]);
   }
 }
 ```
@@ -122,7 +122,7 @@ export class UserService {
 The `query` method executes a SQL query and returns the result as an array of objects:
 
 ```typescript
-const result = await this.db2Service.query("SELECT * FROM users");
+const result = await this.db2Service.query('SELECT * FROM users');
 ```
 
 ### Transaction Management
@@ -131,7 +131,7 @@ The `beginTransaction`, `commitTransaction`, and `rollbackTransaction` methods p
 
 ```typescript
 await this.db2Service.beginTransaction();
-await this.db2Service.query("INSERT INTO users (name) VALUES (?)", ["Alice"]);
+await this.db2Service.query('INSERT INTO users (name) VALUES (?)', ['Alice']);
 await this.db2Service.commitTransaction();
 ```
 
@@ -141,9 +141,9 @@ The `QueryBuilder` class provides a fluent API for building SQL queries:
 
 ```typescript
 const query = new QueryBuilder()
-  .select("name", "email")
-  .from("users")
-  .where("id = ?", [userId])
+  .select('name', 'email')
+  .from('users')
+  .where('id = ?', [userId])
   .limit(1)
   .build();
 
@@ -155,24 +155,24 @@ const result = await this.db2Service.query(query);
 The `@Transaction`, `@Connection`, and `@Cache` decorators can be used to enforce connection state checks and cache results:
 
 ```typescript
-import { Transaction, Connection, Cache } from "ibm_db2";
+import { Transaction, Connection, Cache } from 'ibm_db2';
 
 @Injectable()
 export class UserService {
   @Transaction()
   async createUser(name: string) {
-    await this.db2Service.query("INSERT INTO users (name) VALUES (?)", [name]);
+    await this.db2Service.query('INSERT INTO users (name) VALUES (?)', [name]);
   }
 
   @Connection()
   async getUserData(userId: string) {
-    return this.db2Service.query("SELECT * FROM users WHERE id = ?", [userId]);
+    return this.db2Service.query('SELECT * FROM users WHERE id = ?', [userId]);
   }
 
   @Cache({ ttl: 60 })
   async getRecentUsers() {
     return this.db2Service.query(
-      "SELECT * FROM users ORDER BY created_at DESC LIMIT 10"
+      'SELECT * FROM users ORDER BY created_at DESC LIMIT 10',
     );
   }
 }
@@ -184,9 +184,9 @@ The `ibm_db2` module provides detailed error messages and stack traces for commo
 
 ```typescript
 try {
-  await this.db2Service.query("SELECT * FROM non_existent_table");
+  await this.db2Service.query('SELECT * FROM non_existent_table');
 } catch (error) {
-  console.error("An error occurred:", error.message);
+  console.error('An error occurred:', error.message);
 }
 ```
 
@@ -195,15 +195,15 @@ try {
 You can implement health checks for your NestJS application using the `TerminusModule` and the `Db2HealthIndicator`:
 
 ```typescript
-import { Module } from "@nestjs/common";
-import { TerminusModule } from "@nestjs/terminus";
-import { Db2HealthIndicator } from "ibm_db2";
+import { Module } from '@nestjs/common';
+import { TerminusModule } from '@nestjs/terminus';
+import { Db2HealthIndicator } from 'ibm_db2';
 
 @Module({
   imports: [
     TerminusModule.forRoot({
       healthChecks: {
-        db2: () => Db2HealthIndicator.pingCheck("db2"),
+        db2: () => Db2HealthIndicator.pingCheck('db2'),
       },
     }),
   ],
@@ -229,14 +229,14 @@ Db2Module.forRoot({
 You can use the `@Cache` decorator to cache the results of a query with a specific TTL:
 
 ```typescript
-import { Cache } from "ibm_db2";
+import { Cache } from 'ibm_db2';
 
 @Injectable()
 export class UserService {
   @Cache({ ttl: 60 })
   async getRecentUsers() {
     return this.db2Service.query(
-      "SELECT * FROM users ORDER BY created_at DESC LIMIT 10"
+      'SELECT * FROM users ORDER BY created_at DESC LIMIT 10',
     );
   }
 }

@@ -4,10 +4,21 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'The type of version bump: patch, minor, major'
+        required: false
+  workflow_run:
+    workflows: ['CI'] # Ensure this matches the exact name of your CI workflow
+    types:
+      - completed
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment:
+      name: production # This requires approval to proceed
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
@@ -21,17 +32,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm run test
-
       - name: Lint code
         run: npm run lint
+
+      - name: Run tests
+        run: npm run test
 
       - name: Build the package
         run: npm run build
 
-      - name: Release new version
+      - name: Bump version and set output
+        id: bump
+        run: |
+          new_version=$(npm version ${{ github.event.inputs.bump || 'patch' }} --no-git-tag-version)
+          echo "new_version=$new_version" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Commit version bump
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git commit -am "ci: bump version"
+          git push origin main
+
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.bump.outputs.new_version }}
+          release_name: Release ${{ steps.bump.outputs.new_version }}
+          draft: false
+          prerelease: false
