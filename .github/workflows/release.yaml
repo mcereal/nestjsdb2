@@ -9,8 +9,10 @@ on:
       bump:
         description: 'The type of version bump: patch, minor, major'
         required: false
+        default: 'patch'
+
   workflow_run:
-    workflows: ['CI'] # Ensure this matches the exact name of your CI workflow
+    workflows: ['CI']
     types:
       - completed
 
@@ -18,7 +20,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment:
-      name: production # This requires approval to proceed
+      name: production
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
