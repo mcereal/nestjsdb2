@@ -2,7 +2,7 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=mcereal_nestjsdb2&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=mcereal_nestjsdb2) [![Publish to NPM](https://github.com/mcereal/nestjsdb2/actions/workflows/publish.yaml/badge.svg)](https://github.com/mcereal/nestjsdb2/actions/workflows/publish.yaml) [![Release](https://github.com/mcereal/nestjsdb2/actions/workflows/release.yaml/badge.svg)](https://github.com/mcereal/nestjsdb2/actions/workflows/release.yaml) [![CI](https://github.com/mcereal/nestjsdb2/actions/workflows/ci.yaml/badge.svg)](https://github.com/mcereal/nestjsdb2/actions/workflows/ci.yaml) [![npm version](https://badge.fury.io/js/ibm_db2.svg)](https://badge.fury.io/js/ibm_db2) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The `ibm_db2` module is a powerful and flexible TypeScript library that integrates IBM DB2 database capabilities into NestJS applications. This module provides decorators, services, and utility functions to handle common database operations, connection management, caching, error handling, and transaction management, specifically tailored for IBM DB2 environments.
+The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that integrates IBM DB2 database capabilities into NestJS applications. This package provides decorators, services, and utility functions to handle common database operations, connection management, caching, error handling, and transaction management, specifically tailored for IBM DB2 environments.
 
 ## Table of Contents
 
@@ -37,7 +37,7 @@ The `ibm_db2` module is a powerful and flexible TypeScript library that integrat
 ## Installation
 
 ```bash
-npm install ibm_db2 --save
+npm install @mcereal/nestjsdb2 --save
 ```
 
 ## Getting Started
@@ -46,7 +46,7 @@ To get started, import the Db2Module into your NestJS application and configure 
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { Db2Module } from 'ibm_db2';
+import { Db2Module } from '@mcereal/nestjsdb2';
 
 @Module({
   imports: [
@@ -243,7 +243,7 @@ export class UserService {
 
 ## Security
 
-The `ibm_db2` module follows best practices for security, including:
+The `@mcereal/nestjsdb2` package follows best practices for security, including:
 
 - **Secure Connections**: Supports TLS encryption for secure communication with the database.
 - **Parameterized Queries**: Encourages the use of parameterized queries to prevent SQL injection attacks.
