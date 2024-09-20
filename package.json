@@ -16,8 +16,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "npm run lint && npm run test && npm run build",
     "prepare": "npm run build",
-    "clean": "rimraf dist",
-    "postinstall": "node dist/install/install-driver.js"
+    "clean": "rimraf dist"
   },
   "repository": {
     "type": "git",
