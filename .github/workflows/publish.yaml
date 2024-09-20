@@ -1,4 +1,4 @@
-name: Publish npm package
+name: Publish to NPM
 
 on:
   push:
@@ -7,56 +7,18 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Version bump type (major, minor, patch)'
-        required: true
-        default: 'patch'
-  release:
-    types: [created]
+        description: 'The type of version bump: patch, minor, major'
+        required: false
+  workflow_run:
+    workflows: ['CI']
+    types:
+      - completed
 
 jobs:
-  setup:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm run test
-
-      - name: Build the package
-        run: npm run build
-
-      - name: Bump version
-        run: npm version ${{ github.event.inputs.bump }} --no-git-tag-version
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
-
-      - name: Commit version bump
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git commit -am "ci: bump version to ${{ steps.bump.outputs.new_version }}"
-
-      - name: Push version bump
-        run: git push origin main
-
-  publish_npm:
-    needs: setup
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Node.js
@@ -75,28 +37,4 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  publish_github:
-    needs: setup
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build the package
-        run: npm run build
-
-      - name: Publish to GitHub Packages
-        run: npm publish --registry=https://npm.pkg.github.com
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: github.ref == 'refs/heads/main'

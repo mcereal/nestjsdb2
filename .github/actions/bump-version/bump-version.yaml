@@ -1,0 +1,12 @@
+name: Bump Version
+description: Bumps the version in package.json
+
+inputs:
+  bump-type:
+    description: 'The type of version bump: patch, minor, major'
+    required: true
+    default: 'patch'
+
+runs:
+  using: 'node12'
+  main: 'index.js'
