@@ -11,20 +11,15 @@ on:
         required: false
         default: 'patch'
 
-  workflow_run:
-    workflows: ['CI']
-    types:
-      - completed
-
 jobs:
   release:
     runs-on: ubuntu-latest
     environment:
       name: production
     permissions:
-      contents: write # Required for pushing tags
-      issues: write # Required for creating issues on failure
-      packages: write # Required for publishing to GitHub Packages
+      contents: write
+      issues: write
+      packages: write
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
@@ -42,7 +37,7 @@ jobs:
         run: npm run lint
 
       - name: Run tests
-        run: npm run test
+        run: npm run test -- --coverage
 
       - name: Build the package
         run: npm run build
