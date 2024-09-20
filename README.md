@@ -51,11 +51,15 @@ import { Db2Module } from '@mcereal/nestjsdb2';
 @Module({
   imports: [
     Db2Module.forRoot({
+      auth: {
+        authType: 'password',
+        username: 'db2user',
+        password: 'password',
+      },
       host: 'localhost',
       port: 50000,
-      username: 'db2user',
-      password: 'password',
       database: 'sampledb',
+      useTls: false,
     }),
   ],
 })
@@ -70,14 +74,15 @@ The Db2Module can be configured either synchronously or asynchronously:
 
 ```typescript
 Db2Module.forRoot({
+  auth: {
+    authType: 'password',
+    username: 'db2user',
+    password: 'password',
+  },
   host: 'localhost',
   port: 50000,
-  username: 'db2user',
-  password: 'password',
   database: 'sampledb',
-  useTls: true, // Optional
-  sslCertificatePath: '/path/to/certificate.pem', // Optional
-  cacheEnabled: true, // Optional
+  useTls: false,
 });
 ```
 
@@ -86,11 +91,16 @@ Db2Module.forRoot({
 ```typescript
 Db2Module.forRootAsync({
   useFactory: async (configService: ConfigService) => ({
+    auth: {
+      authType: 'password',
+      username: configService.get<string>('DB_USER'),
+      password: configService.get<string>('DB_PASS'),
+    },
     host: configService.get<string>('DB_HOST'),
     port: configService.get<number>('DB_PORT'),
-    username: configService.get<string>('DB_USER'),
-    password: configService.get<string>('DB_PASS'),
+    useTls: configService.get<boolean>('DB2_SSL_CONNECTION'),
     database: configService.get<string>('DB_NAME'),
+    sslCertificatePath: configService.get<string>('DB_SSL_CERT_PATH'),
   }),
   inject: [ConfigService],
 });
@@ -104,7 +114,7 @@ Inject the Db2Service into your service or controller to interact with the DB2 d
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { Db2Service } from 'ibm_db2';
+import { Db2Service } from '@mcereal/nestjsdb2';
 
 @Injectable()
 export class UserService {
@@ -154,7 +164,7 @@ const result = await this.db2Service.query(query);
 The `@Transaction`, `@Connection`, and `@Cache` decorators can be used to enforce connection state checks and cache results:
 
 ```typescript
-import { Transaction, Connection, Cache } from 'ibm_db2';
+import { Transaction, Connection, Cache } from '@mcereal/nestjsdb2';
 
 @Injectable()
 export class UserService {
@@ -179,7 +189,7 @@ export class UserService {
 
 ## Error Handling
 
-The `ibm_db2` module provides detailed error messages and stack traces for common database errors. You can catch and handle these errors in your application:
+The `@mcereal/nestjsdb2` package provides detailed error messages and stack traces for common database errors. You can catch and handle these errors in your application:
 
 ```typescript
 try {
@@ -196,7 +206,7 @@ You can implement health checks for your NestJS application using the `TerminusM
 ```typescript
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
-import { Db2HealthIndicator } from 'ibm_db2';
+import { Db2HealthIndicator } from '@mcereal/nestjsdb2';
 
 @Module({
   imports: [
@@ -212,7 +222,7 @@ export class HealthModule {}
 
 ## Cache Management
 
-The `ibm_db2` module supports integrated caching with customizable TTL to improve performance for expensive queries. You can enable caching by setting the `cacheEnabled` option in the module configuration:
+The `@mcereal/nestjsdb2` package supports integrated caching with customizable TTL to improve performance for expensive queries. You can enable caching by setting the `cacheEnabled` option in the module configuration:
 
 ```typescript
 Db2Module.forRoot({
@@ -228,7 +238,7 @@ Db2Module.forRoot({
 You can use the `@Cache` decorator to cache the results of a query with a specific TTL:
 
 ```typescript
-import { Cache } from 'ibm_db2';
+import { Cache } from '@mcereal/nestjsdb2';
 
 @Injectable()
 export class UserService {
