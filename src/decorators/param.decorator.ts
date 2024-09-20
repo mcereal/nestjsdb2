@@ -63,8 +63,6 @@ export const Db2Param = createParamDecorator(
       // Attempt to parse the parameter value as JSON if it is a string
       if (typeof paramValue === 'string') {
         paramValue = JSON.parse(paramValue);
-      } else {
-        paramValue = paramValue;
       }
     } catch (error) {
       throw new BadRequestException(`Invalid parameter: ${error.message}`);

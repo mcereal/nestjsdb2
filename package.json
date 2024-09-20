@@ -1,6 +1,6 @@
 {
   "name": "@mcereal/nestjsdb2",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
