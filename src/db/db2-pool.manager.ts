@@ -1,73 +1,80 @@
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Connection } from "ibm_db";
-import { Logger } from "@nestjs/common";
 import { IDb2ConfigOptions, IPoolManager } from "../interfaces";
-import { Pool, createPool } from "generic-pool";
 import * as ibm_db from "ibm_db";
+import { buildConnectionString } from "../utils/buildConnectionString";
+import { Pool, Factory, createPool } from "generic-pool";
 
-export class Db2PoolManager implements IPoolManager {
+@Injectable()
+export class Db2PoolManager implements IPoolManager, OnModuleInit {
   private readonly logger = new Logger(Db2PoolManager.name);
   private pool: Pool<Connection>;
-  protected poolInitialized = false;
+  private poolInitialized = false;
+  private ibm_db: ibm_db;
 
-  constructor(private config: IDb2ConfigOptions) {}
-
-  public async init(): Promise<void> {
-    this.validateConfig(this.config);
-    await this.initializePool();
+  constructor(private config: IDb2ConfigOptions) {
+    this.ibm_db = ibm_db;
   }
 
-  public async initializePool(): Promise<void> {
-    this.validateConfig(this.config);
-    this.pool = createPool(
-      {
-        create: () => {
-          return new Promise<Connection>((resolve, reject) => {
-            const connectionString = this.buildConnectionString(this.config);
-            ibm_db.open(connectionString, (err, connection) => {
-              if (err) {
-                this.logger.error(
-                  "Failed to create DB2 connection",
-                  err.message
-                );
-                reject(err);
-              } else {
-                this.logger.log("New DB2 connection created");
-                resolve(connection);
-              }
-            });
-          });
-        },
-        destroy: (connection: Connection) => {
-          return new Promise<void>((resolve, reject) => {
-            connection.close((err) => {
-              if (err) {
-                this.logger.error(
-                  "Failed to close DB2 connection",
-                  err.message
-                );
-                reject(err);
-              } else {
-                this.logger.log("DB2 connection closed");
-                resolve();
-              }
-            });
-          });
-        },
-      },
-      {
-        max: this.config.maxPoolSize || 10,
-        min: this.config.minPoolSize || 1,
-        idleTimeoutMillis: 30000, // 30 seconds
-        evictionRunIntervalMillis: 15000, // 15 seconds
-      }
-    );
+  public async onModuleInit(): Promise<void> {
+    await this.init();
+  }
 
-    this.poolInitialized = true;
-    this.logger.log("Connection pool initialized successfully.");
+  public async init(): Promise<void> {
+    if (this.poolInitialized) {
+      this.logger.log("Connection pool is already initialized.");
+      return;
+    }
+
+    this.logger.log("Initializing Db2PoolManager...");
+    this.validateConfig(this.config);
+
+    const factory: Factory<Connection> = {
+      create: async () => {
+        const connectionString = buildConnectionString(this.config);
+        this.logger.debug(
+          `Attempting to connect with connection string: ${connectionString}`
+        );
+        return new Promise<Connection>((resolve, reject) => {
+          this.ibm_db.open(connectionString, (err, connection) => {
+            if (err) {
+              this.logger.error("Error opening connection", err.message);
+              reject(err); // Capture more details here
+            } else {
+              this.logger.log("Connection successfully established");
+              resolve(connection);
+            }
+          });
+        });
+      },
+      destroy: async (connection: Connection) => {
+        await connection.close();
+        this.logger.log("Connection closed.");
+      },
+    };
+
+    try {
+      this.pool = createPool(factory, {
+        max: this.config.maxPoolSize || 10,
+        min: this.config.minPoolSize || 2,
+        acquireTimeoutMillis: this.config.acquireTimeoutMillis || 30000,
+      });
+      this.poolInitialized = true;
+      this.logger.log("Connection pool initialized successfully.");
+    } catch (error) {
+      this.logger.error("Error during pool initialization:", error.message);
+      throw error; // Ensure that the error is rethrown
+    }
   }
 
   private validateConfig(config: IDb2ConfigOptions): void {
+    if (!config) {
+      this.logger.error("Configuration is null or undefined.");
+      throw new Error("Invalid configuration: Config object is missing.");
+    }
+
     if (!config.host || !config.port || !config.auth || !config.database) {
+      this.logger.debug(`Configuration: ${JSON.stringify(config)}`);
       throw new Error(
         "Invalid configuration: Host, port, auth, and database are required."
       );
@@ -94,22 +101,13 @@ export class Db2PoolManager implements IPoolManager {
     // Add more validations as needed
   }
 
-  public static async create(
-    config: IDb2ConfigOptions
-  ): Promise<Db2PoolManager> {
-    const manager = new Db2PoolManager(config);
-    await manager.init();
-    return manager;
-  }
-
   public get getPool(): Pool<Connection> {
     if (!this.poolInitialized || !this.pool) {
       this.logger.error("DB2 connection pool is not initialized.");
       throw new Error("DB2 connection pool is not initialized.");
-    } else {
-      this.logger.log("DB2 connection pool already initialized.");
-      return this.pool;
     }
+    this.logger.log("DB2 connection pool already initialized.");
+    return this.pool;
   }
 
   public get isPoolInitialized(): boolean {
@@ -120,18 +118,25 @@ export class Db2PoolManager implements IPoolManager {
     if (!this.poolInitialized || !this.pool) {
       this.logger.error("DB2 connection pool is not initialized.");
       throw new Error("DB2 connection pool is not initialized.");
-    } else {
-      this.logger.log("DB2 connection pool is already initialized.");
     }
 
     try {
-      this.logger.log("Db2PoolManager: Acquiring connection from pool...");
-      const connection = await this.pool.acquire();
-      this.logger.log("Db2PoolManager: Connection acquired from pool.");
+      this.logger.log("Acquiring connection from pool...");
+      const connection = await Promise.race([
+        this.pool.acquire(),
+        new Promise(
+          (_, reject) =>
+            setTimeout(
+              () => reject(new Error("Connection acquisition timeout")),
+              10000
+            ) // 10 seconds
+        ),
+      ]);
+      this.logger.log("Connection acquired from pool.");
       return connection;
     } catch (error) {
       this.logger.error(
-        "Db2PoolManager: Failed to acquire connection from pool.",
+        "Failed to acquire connection from pool.",
         error.message
       );
       throw error;
@@ -157,36 +162,10 @@ export class Db2PoolManager implements IPoolManager {
     }
   }
 
-  /**
-   * Releases a connection back to the pool.
-   */
   public async releaseConnection(connection: Connection): Promise<void> {
     if (this.poolInitialized) {
       await this.pool.release(connection);
       this.logger.log("Connection released back to custom pool.");
     }
-  }
-
-  private buildConnectionString(config: IDb2ConfigOptions): string {
-    const { host, port, database, auth, useTls, sslCertificatePath } = config;
-    let connStr = `DATABASE=${database};HOSTNAME=${host};PORT=${port};`;
-    switch (auth.authType) {
-      case "password":
-        connStr += `UID=${auth.username};PWD=${auth.password};`;
-        break;
-      case "jwt":
-        if ("jwtToken" in auth) {
-          connStr += `TOKEN=${auth.jwtToken};`;
-        }
-        break;
-      // Handle other auth types...
-    }
-    if (useTls) {
-      connStr += "SECURITY=SSL;";
-      if (sslCertificatePath) {
-        connStr += `SSLServerCertificate=${sslCertificatePath};`;
-      }
-    }
-    return connStr;
   }
 }

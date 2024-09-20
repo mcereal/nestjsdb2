@@ -13,16 +13,23 @@ import {
   Db2HealthDetails,
   Db2ServiceInterface,
   IDb2Client,
+  ITransactionManager,
+  IDb2MigrationService,
 } from "../interfaces";
 import { Db2QueryBuilder } from "../db";
 import { handleDb2Error } from "../errors/db2.error";
 import { Cache, caching } from "cache-manager";
-import { Db2MigrationService } from "../services";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { IConnectionManager } from "../interfaces";
-import { TransactionManager } from "../db/transaction-manager";
 import { redisStore } from "cache-manager-redis-yet";
-import { DB2_CONFIG } from "../constants/injection-token.constant";
+import {
+  I_CONNECTION_MANAGER,
+  I_DB2_CLIENT,
+  I_DB2_CONFIG,
+  I_DB2_MIGRATION_SERVICE,
+  I_TRANSACTION_MANAGER,
+} from "../constants/injection-token.constant";
+import { Db2ConnectionState } from "../enums";
 
 @Injectable()
 export class Db2Service
@@ -30,15 +37,18 @@ export class Db2Service
 {
   private readonly logger = new Logger(Db2Service.name);
   private cache?: Cache;
-  private client: IDb2Client;
 
   constructor(
-    @Inject(DB2_CONFIG) private readonly options: IDb2ConfigOptions,
+    @Inject(I_DB2_CONFIG) private readonly options: IDb2ConfigOptions,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-    private readonly transactionManager: TransactionManager,
-    private readonly migrationService: Db2MigrationService,
+    @Inject(I_TRANSACTION_MANAGER)
+    private readonly transactionManager: ITransactionManager,
+    @Inject(I_DB2_MIGRATION_SERVICE)
+    private readonly migrationService: IDb2MigrationService,
+    @Inject(I_CONNECTION_MANAGER)
     private readonly connectionManager: IConnectionManager,
-    db2Client: IDb2Client
+    @Inject(I_DB2_CLIENT)
+    private readonly client: IDb2Client
   ) {
     // Initialize cache if enabled
     if (this.options.cache?.enabled && this.cacheManager) {
@@ -48,14 +58,17 @@ export class Db2Service
     } else {
       this.logger.log("Caching is disabled.");
     }
-
-    this.client = db2Client;
   }
 
   // Lifecycle Hooks
 
   public async onModuleInit(): Promise<void> {
     this.logger.log("Initializing Db2Service...");
+
+    // Set state to INITIALIZING
+    this.connectionManager.setState({
+      connectionState: Db2ConnectionState.INITIALIZING,
+    });
 
     // Validate configuration
     this.validateConfig(this.options);
@@ -76,8 +89,18 @@ export class Db2Service
         this.logger.log("Migrations are disabled. Skipping migration step.");
       }
 
+      // Set state to CONNECTED
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
+
       this.logger.log("Db2Service initialization complete.");
     } catch (error) {
+      // Set state to ERROR on failure
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
+
       const options = {
         host: this.options.host,
         database: this.options.database,
@@ -89,6 +112,12 @@ export class Db2Service
 
   public async onModuleDestroy(): Promise<void> {
     this.logger.log("Destroying Db2Service...");
+
+    // Set state to DISCONNECTING
+    this.connectionManager.setState({
+      connectionState: Db2ConnectionState.DISCONNECTING,
+    });
+
     try {
       await this.drainPool();
     } catch (error) {
@@ -144,15 +173,35 @@ export class Db2Service
         );
       }
     }
+
+    // Set state to DISCONNECTED
+    this.connectionManager.setState({
+      connectionState: Db2ConnectionState.DISCONNECTED,
+    });
   }
 
   // Connection Management
+  // Connection Management
   public async connect(): Promise<void> {
     try {
-      // At this point, Db2Client should have set the connectionState to CONNECTED
+      // Set state to CONNECTING
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTING,
+      });
+
       await this.connectionManager.getConnection(); // Now this should succeed
       this.logger.log("Db2Service connected successfully.");
+
+      // Set state to CONNECTED on successful connection
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
     } catch (error) {
+      // Set state to ERROR on connection failure
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
+
       const options = {
         host: this.options.host,
         database: this.options.database,
@@ -164,8 +213,18 @@ export class Db2Service
 
   public async disconnect(): Promise<void> {
     try {
+      // Set state to DISCONNECTING
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.DISCONNECTING,
+      });
+
       await this.connectionManager.disconnect(); // Delegate to connectionManager
       this.logger.log("Db2Service disconnected successfully.");
+
+      // Set state to DISCONNECTED
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.DISCONNECTED,
+      });
     } catch (error) {
       const options = {
         host: this.options.host,
@@ -178,9 +237,24 @@ export class Db2Service
 
   public async drainPool(): Promise<void> {
     try {
+      // Set state to POOL_DRAINING
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.POOL_DRAINING,
+      });
+
       await this.connectionManager.drainPool(); // Delegate to connectionManager
       this.logger.log("Db2Service drained the connection pool successfully.");
+
+      // Set state to POOL_DRAINED
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.POOL_DRAINED,
+      });
     } catch (error) {
+      // Set state to ERROR if draining fails
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
+
       const options = {
         host: this.options.host,
         database: this.options.database,

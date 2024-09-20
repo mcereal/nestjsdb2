@@ -1,7 +1,8 @@
-import { Logger } from "@nestjs/common";
+import { Inject, Logger } from "@nestjs/common";
 import { IDb2Client, ITransactionManager } from "../interfaces";
 import { Db2Error } from "../errors";
 import { Db2IsolationLevel } from "../enums";
+import { I_DB2_CLIENT } from "../constants/injection-token.constant";
 
 export class TransactionManager implements ITransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
@@ -9,12 +10,14 @@ export class TransactionManager implements ITransactionManager {
   private isolationLevel: Db2IsolationLevel | null = null;
 
   public constructor(
-    private client: IDb2Client,
+    @Inject(I_DB2_CLIENT)
+    private readonly client: IDb2Client,
     private defaultIsolationLevel?: Db2IsolationLevel
   ) {}
 
   /**
    * Begin a transaction with an optional isolation level.
+   * If an isolation level is provided, it will be applied for this transaction.
    * @param isolationLevel The isolation level for the transaction (optional).
    */
   public async beginTransaction(
@@ -28,7 +31,7 @@ export class TransactionManager implements ITransactionManager {
     }
 
     try {
-      // Use provided isolation level or default if not specified
+      // Use the provided isolation level or fallback to the default or READ_COMMITTED
       this.isolationLevel =
         isolationLevel ||
         this.defaultIsolationLevel ||
@@ -36,6 +39,7 @@ export class TransactionManager implements ITransactionManager {
 
       const startTime = Date.now();
       if (this.isolationLevel) {
+        // Set the transaction isolation level in DB2
         await this.client.query(
           `SET TRANSACTION ISOLATION LEVEL ${this.isolationLevel}`
         );
@@ -44,12 +48,14 @@ export class TransactionManager implements ITransactionManager {
         );
       }
 
+      // Begin the actual transaction
       await this.client.query("BEGIN TRANSACTION");
       this.transactionActive = true;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction started in ${duration}ms.`);
     } catch (error) {
       this.logger.error("Failed to start transaction.", error);
+      this.transactionActive = false; // Reset the transaction state
       throw new Db2Error("Transaction start error");
     }
   }

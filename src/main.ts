@@ -9,6 +9,9 @@ async function bootstrap() {
   try {
     logger.log("Starting the application...");
     await app.listen(3000);
+    process.on("unhandledRejection", (reason, promise) => {
+      logger.error("Unhandled Rejection:", reason);
+    });
     logger.log("Application is running on: http://localhost:3000");
   } catch (error) {
     logger.error("Failed to start the application", error);

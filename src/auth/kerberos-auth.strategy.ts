@@ -1,26 +1,23 @@
 import { Db2AuthStrategy } from "./db2-auth.strategy";
 import { Db2AuthenticationError } from "../errors";
-import { Db2Client } from "../db/db2-client";
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Logger } from "@nestjs/common";
 import * as kerberos from "kerberos";
 import {
   Db2KerberosAuthOptions,
   IConnectionManager,
+  IDb2Client,
   IDb2ConfigOptions,
 } from "../interfaces";
 
 export class KerberosAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(KerberosAuthStrategy.name);
-  private dbClient: Db2Client;
 
   constructor(
     config: IDb2ConfigOptions,
-    dbClient: Db2Client,
     connectionManager: IConnectionManager
   ) {
     super(config, connectionManager); // Add the connectionManager argument
-    this.dbClient = dbClient;
   }
 
   /**
@@ -28,7 +25,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
    * Acquires a Kerberos ticket and attempts to authenticate with the DB2 server.
    */
   async authenticate(): Promise<void> {
-    this.dbClient.setState({
+    this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
     this.logger.log("Starting Kerberos authentication...");
@@ -37,7 +34,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
 
     // Narrow down the type to Db2KerberosAuthOptions
     if (authOptions.authType !== "kerberos") {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2AuthenticationError(
@@ -48,7 +45,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     const { krbServiceName, username } = authOptions as Db2KerberosAuthOptions;
 
     if (!krbServiceName || !username) {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2AuthenticationError(
@@ -67,11 +64,13 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
       await this.acquireKerberosTicket(kerberosClient);
 
       // Open the DB2 connection after acquiring the ticket
-      await this.dbClient.openConnection();
-      this.dbClient.setState({ connectionState: Db2ConnectionState.CONNECTED });
+      await this.connectionManager.getConnection();
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
       this.logger.log("Authentication successful using Kerberos strategy.");
     } catch (error) {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       this.logger.error("Kerberos authentication failed:", error.message);

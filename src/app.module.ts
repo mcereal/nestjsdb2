@@ -7,6 +7,7 @@ import { Db2AuthType } from "./enums/db2.enums";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import db2Config from "./config/db2.config";
 import { IDb2ConfigOptions } from "./interfaces";
+import { CacheModule } from "@nestjs/cache-manager";
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ dotenv.config();
       isGlobal: true,
       load: [db2Config],
     }),
+    CacheModule.register(),
     Db2Module.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (
@@ -46,7 +48,6 @@ dotenv.config();
             "memory",
           enabled: configService.get<boolean>("db2.cache.enabled") || false,
         },
-        // Include other configuration options as needed
       }),
       inject: [ConfigService],
     }),

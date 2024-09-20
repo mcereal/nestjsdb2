@@ -17,15 +17,12 @@ import {
   Db2Error,
   Db2TransactionError,
   formatDb2Error,
-  handleDb2Error,
 } from "../errors";
 import { Db2AuthStrategy } from "../auth/db2-auth.strategy";
 import { Db2ConfigManager } from "./db2-config.manager";
 import { Db2AuthManager } from "./db2-auth.manager";
 import { IConnectionManager } from "../interfaces/connection-mannager.interface";
-import { Db2PoolManager } from "./db2-pool.manager";
-import { DB2_CONFIG } from "../constants/injection-token.constant";
-import { buildConnectionString } from "../utils/buildConnectionString";
+import { I_DB2_CONFIG } from "../constants/injection-token.constant";
 
 export class Db2Client
   implements IConnectionManager, IDb2Client, OnModuleInit, OnModuleDestroy
@@ -57,35 +54,38 @@ export class Db2Client
   private idleConnections: number = 0;
 
   public constructor(
-    @Inject(DB2_CONFIG) // Inject the config
+    @Inject(I_DB2_CONFIG) // Inject the config
     config: IDb2ConfigOptions,
     private readonly connectionManager: IConnectionManager,
-    private poolManager: IPoolManager
+    private readonly poolManager: IPoolManager
   ) {
     const configManager = new Db2ConfigManager(config);
     this.config = configManager.getConfig();
 
-    this.authManager = new Db2AuthManager(this.config, connectionManager, this);
-    this.poolManager = new Db2PoolManager(this.config);
+    this.authManager = new Db2AuthManager(this.config, connectionManager);
   }
 
   public async onModuleInit(): Promise<void> {
     try {
-      await this.poolManager.init(); // Initialize the pool
-      this.pool = this.poolManager.getPool; // Assign the pool instance
-      this.connectionManager.setState({
-        poolInitialized: true,
-        connectionState: Db2ConnectionState.CONNECTED,
-      });
-      this.logger.log("Db2 client module initialized successfully.");
-      this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
+      // PoolManager is already initialized via OnModuleInit in Db2PoolManager
+      this.poolInitialized = this.poolManager.isPoolInitialized;
+      if (this.poolInitialized) {
+        this.connectionManager.setState({
+          poolInitialized: true,
+          connectionState: Db2ConnectionState.CONNECTED,
+        });
+        this.logger.log("Db2 client module initialized successfully.");
+        this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
+      } else {
+        this.logger.error("Failed to initialize connection pool.");
+        this.setState({ connectionState: Db2ConnectionState.ERROR });
+      }
     } catch (error) {
       this.setState({ connectionState: Db2ConnectionState.ERROR });
       this.logger.error("Error during Db2 client initialization:", error);
       throw error; // Re-throw to propagate the error
     }
   }
-
   public onModuleDestroy(): void {
     this.drainPool();
     this.setState({ connectionState: Db2ConnectionState.DISCONNECTED });
@@ -108,11 +108,17 @@ export class Db2Client
   }
 
   public async getConnection(): Promise<Connection> {
-    const connection = await this.poolManager.getConnection();
-    this.activeConnectionsList.push(connection);
-    this.totalConnections++;
-    this.setState({ activeConnections: this.activeConnectionsList.length });
-    return connection;
+    try {
+      const connection = await this.poolManager.getConnection();
+      this.activeConnectionsList.push(connection);
+      this.totalConnections++;
+      this.setState({ activeConnections: this.activeConnectionsList.length });
+      return connection;
+    } catch (error) {
+      this.setState({ connectionState: Db2ConnectionState.ERROR });
+      this.logger.error("Failed to get connection:", error);
+      throw new Db2ConnectionError("Failed to get connection");
+    }
   }
 
   public async closePool(): Promise<void> {
@@ -131,57 +137,6 @@ export class Db2Client
           resolve();
         }
       });
-    });
-  }
-
-  public async getConnectionFromPool(connectionString: string): Promise<void> {
-    if (!this.pool) {
-      throw new Db2ConnectionError("Connection pool is not initialized");
-    }
-
-    this.connection = await new Promise<Connection>((resolve, reject) => {
-      this.pool?.open(connectionString, (err, connection) => {
-        if (err) {
-          reject(new Db2ConnectionError("Failed to get connection from pool"));
-        } else {
-          this.idleConnections--; // Decrease idle connections count
-          resolve(connection);
-        }
-      });
-    });
-
-    this.logger.log("Connection successfully retrieved from pool");
-  }
-
-  public openConnection(isInitialization = false): Promise<Connection> {
-    return new Promise<Connection>(async (resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Db2ConnectionError("Connection attempt timed out"));
-      }, this.config.connectionTimeout);
-
-      // Authenticate before opening the connection
-      await this.authManager.authenticate();
-
-      this.pool.open(
-        buildConnectionString(this.config),
-        async (err: Error, connection: Connection) => {
-          clearTimeout(timeout);
-          if (err) {
-            this.logger.error("DB2 connection failed", err);
-            await this.handleConnectionError(err); // Handle error and retry logic
-            reject(new Db2ConnectionError("Failed to open DB2 connection"));
-          } else {
-            if (!isInitialization) {
-              this.logger.log("DB2 connection opened successfully");
-            }
-            this.connection = connection;
-            this.lastUsed = Date.now();
-            this.activeConnectionsList.push(connection);
-            this.totalConnections++;
-            resolve(connection);
-          }
-        }
-      );
     });
   }
 
@@ -215,7 +170,7 @@ export class Db2Client
     }
 
     await this.sleep(this.config.retry?.reconnectInterval || 5000);
-    await this.openConnection();
+    await this.getConnection();
   }
 
   private async sleep(ms: number): Promise<void> {
@@ -277,7 +232,7 @@ export class Db2Client
     if (this.connection) {
       try {
         this.logger.log("Disconnecting from DB2 database...");
-        await this.closeConnection(this.connection);
+        await this.poolManager.releaseConnection(this.connection);
 
         // Ensure the connection is properly set to null
         this.connection = null;
@@ -323,7 +278,7 @@ export class Db2Client
         this.logger.log("Attempting to reconnect to DB2...");
         this.setState({ connectionState: Db2ConnectionState.RECONNECTING });
         this.reconnectionAttempts += 1;
-        const connection = await this.openConnection();
+        const connection = await this.getConnection();
         await this.closeConnection(connection);
         this.logger.log("Reconnection successful");
         this.setState({ connectionState: Db2ConnectionState.CONNECTED });
@@ -343,13 +298,13 @@ export class Db2Client
    * @returns A promise that resolves with the result of the query.
    */
   public async query<T>(
-    query: string,
+    sql: string,
     params: any[] = [],
     timeout?: number
   ): Promise<T> {
-    const connection = await this.openConnection();
+    const connection = await this.getConnection();
     try {
-      this.logger.log(`Executing query: ${query}`);
+      this.logger.log(`Executing query: ${sql}`);
 
       return new Promise<T>((resolve, reject) => {
         // Apply a query timeout if provided
@@ -357,7 +312,7 @@ export class Db2Client
           reject(new Db2ConnectionError("Query execution timed out"));
         }, timeout || this.config.queryTimeout);
 
-        connection.query(query, params, (err: Error, result: T) => {
+        connection.query(sql, params, (err: Error, result: T) => {
           clearTimeout(queryTimeout); // Clear the timeout once the query resolves
           if (err) {
             this.logger.error("Error executing query", err);
@@ -371,7 +326,6 @@ export class Db2Client
       await this.closeConnection(connection);
     }
   }
-
   /**
    * Executes a batch insert operation on the Db2 database.
    * @param tableName The name of the table to insert into.
@@ -669,25 +623,14 @@ export class Db2Client
       `;
 
     try {
-      const connection = await this.openConnection();
       this.logger.log("Executing query: " + query);
-
-      return new Promise<any>((resolve, reject) => {
-        connection.query(query, (err: Error, result: any) => {
-          if (err) {
-            this.logger.error("Error executing query", err);
-            reject(new Db2ConnectionError("Failed to execute query"));
-          } else {
-            this.logger.log("DB2 connection details retrieved successfully");
-            resolve(result);
-          }
-        });
-      });
+      const connection = await this.getConnection();
+      const result = await this.query(query);
+      this.logger.log("DB2 connection details retrieved successfully");
+      return result;
     } catch (error) {
       this.logger.error("Failed to get DB connection details:", error);
       throw new Db2Error("Failed to get DB connection details");
-    } finally {
-      await this.closeConnection(this.connection);
     }
   }
 }

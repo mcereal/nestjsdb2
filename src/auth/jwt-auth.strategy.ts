@@ -1,7 +1,7 @@
 import { Db2AuthStrategy } from "./db2-auth.strategy";
 
 import { Db2AuthenticationError, Db2Error } from "../errors";
-import { Db2Client } from "../db";
+
 import { Db2ConnectionState } from "../enums/db2.enums";
 import { Logger } from "@nestjs/common";
 import { verify, JwtPayload } from "jsonwebtoken"; // Import JwtPayload type
@@ -9,15 +9,12 @@ import { IConnectionManager, IDb2ConfigOptions } from "../interfaces";
 
 export class JwtAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(JwtAuthStrategy.name);
-  private dbClient: Db2Client;
 
   constructor(
     config: IDb2ConfigOptions,
-    dbClient: Db2Client,
     connectionManager: IConnectionManager
   ) {
     super(config, connectionManager); // Add the connectionManager argument
-    this.dbClient = dbClient;
   }
 
   /**
@@ -25,7 +22,7 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
    * Verifies the JWT token and attempts to authenticate with the DB2 server.
    */
   async authenticate(): Promise<void> {
-    this.dbClient.setState({
+    this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
     this.logger.log("Starting JWT authentication...");
@@ -36,7 +33,7 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
     };
 
     if (!jwtToken || !jwtSecret) {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2Error(
@@ -50,11 +47,13 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
       this.logger.log("JWT token successfully verified:", decoded);
 
       // Proceed to open a connection after successful token verification
-      await this.dbClient.openConnection();
-      this.dbClient.setState({ connectionState: Db2ConnectionState.CONNECTED });
+      await this.connectionManager.getConnection();
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
       this.logger.log("Authentication successful using JWT strategy.");
     } catch (error) {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       this.logger.error("JWT authentication failed:", error.message);

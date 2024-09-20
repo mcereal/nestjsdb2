@@ -8,7 +8,6 @@ export interface IConnectionManager {
   getConnection(): Promise<Connection>;
   closeConnection(connection: Connection): Promise<void>;
   disconnect(): Promise<void>;
-  getConnectionFromPool(connectionString: string): Promise<void>;
   drainPool(): Promise<void>;
   logPoolStatus(): void;
   checkHealth(): Promise<{ status: boolean; details?: any }>;

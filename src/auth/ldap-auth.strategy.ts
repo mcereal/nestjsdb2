@@ -5,22 +5,18 @@ import {
   Db2LdapAuthOptions,
 } from "../interfaces";
 import { Db2AuthenticationError } from "../errors";
-import { Db2Client } from "../db/db2-client";
 import { Db2ConnectionState } from "../enums";
 import { Logger } from "@nestjs/common";
 import * as ldap from "ldapjs"; // Import ldapjs for LDAP authentication
 
 export class LdapAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
-  private dbClient: Db2Client;
 
   constructor(
     config: IDb2ConfigOptions,
-    dbClient: Db2Client,
     connectionManager: IConnectionManager
   ) {
     super(config, connectionManager); // Add the connectionManager argument
-    this.dbClient = dbClient;
   }
 
   /**
@@ -28,7 +24,7 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
    * Binds to an LDAP server and attempts to authenticate with the DB2 server.
    */
   async authenticate(): Promise<void> {
-    this.dbClient.setState({
+    this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
     this.logger.log("Starting LDAP authentication...");
@@ -38,7 +34,7 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       const { username, password } = this.config.auth as Db2LdapAuthOptions;
 
       if (!username || !password) {
-        this.dbClient.setState({
+        this.connectionManager.setState({
           connectionState: Db2ConnectionState.AUTH_FAILED,
         });
         throw new Db2AuthenticationError(
@@ -49,19 +45,19 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       try {
         // Perform LDAP bind (authentication)
         await this.ldapBind(username, password);
-        this.dbClient.setState({
+        this.connectionManager.setState({
           connectionState: Db2ConnectionState.CONNECTED,
         });
         this.logger.log("LDAP authentication successful.");
       } catch (error) {
-        this.dbClient.setState({
+        this.connectionManager.setState({
           connectionState: Db2ConnectionState.AUTH_FAILED,
         });
         this.logger.error("LDAP authentication failed:", error.message);
         throw new Db2AuthenticationError("LDAP authentication failed.");
       }
     } else {
-      this.dbClient.setState({
+      this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2AuthenticationError(

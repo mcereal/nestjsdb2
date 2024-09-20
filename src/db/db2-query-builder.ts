@@ -1,8 +1,8 @@
 // src/modules/db2/query-builder.ts
 
-import { Db2QueryBuilderInterface } from "../interfaces";
+import { IQueryBuilder } from "../interfaces";
 
-export class Db2QueryBuilder implements Db2QueryBuilderInterface {
+export class Db2QueryBuilder implements IQueryBuilder {
   private query: string;
   private params: Record<string, any>;
   private hasWhereClause: boolean;
