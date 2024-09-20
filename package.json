@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "install-driver": "ts-node src/cli/db2-cli.ts",
-    "test": "jest --detectOpenHandles --forceExit",
+    "test": "jest --detectOpenHandles --forceExit --config jest.config.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "start:dev": "nest start --watch",
@@ -87,22 +87,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }
