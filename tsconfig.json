@@ -25,5 +25,9 @@
       "src/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "testconnection/app.module.ts",
+    "testconnection/main.ts"
+  ]
 }
