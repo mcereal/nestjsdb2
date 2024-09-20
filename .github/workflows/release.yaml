@@ -42,6 +42,15 @@ jobs:
       - name: Build the package
         run: npm run build
 
+      # Add a step to wait for required status checks to pass
+      - name: Wait for status checks
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'CodeQL, Linting, Tests'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 180
+
       - name: Run semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
