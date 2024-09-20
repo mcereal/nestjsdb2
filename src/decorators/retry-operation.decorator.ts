@@ -1,6 +1,6 @@
 // src/decorators/db2-retry-operation.decorator.ts
 
-import { Logger } from "@nestjs/common";
+import { Logger } from '@nestjs/common';
 
 /**
  * @function RetryOperation
@@ -31,17 +31,17 @@ import { Logger } from "@nestjs/common";
  * }
  */
 export function RetryOperation(
-  attempts: number = 3,
-  delay: number = 1000,
-  exponentialBackoff: boolean = false,
-  shouldRetry: (error: any) => boolean = () => true
+  attempts = 3,
+  delay = 1000,
+  exponentialBackoff = false,
+  shouldRetry: (error: any) => boolean = () => true,
 ): MethodDecorator {
-  const logger = new Logger("RetryOperationDecorator");
+  const logger = new Logger('RetryOperationDecorator');
 
   return function (
-    _target: Object,
+    _target: new (...args: any[]) => any,
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
@@ -55,7 +55,7 @@ export function RetryOperation(
           // Try executing the original method
           const result = await originalMethod.apply(this, args);
           logger.debug(
-            `Method ${propertyKey.toString()} succeeded on attempt ${i + 1}`
+            `Method ${propertyKey.toString()} succeeded on attempt ${i + 1}`,
           );
           return result; // Return the result if successful
         } catch (error) {
@@ -63,7 +63,7 @@ export function RetryOperation(
           logger.warn(
             `Method ${propertyKey.toString()} failed on attempt ${
               i + 1
-            } with error: ${error.message}`
+            } with error: ${error.message}`,
           );
 
           // Check if the error is retryable
@@ -87,7 +87,7 @@ export function RetryOperation(
 
       // If all attempts fail, throw the last error encountered
       logger.error(
-        `All retry attempts failed for method ${propertyKey.toString()}`
+        `All retry attempts failed for method ${propertyKey.toString()}`,
       );
       throw lastError;
     };

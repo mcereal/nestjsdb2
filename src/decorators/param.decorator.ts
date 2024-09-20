@@ -4,7 +4,7 @@ import {
   createParamDecorator,
   ExecutionContext,
   BadRequestException,
-} from "@nestjs/common";
+} from '@nestjs/common';
 
 /**
  * @function Db2Param
@@ -43,25 +43,25 @@ export const Db2Param = createParamDecorator(
     // Default to the first argument if no key or index is provided
     if (data === undefined) {
       paramValue = args[0];
-    } else if (typeof data === "string") {
+    } else if (typeof data === 'string') {
       const request = ctx.switchToHttp().getRequest();
       paramValue =
         request[data] ||
-        args.find((arg) => arg && typeof arg === "object" && arg[data])?.[data];
-    } else if (typeof data === "number") {
+        args.find((arg) => arg && typeof arg === 'object' && arg[data])?.[data];
+    } else if (typeof data === 'number') {
       paramValue = args[data];
     }
 
     // If the parameter is not found, throw an exception
     if (paramValue === undefined) {
       throw new BadRequestException(
-        `Parameter ${data} not found in execution context`
+        `Parameter ${data} not found in execution context`,
       );
     }
 
     try {
       // Attempt to parse the parameter value as JSON if it is a string
-      if (typeof paramValue === "string") {
+      if (typeof paramValue === 'string') {
         paramValue = JSON.parse(paramValue);
       } else {
         paramValue = paramValue;
@@ -71,5 +71,5 @@ export const Db2Param = createParamDecorator(
     }
 
     return paramValue;
-  }
+  },
 );

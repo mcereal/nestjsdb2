@@ -56,7 +56,7 @@ export interface IQueryBuilder {
    * @param column The column to order by.
    * @param direction The direction of the ordering, ASC or DESC.
    */
-  orderBy(column: string, direction?: "ASC" | "DESC"): IQueryBuilder;
+  orderBy(column: string, direction?: 'ASC' | 'DESC'): IQueryBuilder;
 
   /**
    * Adds a LIMIT clause to the query.
@@ -79,7 +79,7 @@ export interface IQueryBuilder {
   join(
     table: string,
     condition: string,
-    type?: "INNER" | "LEFT" | "RIGHT" | "FULL" | "NATURAL" | "CROSS"
+    type?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL' | 'NATURAL' | 'CROSS',
   ): IQueryBuilder;
 
   /**
@@ -121,7 +121,7 @@ export interface IQueryBuilder {
     table: string,
     updates: Record<string, any>,
     where: string,
-    whereParams: any[]
+    whereParams: any[],
   ): IQueryBuilder;
 
   /**
@@ -145,7 +145,7 @@ export interface IQueryBuilder {
     insertValues: any[][],
     conflictTarget: string,
     updateColumns: string[],
-    updateValues: any[]
+    updateValues: any[],
   ): IQueryBuilder;
 
   /**

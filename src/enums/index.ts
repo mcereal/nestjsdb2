@@ -10,4 +10,4 @@
  * @exports Db2ConnectionState
  */
 
-export * from "./db2.enums";
+export * from './db2.enums';

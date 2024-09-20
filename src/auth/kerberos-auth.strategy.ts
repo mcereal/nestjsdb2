@@ -1,21 +1,20 @@
-import { Db2AuthStrategy } from "./db2-auth.strategy";
-import { Db2AuthenticationError } from "../errors";
-import { Db2ConnectionState } from "../enums/db2.enums";
-import { Logger } from "@nestjs/common";
-import * as kerberos from "kerberos";
+import { Db2AuthStrategy } from './db2-auth.strategy';
+import { Db2AuthenticationError } from '../errors';
+import { Db2ConnectionState } from '../enums/db2.enums';
+import { Logger } from '@nestjs/common';
+import * as kerberos from 'kerberos';
 import {
   Db2KerberosAuthOptions,
   IConnectionManager,
-  IDb2Client,
   IDb2ConfigOptions,
-} from "../interfaces";
+} from '../interfaces';
 
 export class KerberosAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(KerberosAuthStrategy.name);
 
   constructor(
     config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager
+    connectionManager: IConnectionManager,
   ) {
     super(config, connectionManager); // Add the connectionManager argument
   }
@@ -28,17 +27,17 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
-    this.logger.log("Starting Kerberos authentication...");
+    this.logger.log('Starting Kerberos authentication...');
 
     const authOptions = this.config.auth;
 
     // Narrow down the type to Db2KerberosAuthOptions
-    if (authOptions.authType !== "kerberos") {
+    if (authOptions.authType !== 'kerberos') {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2AuthenticationError(
-        "Kerberos authentication was expected, but another authentication type was provided."
+        'Kerberos authentication was expected, but another authentication type was provided.',
       );
     }
 
@@ -49,7 +48,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       throw new Db2AuthenticationError(
-        "Kerberos service name and username are required for Kerberos authentication."
+        'Kerberos service name and username are required for Kerberos authentication.',
       );
     }
 
@@ -57,7 +56,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
       // Initialize Kerberos client
       const kerberosClient = await this.getKerberosClient(
         username,
-        krbServiceName
+        krbServiceName,
       );
 
       // Request a service ticket for the DB2 service
@@ -68,14 +67,14 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.CONNECTED,
       });
-      this.logger.log("Authentication successful using Kerberos strategy.");
+      this.logger.log('Authentication successful using Kerberos strategy.');
     } catch (error) {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
-      this.logger.error("Kerberos authentication failed:", error.message);
+      this.logger.error('Kerberos authentication failed:', error.message);
       throw new Db2AuthenticationError(
-        "Authentication failed during Kerberos strategy."
+        'Authentication failed during Kerberos strategy.',
       );
     }
   }
@@ -85,14 +84,14 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
    */
   private async getKerberosClient(
     username: string,
-    serviceName: string
+    serviceName: string,
   ): Promise<kerberos.Client> {
     const authOptions = this.config.auth;
 
     // Ensure we are dealing with Kerberos authentication options
-    if (authOptions.authType !== "kerberos") {
+    if (authOptions.authType !== 'kerberos') {
       throw new Db2AuthenticationError(
-        "Expected Kerberos authentication options, but received a different auth type."
+        'Expected Kerberos authentication options, but received a different auth type.',
       );
     }
 
@@ -103,12 +102,12 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
         keytab: krbKeytab, // This is now safe because of the type narrowing
         kdc: process.env.KRB_KDC, // Optional KDC (Key Distribution Center) host from environment variables
       });
-      this.logger.log("Kerberos client initialized successfully.");
+      this.logger.log('Kerberos client initialized successfully.');
       return client;
     } catch (error) {
-      this.logger.error("Failed to initialize Kerberos client:", error.message);
+      this.logger.error('Failed to initialize Kerberos client:', error.message);
       throw new Db2AuthenticationError(
-        "Kerberos client initialization failed."
+        'Kerberos client initialization failed.',
       );
     }
   }
@@ -120,19 +119,19 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     try {
       // Send an authentication request to the KDC (Key Distribution Center) to obtain a ticket
       await new Promise((resolve, reject) => {
-        client.step("", (error, response) => {
+        client.step('', (error, response) => {
           if (error) {
             return reject(
-              new Db2AuthenticationError("Failed to acquire Kerberos ticket.")
+              new Db2AuthenticationError('Failed to acquire Kerberos ticket.'),
             );
           }
-          this.logger.log("Kerberos ticket acquired successfully.");
+          this.logger.log('Kerberos ticket acquired successfully.');
           resolve(response);
         });
       });
     } catch (error) {
-      this.logger.error("Failed to acquire Kerberos ticket:", error.message);
-      throw new Db2AuthenticationError("Failed to acquire Kerberos ticket.");
+      this.logger.error('Failed to acquire Kerberos ticket:', error.message);
+      throw new Db2AuthenticationError('Failed to acquire Kerberos ticket.');
     }
   }
 }

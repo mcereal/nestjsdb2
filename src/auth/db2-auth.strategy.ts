@@ -1,4 +1,4 @@
-import { IConnectionManager, IDb2ConfigOptions } from "../interfaces";
+import { IConnectionManager, IDb2ConfigOptions } from '../interfaces';
 
 export abstract class Db2AuthStrategy {
   protected config: IDb2ConfigOptions;
@@ -6,7 +6,7 @@ export abstract class Db2AuthStrategy {
 
   constructor(
     config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager
+    connectionManager: IConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;

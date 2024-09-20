@@ -1,4 +1,4 @@
-import { Db2IsolationLevel } from "../enums";
+import { Db2IsolationLevel } from '../enums';
 import {
   Db2AuthOptions,
   Db2BasicConnectionOptions,
@@ -6,7 +6,7 @@ import {
   Db2LoggingOptions,
   Db2MigrationOptions,
   Db2RetryOptions,
-} from "./db2.interface";
+} from './db2.interface';
 
 export interface IDb2ConfigOptions extends Db2BasicConnectionOptions {
   useTls?: boolean;

@@ -1,7 +1,7 @@
 // src/interfaces/pool-manager.interface.ts
 
-import { Pool } from "generic-pool";
-import { Connection } from "ibm_db";
+import { Pool } from 'generic-pool';
+import { Connection } from 'ibm_db';
 
 /**
  * PoolManager interface

@@ -1,7 +1,7 @@
 // src/decorators/db2-transaction.decorator.ts
 
-import { Db2Service } from "../services";
-import { Logger } from "@nestjs/common";
+import { Db2Service } from '../services';
+import { Logger } from '@nestjs/common';
 
 /**
  * @function Transaction
@@ -31,12 +31,12 @@ import { Logger } from "@nestjs/common";
  * }
  */
 export function Transaction(): MethodDecorator {
-  const logger = new Logger("TransactionDecorator");
+  const logger = new Logger('TransactionDecorator');
 
   return function (
-    _target: Object,
+    _target: new (...args: any[]) => any,
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
@@ -46,7 +46,7 @@ export function Transaction(): MethodDecorator {
 
       // Check if Db2Service is available
       if (!db2Service) {
-        const errorMessage = "Db2Service is not available";
+        const errorMessage = 'Db2Service is not available';
         logger.error(errorMessage);
         throw new Error(errorMessage);
       }
@@ -54,7 +54,7 @@ export function Transaction(): MethodDecorator {
       // Start a transaction
       try {
         logger.debug(
-          `Starting transaction for method ${propertyKey.toString()}`
+          `Starting transaction for method ${propertyKey.toString()}`,
         );
         await db2Service.beginTransaction();
 
@@ -64,7 +64,7 @@ export function Transaction(): MethodDecorator {
         // Commit the transaction if the method completes successfully
         await db2Service.commitTransaction();
         logger.debug(
-          `Transaction committed successfully for method ${propertyKey.toString()}`
+          `Transaction committed successfully for method ${propertyKey.toString()}`,
         );
 
         return result;
@@ -73,18 +73,18 @@ export function Transaction(): MethodDecorator {
         logger.error(
           `Transaction failed for method ${propertyKey.toString()}: ${
             error.message
-          }`
+          }`,
         );
         try {
           await db2Service.rollbackTransaction();
           logger.debug(
-            `Transaction rolled back for method ${propertyKey.toString()}`
+            `Transaction rolled back for method ${propertyKey.toString()}`,
           );
         } catch (rollbackError) {
           logger.error(
             `Failed to roll back transaction for method ${propertyKey.toString()}: ${
               rollbackError.message
-            }`
+            }`,
           );
         }
 

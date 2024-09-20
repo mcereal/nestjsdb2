@@ -1,11 +1,11 @@
 // src/decorators/many-to-many.decorator.ts
 
-import "reflect-metadata";
-import { ManyToManyMetadata } from "../metadata";
+import 'reflect-metadata';
+import { ManyToManyMetadata } from '../metadata';
 import {
   ManyToManyOptions,
   MANY_TO_MANY_RELATIONS_METADATA_KEY,
-} from "../types";
+} from '../types';
 
 /**
  * @ManyToMany decorator to define a many-to-many relationship between entities.
@@ -14,19 +14,22 @@ import {
  */
 export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
   // Validate the provided options
-  if (typeof options.target !== "function") {
+  if (typeof options.target !== 'function') {
     throw new Error(
-      "ManyToMany decorator requires a 'target' option that is a function (constructor of the target entity)."
+      "ManyToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  if (options.joinTable && typeof options.joinTable !== "string") {
+  if (options.joinTable && typeof options.joinTable !== 'string') {
     throw new Error(
-      "ManyToMany decorator 'joinTable' option must be a string if provided."
+      "ManyToMany decorator 'joinTable' option must be a string if provided.",
     );
   }
 
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing many-to-many relations metadata or initialize if none exists
@@ -36,7 +39,7 @@ export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
 
     // Check for existing relation for the same property key to avoid duplicates
     const isAlreadyRelated = manyToManyRelations.some(
-      (relation) => relation.manyToManyOptions.propertyKey === propertyKey
+      (relation) => relation.manyToManyOptions.propertyKey === propertyKey,
     );
 
     if (!isAlreadyRelated) {
@@ -49,7 +52,7 @@ export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
       Reflect.defineMetadata(
         MANY_TO_MANY_RELATIONS_METADATA_KEY,
         manyToManyRelations,
-        constructor
+        constructor,
       );
     }
   };

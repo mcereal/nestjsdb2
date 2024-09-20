@@ -1,18 +1,18 @@
-import { Inject, Logger } from "@nestjs/common";
-import { IDb2Client, ITransactionManager } from "../interfaces";
-import { Db2Error } from "../errors";
-import { Db2IsolationLevel } from "../enums";
-import { I_DB2_CLIENT } from "../constants/injection-token.constant";
+import { Inject, Logger } from '@nestjs/common';
+import { IDb2Client, ITransactionManager } from '../interfaces';
+import { Db2Error } from '../errors';
+import { Db2IsolationLevel } from '../enums';
+import { I_DB2_CLIENT } from '../constants/injection-token.constant';
 
 export class TransactionManager implements ITransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
-  private transactionActive: boolean = false;
+  private transactionActive = false;
   private isolationLevel: Db2IsolationLevel | null = null;
 
   public constructor(
     @Inject(I_DB2_CLIENT)
     private readonly client: IDb2Client,
-    private defaultIsolationLevel?: Db2IsolationLevel
+    private defaultIsolationLevel?: Db2IsolationLevel,
   ) {}
 
   /**
@@ -21,11 +21,11 @@ export class TransactionManager implements ITransactionManager {
    * @param isolationLevel The isolation level for the transaction (optional).
    */
   public async beginTransaction(
-    isolationLevel?: Db2IsolationLevel
+    isolationLevel?: Db2IsolationLevel,
   ): Promise<void> {
     if (this.transactionActive) {
       this.logger.warn(
-        "A transaction is already active. Nested transactions are not supported."
+        'A transaction is already active. Nested transactions are not supported.',
       );
       return;
     }
@@ -41,22 +41,22 @@ export class TransactionManager implements ITransactionManager {
       if (this.isolationLevel) {
         // Set the transaction isolation level in DB2
         await this.client.query(
-          `SET TRANSACTION ISOLATION LEVEL ${this.isolationLevel}`
+          `SET TRANSACTION ISOLATION LEVEL ${this.isolationLevel}`,
         );
         this.logger.log(
-          `Transaction isolation level set to ${this.isolationLevel}.`
+          `Transaction isolation level set to ${this.isolationLevel}.`,
         );
       }
 
       // Begin the actual transaction
-      await this.client.query("BEGIN TRANSACTION");
+      await this.client.query('BEGIN TRANSACTION');
       this.transactionActive = true;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction started in ${duration}ms.`);
     } catch (error) {
-      this.logger.error("Failed to start transaction.", error);
+      this.logger.error('Failed to start transaction.', error);
       this.transactionActive = false; // Reset the transaction state
-      throw new Db2Error("Transaction start error");
+      throw new Db2Error('Transaction start error');
     }
   }
 
@@ -66,19 +66,19 @@ export class TransactionManager implements ITransactionManager {
    */
   public async commitTransaction(): Promise<void> {
     if (!this.transactionActive) {
-      this.logger.warn("No active transaction to commit.");
-      throw new Db2Error("No active transaction to commit.");
+      this.logger.warn('No active transaction to commit.');
+      throw new Db2Error('No active transaction to commit.');
     }
 
     try {
       const startTime = Date.now();
-      await this.client.query("COMMIT");
+      await this.client.query('COMMIT');
       this.transactionActive = false;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction committed in ${duration}ms.`);
     } catch (error) {
-      this.logger.error("Failed to commit transaction.", error);
-      throw new Db2Error("Transaction commit error");
+      this.logger.error('Failed to commit transaction.', error);
+      throw new Db2Error('Transaction commit error');
     }
   }
 
@@ -88,19 +88,19 @@ export class TransactionManager implements ITransactionManager {
    */
   public async rollbackTransaction(): Promise<void> {
     if (!this.transactionActive) {
-      this.logger.warn("No active transaction to rollback.");
-      throw new Db2Error("No active transaction to rollback.");
+      this.logger.warn('No active transaction to rollback.');
+      throw new Db2Error('No active transaction to rollback.');
     }
 
     try {
       const startTime = Date.now();
-      await this.client.query("ROLLBACK");
+      await this.client.query('ROLLBACK');
       this.transactionActive = false;
       const duration = Date.now() - startTime;
       this.logger.log(`Transaction rolled back in ${duration}ms.`);
     } catch (error) {
-      this.logger.error("Failed to rollback transaction.", error);
-      throw new Db2Error("Transaction rollback error");
+      this.logger.error('Failed to rollback transaction.', error);
+      throw new Db2Error('Transaction rollback error');
     }
   }
 
@@ -112,10 +112,10 @@ export class TransactionManager implements ITransactionManager {
   public setIsolationLevel(level: Db2IsolationLevel): void {
     if (this.transactionActive) {
       this.logger.warn(
-        "Cannot change isolation level during an active transaction."
+        'Cannot change isolation level during an active transaction.',
       );
       throw new Db2Error(
-        "Cannot change isolation level during an active transaction."
+        'Cannot change isolation level during an active transaction.',
       );
     }
 
@@ -139,8 +139,8 @@ export class TransactionManager implements ITransactionManager {
    */
   public async retryOperation<T>(
     operation: () => Promise<T>,
-    attempts: number = 3,
-    delay: number = 1000
+    attempts = 3,
+    delay = 1000,
   ): Promise<T> {
     for (let attempt = 0; attempt < attempts; attempt++) {
       try {
@@ -148,13 +148,13 @@ export class TransactionManager implements ITransactionManager {
       } catch (error) {
         this.logger.error(
           `Attempt ${attempt + 1} failed. Retrying in ${delay}ms...`,
-          error
+          error,
         );
         if (attempt < attempts - 1) {
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
-          this.logger.error("All retry attempts failed.", error);
-          throw new Db2Error("Operation failed after multiple retries.");
+          this.logger.error('All retry attempts failed.', error);
+          throw new Db2Error('Operation failed after multiple retries.');
         }
       }
     }
@@ -167,16 +167,16 @@ export class TransactionManager implements ITransactionManager {
    */
   public async withTimeout<T>(
     operation: () => Promise<T>,
-    timeout: number
+    timeout: number,
   ): Promise<T> {
     let timeoutHandle: NodeJS.Timeout;
 
     const timeoutPromise = new Promise<never>(
       (_, reject) =>
         (timeoutHandle = setTimeout(
-          () => reject(new Db2Error("Transaction operation timed out")),
-          timeout
-        ))
+          () => reject(new Db2Error('Transaction operation timed out')),
+          timeout,
+        )),
     );
 
     try {

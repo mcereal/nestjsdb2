@@ -1,7 +1,5 @@
-// src/utils/metadata.util.ts
-
-import "reflect-metadata";
-import { EntityMetadataStorage, EntityMetadata } from "../metadata";
+import 'reflect-metadata';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 /**
  * Utility class for retrieving metadata.
@@ -9,9 +7,9 @@ import { EntityMetadataStorage, EntityMetadata } from "../metadata";
 export class MetadataUtil {
   /**
    * Retrieves all registered entity classes.
-   * @returns Array of entity classes (constructors).
+   * @returns Array of entity class constructors.
    */
-  static getAllEntities(): Function[] {
+  static getAllEntities(): (new (...args: any[]) => any)[] {
     return EntityMetadataStorage.getEntities();
   }
 
@@ -20,7 +18,9 @@ export class MetadataUtil {
    * @param target - The constructor of the entity class.
    * @returns EntityMetadata
    */
-  static getEntityMetadata(target: Function): EntityMetadata {
+  static getEntityMetadata(
+    target: new (...args: any[]) => any,
+  ): EntityMetadata {
     return EntityMetadataStorage.getEntityMetadata(target);
   }
 }

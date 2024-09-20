@@ -1,8 +1,8 @@
 // src/decorators/index.decorator.ts
 
-import "reflect-metadata";
-import { IndexMetadata } from "../metadata/entity-metadata.storage";
-import { INDEXED_COLUMNS_METADATA_KEY } from "../types";
+import 'reflect-metadata';
+import { IndexMetadata } from '../metadata/entity-metadata.storage';
+import { INDEXED_COLUMNS_METADATA_KEY } from '../types';
 
 /**
  * @Index decorator to mark a property as indexed.
@@ -10,7 +10,10 @@ import { INDEXED_COLUMNS_METADATA_KEY } from "../types";
  * @returns PropertyDecorator
  */
 export function Index(): PropertyDecorator {
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing index metadata or initialize if none exists
@@ -19,7 +22,7 @@ export function Index(): PropertyDecorator {
 
     // Check if the property is already marked as an index to avoid duplicates
     const isAlreadyIndexed = indexColumns.some(
-      (index) => index.propertyKey === propertyKey
+      (index) => index.propertyKey === propertyKey,
     );
 
     if (!isAlreadyIndexed) {
@@ -30,7 +33,7 @@ export function Index(): PropertyDecorator {
       Reflect.defineMetadata(
         INDEXED_COLUMNS_METADATA_KEY,
         indexColumns,
-        constructor
+        constructor,
       );
     }
   };

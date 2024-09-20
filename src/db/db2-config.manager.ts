@@ -2,7 +2,7 @@ import {
   IDb2ConfigOptions,
   Db2RetryOptions,
   Db2LoggingOptions,
-} from "../interfaces";
+} from '../interfaces';
 
 export class Db2ConfigManager {
   private config: IDb2ConfigOptions;
@@ -28,7 +28,7 @@ export class Db2ConfigManager {
       fetchSize: config.fetchSize ?? 100, // Default to 100 rows
       queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
       prefetchSize: config.prefetchSize ?? 10, // Default to 10 rows
-      characterEncoding: config.characterEncoding ?? "UTF-8", // Default to UTF-8
+      characterEncoding: config.characterEncoding ?? 'UTF-8', // Default to UTF-8
     };
   }
 
@@ -39,7 +39,7 @@ export class Db2ConfigManager {
     return {
       maxReconnectAttempts: retry.maxReconnectAttempts ?? 3, // Default to 3 attempts
       reconnectInterval: retry.reconnectInterval ?? 5000, // Default to 5 seconds
-      retryPolicy: retry.retryPolicy ?? "simple",
+      retryPolicy: retry.retryPolicy ?? 'simple',
       retryAttempts: retry.retryAttempts ?? 3,
       retryInterval: retry.retryInterval ?? 1000, // Default retry interval
     };
@@ -49,7 +49,7 @@ export class Db2ConfigManager {
    * Applies default values to the logging options if missing.
    */
   private applyLoggingDefaults(
-    logging: Db2LoggingOptions = {}
+    logging: Db2LoggingOptions = {},
   ): Db2LoggingOptions {
     return {
       logQueries: logging.logQueries ?? false, // Default to false

@@ -1,15 +1,13 @@
-// src/decorators/cache-result.decorator.ts
+import { Cache } from 'cache-manager';
+import { Logger } from '@nestjs/common';
 
-import { Cache } from "cache-manager";
-import { Logger } from "@nestjs/common";
-
-export const CacheResult = (ttl: number = 60): MethodDecorator => {
-  const logger = new Logger("CacheResultDecorator");
+export const CacheResult = (ttl = 60): MethodDecorator => {
+  const logger = new Logger('CacheResultDecorator');
 
   return (
-    _target: Object, // Not being used, so we can ignore it
+    _target: unknown, // Changed to `unknown` as it is not being used
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) => {
     const originalMethod = descriptor.value;
 
@@ -20,7 +18,7 @@ export const CacheResult = (ttl: number = 60): MethodDecorator => {
       // Check if cache is available
       if (!cache) {
         logger.warn(
-          `Cache manager not available for ${propertyKey.toString()}. Proceeding without caching.`
+          `Cache manager not available for ${propertyKey.toString()}. Proceeding without caching.`,
         );
         return originalMethod.apply(this, args);
       }
@@ -48,7 +46,7 @@ export const CacheResult = (ttl: number = 60): MethodDecorator => {
         logger.error(
           `Cache operation failed for ${propertyKey.toString()}: ${
             error.message
-          }`
+          }`,
         );
         // Fallback: execute the method without caching
         return originalMethod.apply(this, args);

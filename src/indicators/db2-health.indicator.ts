@@ -1,9 +1,9 @@
 // src/indicators/db2-health.indicator.ts
 
-import { Injectable, Logger } from "@nestjs/common";
-import { HealthIndicatorResult, HealthCheckError } from "@nestjs/terminus";
-import { Db2Service } from "../services/db2.service";
-import { Db2ConnectionState } from "../enums";
+import { Injectable, Logger } from '@nestjs/common';
+import { HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import { Db2Service } from '../services/db2.service';
+import { Db2ConnectionState } from '../enums';
 
 /**
  * @class Db2HealthIndicator
@@ -22,19 +22,19 @@ export class Db2HealthIndicator {
    * @returns A promise that resolves to a HealthIndicatorResult indicating the health status.
    * @throws HealthCheckError if the health check fails.
    */
-  async checkHealth(key: string = "db2"): Promise<HealthIndicatorResult> {
-    this.logger.log("Performing Db2 health check...");
+  async checkHealth(key = 'db2'): Promise<HealthIndicatorResult> {
+    this.logger.log('Performing Db2 health check...');
 
     try {
       // Check the current connection state
       const { connectionState } = this.db2Service.getState();
       if (connectionState !== Db2ConnectionState.CONNECTED) {
         this.logger.warn(
-          `Db2 connection state is not CONNECTED: ${connectionState}`
+          `Db2 connection state is not CONNECTED: ${connectionState}`,
         );
         throw new HealthCheckError(
-          "Db2 connection state error",
-          this.getStatus(key, false, { connectionState })
+          'Db2 connection state error',
+          this.getStatus(key, false, { connectionState }),
         );
       }
 
@@ -51,20 +51,20 @@ export class Db2HealthIndicator {
       });
 
       if (!isHealthy) {
-        this.logger.warn("Db2 health check failed.", healthStatus);
-        throw new HealthCheckError("Db2 health check failed", healthStatus);
+        this.logger.warn('Db2 health check failed.', healthStatus);
+        throw new HealthCheckError('Db2 health check failed', healthStatus);
       }
 
-      this.logger.log("Db2 is healthy.", healthStatus);
+      this.logger.log('Db2 is healthy.', healthStatus);
       return healthStatus;
     } catch (error) {
       const healthStatus = this.getStatus(key, false, {
         error: error.message,
       });
-      this.logger.error("Db2 health check failed", error.message);
+      this.logger.error('Db2 health check failed', error.message);
       throw new HealthCheckError(
         `Db2 health check failed: ${error.message}`,
-        healthStatus
+        healthStatus,
       );
     }
   }
@@ -75,11 +75,11 @@ export class Db2HealthIndicator {
   private getStatus(
     key: string,
     isHealthy: boolean,
-    details: Record<string, any>
+    details: Record<string, any>,
   ): HealthIndicatorResult {
     return {
       [key]: {
-        status: isHealthy ? "up" : "down",
+        status: isHealthy ? 'up' : 'down',
         ...details,
       },
     };

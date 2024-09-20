@@ -1,19 +1,22 @@
 // src/decorators/default.decorator.ts
 
-import "reflect-metadata";
-import { DefaultMetadata } from "../types";
+import 'reflect-metadata';
+import { DefaultMetadata } from '../types';
 
 export function Default(value: any): PropertyDecorator {
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing default values metadata or initialize if none exists
     const defaultValues: DefaultMetadata[] =
-      Reflect.getMetadata("defaultValues", constructor) || [];
+      Reflect.getMetadata('defaultValues', constructor) || [];
 
     // Add or update the default value for the specific propertyKey
     const existingIndex = defaultValues.findIndex(
-      (entry) => entry.propertyKey === propertyKey
+      (entry) => entry.propertyKey === propertyKey,
     );
 
     if (existingIndex !== -1) {
@@ -25,6 +28,6 @@ export function Default(value: any): PropertyDecorator {
     }
 
     // Define or update metadata with the new default values
-    Reflect.defineMetadata("defaultValues", defaultValues, constructor);
+    Reflect.defineMetadata('defaultValues', defaultValues, constructor);
   };
 }

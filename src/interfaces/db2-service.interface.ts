@@ -1,6 +1,6 @@
-import { Db2QueryBuilder } from "../db";
-import { Db2ClientState } from "./db2-client.interface";
-import { Connection } from "ibm_db";
+import { Db2QueryBuilder } from '../db';
+import { Db2ClientState } from './db2-client.interface';
+import { Connection } from 'ibm_db';
 
 export interface Db2ServiceInterface {
   // Lifecycle hooks
@@ -23,13 +23,13 @@ export interface Db2ServiceInterface {
   batchInsert(
     tableName: string,
     columns: string[],
-    valuesArray: any[][]
+    valuesArray: any[][],
   ): Promise<void>;
   batchUpdate(
     tableName: string,
     columns: string[],
     valuesArray: any[][],
-    whereClause: string
+    whereClause: string,
   ): Promise<void>;
 
   // Transaction management methods

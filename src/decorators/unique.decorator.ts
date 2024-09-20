@@ -1,16 +1,19 @@
 // decorators/unique.decorator.ts
 
-import "reflect-metadata";
-import { UniqueColumnMetadata } from "../metadata";
+import 'reflect-metadata';
+import { UniqueColumnMetadata } from '../metadata';
 import {
   UniqueColumnMetadataOptions,
   UNIQUE_COLUMNS_METADATA_KEY,
-} from "../types";
+} from '../types';
 
 export function Unique(
-  options: UniqueColumnMetadataOptions
+  options: UniqueColumnMetadataOptions,
 ): PropertyDecorator {
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing unique columns metadata or initialize if none exists
@@ -19,7 +22,7 @@ export function Unique(
 
     // Check if the property key is already marked as unique
     const existingColumn = uniqueColumns.find(
-      (column) => column.propertyKey === propertyKey
+      (column) => column.propertyKey === propertyKey,
     );
 
     if (!existingColumn) {
@@ -27,13 +30,13 @@ export function Unique(
       uniqueColumns.push({
         propertyKey,
         uniqueKeyOptions: {
-          name: options.name || "",
+          name: options.name || '',
           columns: options.columns || [],
         },
       });
 
       // Define or update metadata with the new unique columns
-      Reflect.defineMetadata("uniqueColumns", uniqueColumns, constructor);
+      Reflect.defineMetadata('uniqueColumns', uniqueColumns, constructor);
     }
   };
 }

@@ -10,4 +10,4 @@
  * @exports Db2Error
  */
 
-export * from "./db2.error";
+export * from './db2.error';

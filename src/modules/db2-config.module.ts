@@ -1,8 +1,8 @@
 // src/modules/db2-config.module.ts
 
-import { Module, DynamicModule, Global } from "@nestjs/common";
-import { I_DB2_CONFIG } from "../constants/injection-token.constant";
-import { IDb2ConfigOptions } from "../interfaces";
+import { Module, DynamicModule, Global } from '@nestjs/common';
+import { I_DB2_CONFIG } from '../constants/injection-token.constant';
+import { IDb2ConfigOptions } from '../interfaces';
 
 @Global()
 @Module({})

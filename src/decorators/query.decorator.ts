@@ -1,18 +1,18 @@
 // src/decorators/db2-query.decorator.ts
 
-import { Db2Service } from "src/services/db2.service";
-import { Logger } from "@nestjs/common";
+import { Db2Service } from 'src/services/db2.service';
+import { Logger } from '@nestjs/common';
 
 export const Db2Query = (
   query: string,
-  executeQuery: boolean = true
+  executeQuery = true,
 ): MethodDecorator => {
-  const logger = new Logger("Db2QueryDecorator");
+  const logger = new Logger('Db2QueryDecorator');
 
   return (
-    _target: Object,
+    _target: new (...args: any[]) => any,
     _propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) => {
     const originalMethod = descriptor.value;
 
@@ -20,8 +20,8 @@ export const Db2Query = (
       const db2Service = (this as any).db2Service as Db2Service;
 
       if (!db2Service) {
-        logger.error("Db2Service is not available on the instance");
-        throw new Error("Db2Service is not available");
+        logger.error('Db2Service is not available on the instance');
+        throw new Error('Db2Service is not available');
       }
 
       let queryResult;

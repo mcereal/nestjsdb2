@@ -1,2 +1,2 @@
-export * from "./db2.service";
-export * from "./migration.service";
+export * from './db2.service';
+export * from './migration.service';

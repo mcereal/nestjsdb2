@@ -1,5 +1,5 @@
-import { Db2ConnectionState } from "../enums";
-import { Connection } from "ibm_db";
+import { Db2ConnectionState } from '../enums';
+import { Connection } from 'ibm_db';
 
 export interface IDb2Client {
   // Lifecycle hooks
@@ -24,13 +24,13 @@ export interface IDb2Client {
   batchInsert(
     tableName: string,
     columns: string[],
-    valuesArray: any[][]
+    valuesArray: any[][],
   ): Promise<void>;
   batchUpdate(
     tableName: string,
     columns: string[],
     valuesArray: any[][],
-    whereClause: string
+    whereClause: string,
   ): Promise<void>;
 
   // Connection state management

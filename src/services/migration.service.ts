@@ -1,16 +1,16 @@
 // migration/migration.service.ts
 
-import { Logger } from "@nestjs/common";
-import { promises as fs } from "fs";
-import { join } from "path";
+import { Logger } from '@nestjs/common';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import {
   IDb2ConfigOptions,
   Db2MigrationOptions,
   IDb2MigrationService,
   IDb2Client,
-} from "../interfaces";
-import { handleDb2Error } from "../errors";
-import { EntityMetadataStorage, EntityMetadata } from "../metadata";
+} from '../interfaces';
+import { handleDb2Error } from '../errors';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 export class Db2MigrationService implements IDb2MigrationService {
   private readonly logger = new Logger(Db2MigrationService.name);
@@ -19,7 +19,7 @@ export class Db2MigrationService implements IDb2MigrationService {
 
   public constructor(
     private db2Client: IDb2Client,
-    migrationConfig: Db2MigrationOptions
+    migrationConfig: Db2MigrationOptions,
   ) {
     this.migrationConfig = migrationConfig;
   }
@@ -30,14 +30,14 @@ export class Db2MigrationService implements IDb2MigrationService {
   public async runMigrations(): Promise<void> {
     if (!this.migrationConfig.enabled) {
       this.logger.warn(
-        "Migrations are disabled. Skipping migration execution."
+        'Migrations are disabled. Skipping migration execution.',
       );
       return;
     }
 
     if (!this.migrationConfig.runOnStart) {
       this.logger.log(
-        "Migrations are not configured to run on start. Skipping migration execution."
+        'Migrations are not configured to run on start. Skipping migration execution.',
       );
       return;
     }
@@ -48,12 +48,12 @@ export class Db2MigrationService implements IDb2MigrationService {
     } catch (error) {
       handleDb2Error(
         error,
-        "Migration process",
+        'Migration process',
         {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
       throw error;
     }
@@ -79,16 +79,16 @@ export class Db2MigrationService implements IDb2MigrationService {
         // Execute or log the SQL script as required
         if (this.migrationConfig.dryRun) {
           this.logger.log(
-            `Dry run enabled. Migration script not executed: ${createTableSQL}`
+            `Dry run enabled. Migration script not executed: ${createTableSQL}`,
           );
         } else {
           try {
             this.logger.log(
-              `Executing migration script for table: ${metadata.tableName}`
+              `Executing migration script for table: ${metadata.tableName}`,
             );
             await this.db2Client.query(createTableSQL);
             this.logger.log(
-              `Migration for table ${metadata.tableName} applied successfully.`
+              `Migration for table ${metadata.tableName} applied successfully.`,
             );
           } catch (error) {
             handleDb2Error(
@@ -98,16 +98,16 @@ export class Db2MigrationService implements IDb2MigrationService {
                 host: this.config.host,
                 database: this.config.database,
               },
-              this.logger
+              this.logger,
             );
             if (this.migrationConfig.skipOnFail) {
               this.logger.warn(
-                `Skipping remaining migrations due to error in table: ${metadata.tableName}`
+                `Skipping remaining migrations due to error in table: ${metadata.tableName}`,
               );
               break;
             } else if (this.migrationConfig.ignoreErrors) {
               this.logger.warn(
-                `Ignoring error in migration for table: ${metadata.tableName} and continuing.`
+                `Ignoring error in migration for table: ${metadata.tableName} and continuing.`,
               );
               continue;
             } else {
@@ -119,12 +119,12 @@ export class Db2MigrationService implements IDb2MigrationService {
     } catch (error) {
       handleDb2Error(
         error,
-        "Migration process",
+        'Migration process',
         {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
       throw error;
     }
@@ -139,28 +139,28 @@ export class Db2MigrationService implements IDb2MigrationService {
     // Define columns
     const columnDefinitions = metadata.columns.map((column) => {
       let columnDef = `${String(
-        column.propertyKey
+        column.propertyKey,
       )} ${column.type.toUpperCase()}`;
       if (column.length) columnDef += `(${column.length})`;
       if (column.nullable === false) columnDef += ` NOT NULL`;
       if (
         metadata.defaultValues.some(
-          (def) => def.propertyKey === column.propertyKey
+          (def) => def.propertyKey === column.propertyKey,
         )
       ) {
         const defaultValue = metadata.defaultValues.find(
-          (def) => def.propertyKey === column.propertyKey
+          (def) => def.propertyKey === column.propertyKey,
         ).value;
         columnDef += ` DEFAULT ${defaultValue}`;
       }
       return columnDef;
     });
 
-    sql += columnDefinitions.join(", ");
+    sql += columnDefinitions.join(', ');
 
     // Define primary keys
     if (metadata.primaryKeys.length) {
-      sql += `, PRIMARY KEY (${metadata.primaryKeys.join(", ")})`;
+      sql += `, PRIMARY KEY (${metadata.primaryKeys.join(', ')})`;
     }
 
     // Define unique constraints
@@ -189,13 +189,13 @@ export class Db2MigrationService implements IDb2MigrationService {
       });
     }
 
-    sql += ");";
+    sql += ');';
 
     // Define indexes
     if (metadata.indexedColumns.length) {
       metadata.indexedColumns.forEach((indexedColumn) => {
         sql += ` CREATE INDEX idx_${metadata.tableName}_${String(
-          indexedColumn
+          indexedColumn,
         )} ON ${metadata.tableName} (${String(indexedColumn)});`;
       });
     }
@@ -215,17 +215,17 @@ export class Db2MigrationService implements IDb2MigrationService {
     } catch (error) {
       handleDb2Error(
         error,
-        "Loading migration files",
+        'Loading migration files',
         {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
 
       if (this.migrationConfig.ignoreMissing) {
         this.logger.warn(
-          "Ignoring missing migration files due to configuration."
+          'Ignoring missing migration files due to configuration.',
         );
         return [];
       } else {
@@ -247,11 +247,11 @@ export class Db2MigrationService implements IDb2MigrationService {
       return;
     }
 
-    const script = await fs.readFile(file, "utf-8");
+    const script = await fs.readFile(file, 'utf-8');
 
     if (this.migrationConfig.dryRun) {
       this.logger.log(
-        `Dry run enabled. Migration script not executed: ${file}`
+        `Dry run enabled. Migration script not executed: ${file}`,
       );
       return;
     }
@@ -279,16 +279,16 @@ export class Db2MigrationService implements IDb2MigrationService {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
 
       if (this.migrationConfig.skipOnFail) {
         this.logger.warn(
-          `Skipping remaining migrations due to error in: ${file}`
+          `Skipping remaining migrations due to error in: ${file}`,
         );
       } else if (this.migrationConfig.ignoreErrors) {
         this.logger.warn(
-          `Ignoring error in migration: ${file} and continuing.`
+          `Ignoring error in migration: ${file} and continuing.`,
         );
       } else {
         throw error;
@@ -312,17 +312,17 @@ export class Db2MigrationService implements IDb2MigrationService {
     } catch (error) {
       handleDb2Error(
         error,
-        "Checking if migration is executed",
+        'Checking if migration is executed',
         {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
 
       if (this.migrationConfig.ignoreErrors) {
         this.logger.warn(
-          `Ignoring error and continuing. Error: ${error.message}`
+          `Ignoring error and continuing. Error: ${error.message}`,
         );
         return false;
       }
@@ -346,17 +346,17 @@ export class Db2MigrationService implements IDb2MigrationService {
     } catch (error) {
       handleDb2Error(
         error,
-        "Marking migration as executed",
+        'Marking migration as executed',
         {
           host: this.config.host,
           database: this.config.database,
         },
-        this.logger
+        this.logger,
       );
 
       if (this.migrationConfig.ignoreErrors) {
         this.logger.warn(
-          `Ignoring error and continuing. Error: ${error.message}`
+          `Ignoring error and continuing. Error: ${error.message}`,
         );
         return;
       }

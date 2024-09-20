@@ -5,7 +5,7 @@ import {
   Db2LdapAuthOptions,
   Db2PasswordAuthOptions,
   IDb2ConfigOptions,
-} from "../interfaces";
+} from '../interfaces';
 
 export function buildConnectionString(config: IDb2ConfigOptions): string {
   const {
@@ -45,7 +45,7 @@ export function buildConnectionString(config: IDb2ConfigOptions): string {
   }
 
   if (useTls) {
-    connStr += "SECURITY=SSL;";
+    connStr += 'SECURITY=SSL;';
     if (sslCertificatePath) {
       connStr += `SSLServerCertificate=${sslCertificatePath};`;
     }
@@ -56,13 +56,13 @@ export function buildConnectionString(config: IDb2ConfigOptions): string {
 
 const buildAuthSection = (authType: string, authConfig: any): string => {
   switch (authType) {
-    case "password":
+    case 'password':
       return buildPasswordAuth(authConfig);
-    case "kerberos":
+    case 'kerberos':
       return buildKerberosAuth(authConfig);
-    case "jwt":
+    case 'jwt':
       return buildJwtAuth(authConfig);
-    case "ldap":
+    case 'ldap':
       return buildLdapAuth(authConfig);
     default:
       throw new Error(`Unsupported authentication type: ${authType}`);
@@ -75,7 +75,7 @@ const buildPasswordAuth = ({
 }: Db2PasswordAuthOptions): string => {
   if (!username || !password) {
     throw new Error(
-      "Username and password are required for password authentication."
+      'Username and password are required for password authentication.',
     );
   }
   return `UID=${username};PWD=${password};`;
@@ -86,7 +86,7 @@ const buildKerberosAuth = ({
 }: Db2KerberosAuthOptions): string => {
   if (!krbServiceName) {
     throw new Error(
-      "Kerberos service name (krbServiceName) is required for Kerberos authentication."
+      'Kerberos service name (krbServiceName) is required for Kerberos authentication.',
     );
   }
   return `SecurityMechanism=11;ServiceName=${krbServiceName};`;
@@ -97,7 +97,7 @@ const buildKerberosAuth = ({
  */
 const buildJwtAuth = ({ jwtToken }: Db2JwtAuthOptions): string => {
   if (!jwtToken) {
-    throw new Error("JWT token is required for JWT authentication.");
+    throw new Error('JWT token is required for JWT authentication.');
   }
   return `AUTHENTICATION=jwt;Token=${jwtToken};`;
 };
@@ -108,7 +108,7 @@ const buildJwtAuth = ({ jwtToken }: Db2JwtAuthOptions): string => {
 const buildLdapAuth = ({ username, password }: Db2LdapAuthOptions): string => {
   if (!username || !password) {
     throw new Error(
-      "Username and password are required for LDAP authentication."
+      'Username and password are required for LDAP authentication.',
     );
   }
   return `UID=${username};PWD=${password};AUTHENTICATION=ldap;`;

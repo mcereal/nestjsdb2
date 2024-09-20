@@ -1,11 +1,11 @@
 // src/config/db2.config.ts
 
-import { registerAs } from "@nestjs/config";
-import { IDb2ConfigOptions } from "../interfaces";
-import { Db2AuthType } from "../enums";
+import { registerAs } from '@nestjs/config';
+import { IDb2ConfigOptions } from '../interfaces';
+import { Db2AuthType } from '../enums';
 
 export default registerAs(
-  "db2",
+  'db2',
   (): IDb2ConfigOptions => ({
     host: process.env.DB2_HOST,
     port: parseInt(process.env.DB2_PORT, 10),
@@ -15,7 +15,7 @@ export default registerAs(
       username: process.env.DB2_USERNAME,
       password: process.env.DB2_PASSWORD,
     },
-    useTls: process.env.DB2_USE_TLS === "true",
+    useTls: process.env.DB2_USE_TLS === 'true',
     sslCertificatePath: process.env.DB2_SSL_CERT_PATH,
     retry: {
       maxReconnectAttempts:
@@ -24,13 +24,13 @@ export default registerAs(
         parseInt(process.env.DB2_RECONNECT_INTERVAL, 10) || 5000,
     },
     cache: {
-      enabled: process.env.DB2_CACHE_ENABLED === "true",
-      store: (process.env.DB2_CACHE_STORE as "memory" | "redis") || "memory",
+      enabled: process.env.DB2_CACHE_ENABLED === 'true',
+      store: (process.env.DB2_CACHE_STORE as 'memory' | 'redis') || 'memory',
     },
     migration: {
-      enabled: process.env.DB2_MIGRATION_ENABLED === "true",
-      migrationDir: "",
-      fileExtension: "",
+      enabled: process.env.DB2_MIGRATION_ENABLED === 'true',
+      migrationDir: '',
+      fileExtension: '',
       runOnStart: false,
       logQueries: false,
       logErrors: false,
@@ -42,9 +42,9 @@ export default registerAs(
       markAsExecuted: false,
     },
     logging: {
-      logQueries: process.env.DB2_LOG_QUERIES === "true",
-      logErrors: process.env.DB2_LOG_ERRORS === "true",
-      profileSql: process.env.DB2_PROFILE_SQL === "true",
+      logQueries: process.env.DB2_LOG_QUERIES === 'true',
+      logErrors: process.env.DB2_LOG_ERRORS === 'true',
+      profileSql: process.env.DB2_PROFILE_SQL === 'true',
     },
-  })
+  }),
 );

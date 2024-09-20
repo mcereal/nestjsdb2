@@ -1,5 +1,3 @@
-// src/types/one-to-one.types.ts
-
 /**
  * Interface defining the options for the OneToOne decorator.
  */
@@ -7,7 +5,7 @@ export interface OneToOneOptions {
   /**
    * The constructor of the target entity class.
    */
-  target: Function;
+  target: new (...args: any[]) => any;
 
   /**
    * The property key of the target entity class.

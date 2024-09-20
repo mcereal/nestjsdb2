@@ -1,5 +1,5 @@
-import { Logger } from "@nestjs/common";
-import * as _ from "lodash";
+import { Logger } from '@nestjs/common';
+import * as _ from 'lodash';
 
 /**
  * @function Db2Audit
@@ -24,18 +24,18 @@ import * as _ from "lodash";
  * }
  */
 export function Db2Audit(ignoreProperties: string[] = []): MethodDecorator {
-  const logger = new Logger("Db2AuditDecorator");
+  const logger = new Logger('Db2AuditDecorator');
 
   return function (
-    _target: Object,
+    _target: unknown, // Changed to `unknown` as the type of the target
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
       try {
-        const entity = args[0]; // Assume the first argument is the entity
+        const entity: object = args[0]; // Assume the first argument is the entity and changed type to `object`
         const beforeChange = _.cloneDeep(entity); // Deep copy for comparison
 
         const result = await originalMethod.apply(this, args);
@@ -54,7 +54,7 @@ export function Db2Audit(ignoreProperties: string[] = []): MethodDecorator {
             }
             return result;
           },
-          {} as Record<string, any>
+          {} as Record<string, any>,
         );
 
         // Log the differences
@@ -69,7 +69,7 @@ export function Db2Audit(ignoreProperties: string[] = []): MethodDecorator {
         return result;
       } catch (error) {
         logger.error(
-          `Error in method ${String(propertyKey)}: ${error.message}`
+          `Error in method ${String(propertyKey)}: ${error.message}`,
         );
         throw error; // Rethrow the error after logging it
       }

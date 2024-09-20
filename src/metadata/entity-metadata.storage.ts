@@ -1,6 +1,6 @@
 // src/metadata/entity-metadata.storage.ts
 
-import "reflect-metadata";
+import 'reflect-metadata';
 
 import {
   TABLE_NAME_METADATA_KEY,
@@ -16,15 +16,15 @@ import {
   DEFAULT_VALUES_METADATA_KEY,
   CHECK_CONSTRAINTS_METADATA_KEY,
   COMPOSITE_KEYS_METADATA_KEY,
-} from "../types";
-import { primeKeyOptions } from "src/types/prime-key.types";
+} from '../types';
+import { primeKeyOptions } from 'src/types/prime-key.types';
 import {
   ManyToManyOptions,
   ManyToOneOptions,
   OneToManyOptions,
   OneToOneOptions,
   UniqueColumnMetadataOptions,
-} from "../types";
+} from '../types';
 
 export interface EntityMetadata {
   tableName: string;
@@ -65,12 +65,12 @@ export interface ForeignKeyMetadata {
 
 export interface ForeignKeyOptions {
   reference: string;
-  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT";
+  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
 interface RelationMetadata {
   propertyKey: string | symbol;
-  target: Function;
+  target: new (...args: any[]) => any;
   cascade?: boolean;
   joinTable?: string;
 }
@@ -137,13 +137,13 @@ export interface UniqueColumnMetadata {
 
 export class EntityMetadataStorage {
   // Unique metadata key used in the decorator
-  private static ENTITIES_METADATA_KEY = Symbol("entities");
+  private static ENTITIES_METADATA_KEY = Symbol('entities');
 
   /**
    * Retrieves all registered entity classes.
-   * @returns Array of entity classes (constructors).
+   * @returns Array of entity class constructors.
    */
-  static getEntities(): Function[] {
+  static getEntities(): (new (...args: any[]) => any)[] {
     return Reflect.getMetadata(this.ENTITIES_METADATA_KEY, globalThis) || [];
   }
 
@@ -152,7 +152,9 @@ export class EntityMetadataStorage {
    * @param target - The constructor of the entity class.
    * @returns EntityMetadata
    */
-  static getEntityMetadata(target: Function): EntityMetadata {
+  static getEntityMetadata(
+    target: new (...args: any[]) => any,
+  ): EntityMetadata {
     const tableName = Reflect.getMetadata(TABLE_NAME_METADATA_KEY, target);
     const columns: ColumnMetadata[] =
       Reflect.getMetadata(COLUMNS_METADATA_KEY, target) || [];
@@ -178,8 +180,6 @@ export class EntityMetadataStorage {
       Reflect.getMetadata(CHECK_CONSTRAINTS_METADATA_KEY, target) || [];
     const compositeKeys: string[] =
       Reflect.getMetadata(COMPOSITE_KEYS_METADATA_KEY, target) || [];
-    const entityMetadata: EntityMetadata[] =
-      Reflect.getMetadata(this.ENTITIES_METADATA_KEY, globalThis) || [];
     const uniqueColumnMetadada: UniqueColumnMetadata[] =
       Reflect.getMetadata(UNIQUE_COLUMNS_METADATA_KEY, target) || [];
 
@@ -189,7 +189,7 @@ export class EntityMetadataStorage {
       primaryKeys,
       uniqueColumns,
       indexedColumns: indexedColumns.map(
-        (index) => index.propertyKey as string
+        (index) => index.propertyKey as string,
       ),
       foreignKeys,
       oneToOneRelations,

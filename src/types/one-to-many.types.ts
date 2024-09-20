@@ -4,7 +4,7 @@ export interface OneToManyOptions {
   /**
    * The constructor of the target entity class.
    */
-  target: Function;
+  target: new (...args: any[]) => any;
 
   /**
    * The property key of the target entity class.

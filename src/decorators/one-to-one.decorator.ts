@@ -1,18 +1,21 @@
 // decorators/one-to-one.decorator.ts
 
-import "reflect-metadata";
-import { OneToOneMetadata } from "../metadata";
-import { OneToOneOptions, ONE_TO_ONE_RELATIONS_METADATA_KEY } from "../types";
+import 'reflect-metadata';
+import { OneToOneMetadata } from '../metadata';
+import { OneToOneOptions, ONE_TO_ONE_RELATIONS_METADATA_KEY } from '../types';
 
 export function OneToOne(options: OneToOneOptions): PropertyDecorator {
   // Validate the provided options
-  if (typeof options.target !== "function") {
+  if (typeof options.target !== 'function') {
     throw new Error(
-      "OneToOne decorator requires a 'target' option that is a function (constructor of the target entity)."
+      "OneToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing one-to-one relations metadata or initialize if none exists
@@ -21,7 +24,7 @@ export function OneToOne(options: OneToOneOptions): PropertyDecorator {
 
     // Check if the relation already exists to avoid duplicates
     const existingRelation = oneToOneRelations.find(
-      (relation) => relation.oneToOneOptions.propertyKey === propertyKey
+      (relation) => relation.oneToOneOptions.propertyKey === propertyKey,
     );
 
     if (!existingRelation) {
@@ -34,9 +37,9 @@ export function OneToOne(options: OneToOneOptions): PropertyDecorator {
 
       // Define or update metadata with the new one-to-one relations
       Reflect.defineMetadata(
-        "oneToOneRelations",
+        'oneToOneRelations',
         oneToOneRelations,
-        constructor
+        constructor,
       );
     }
   };

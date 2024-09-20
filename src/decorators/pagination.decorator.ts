@@ -1,6 +1,6 @@
 // src/decorators/db2-pagination.decorator.ts
 
-import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 /**
  * @function Db2Pagination
@@ -30,5 +30,5 @@ export const Db2Pagination = createParamDecorator(
     const skip = (page - 1) * limit; // Calculate the number of items to skip
 
     return { skip, limit };
-  }
+  },
 );

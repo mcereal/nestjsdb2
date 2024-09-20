@@ -10,4 +10,4 @@
  * @exports Db2HealthIndicator
  */
 
-export * from "./db2-health.indicator"; // Export the main module
+export * from './db2-health.indicator'; // Export the main module

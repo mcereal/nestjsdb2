@@ -1,8 +1,8 @@
 // src/decorators/column.decorator.ts
 
-import "reflect-metadata";
-import { ColumnMetadata, ColumnOptions } from "../metadata";
-import { COLUMNS_METADATA_KEY } from "../types";
+import 'reflect-metadata';
+import { ColumnMetadata, ColumnOptions } from '../metadata';
+import { COLUMNS_METADATA_KEY } from '../types';
 
 /**
  * @Column decorator to define a database column.
@@ -10,11 +10,14 @@ import { COLUMNS_METADATA_KEY } from "../types";
  * @returns PropertyDecorator
  */
 export function Column(options: ColumnOptions): PropertyDecorator {
-  if (!options.type || typeof options.type !== "string") {
-    throw new Error("Column type must be a non-empty string.");
+  if (!options.type || typeof options.type !== 'string') {
+    throw new Error('Column type must be a non-empty string.');
   }
 
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing columns metadata or initialize if none exists

@@ -15,7 +15,7 @@
  * @exports Db2ConnectionError
  */
 
-import { Logger } from "@nestjs/common";
+import { Logger } from '@nestjs/common';
 
 /**
  * Custom error class for Db2-related errors.
@@ -27,11 +27,11 @@ export class Db2Error extends Error {
 
   constructor(
     message: string,
-    errorCode: string = "DB2_ERROR",
-    metadata?: Record<string, any>
+    errorCode = 'DB2_ERROR',
+    metadata?: Record<string, any>,
   ) {
     super(message);
-    this.name = "Db2Error";
+    this.name = 'Db2Error';
     this.errorCode = errorCode;
     this.metadata = metadata;
     this.timestamp = new Date().toISOString();
@@ -57,8 +57,8 @@ export class Db2Error extends Error {
  */
 export class Db2TimeoutError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_TIMEOUT_ERROR", metadata);
-    this.name = "Db2TimeoutError";
+    super(message, 'DB2_TIMEOUT_ERROR', metadata);
+    this.name = 'Db2TimeoutError';
   }
 }
 
@@ -67,8 +67,8 @@ export class Db2TimeoutError extends Db2Error {
  */
 export class Db2AuthenticationError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_AUTHENTICATION_ERROR", metadata);
-    this.name = "Db2AuthenticationError";
+    super(message, 'DB2_AUTHENTICATION_ERROR', metadata);
+    this.name = 'Db2AuthenticationError';
   }
 }
 
@@ -77,8 +77,8 @@ export class Db2AuthenticationError extends Db2Error {
  */
 export class Db2ConnectionError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_CONNECTION_ERROR", metadata);
-    this.name = "Db2ConnectionError";
+    super(message, 'DB2_CONNECTION_ERROR', metadata);
+    this.name = 'Db2ConnectionError';
   }
 }
 /**
@@ -86,37 +86,37 @@ export class Db2ConnectionError extends Db2Error {
  */
 export class Db2TransactionError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_TRANSACTION_ERROR", metadata);
-    this.name = "Db2TransactionError";
+    super(message, 'DB2_TRANSACTION_ERROR', metadata);
+    this.name = 'Db2TransactionError';
   }
 }
 
 export class Db2QuerySyntaxError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_QUERY_SYNTAX_ERROR", metadata);
-    this.name = "Db2QuerySyntaxError";
+    super(message, 'DB2_QUERY_SYNTAX_ERROR', metadata);
+    this.name = 'Db2QuerySyntaxError';
   }
 }
 
 export class Db2PoolError extends Db2Error {
   constructor(message: string, metadata?: Record<string, any>) {
-    super(message, "DB2_POOL_ERROR", metadata);
-    this.name = "Db2PoolError";
+    super(message, 'DB2_POOL_ERROR', metadata);
+    this.name = 'Db2PoolError';
   }
 }
 
 export function formatDb2Error(
   error: any,
   context: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ): string {
-  const errorCode = error.code || "UNKNOWN_ERROR";
-  const errorMessage = error.message || "An unknown error occurred";
-  const metadataString = metadata ? JSON.stringify(metadata, null, 2) : "";
-  const stackTrace = error.stack ? `\nStack Trace: ${error.stack}` : "";
+  const errorCode = error.code || 'UNKNOWN_ERROR';
+  const errorMessage = error.message || 'An unknown error occurred';
+  const metadataString = metadata ? JSON.stringify(metadata, null, 2) : '';
+  const stackTrace = error.stack ? `\nStack Trace: ${error.stack}` : '';
 
   return `Error in ${context} - Code: ${errorCode}, Message: ${errorMessage}${stackTrace}${
-    metadataString ? `\nMetadata: ${metadataString}` : ""
+    metadataString ? `\nMetadata: ${metadataString}` : ''
   }`;
 }
 
@@ -124,7 +124,7 @@ export function handleDb2Error(
   error: any,
   context: string,
   options: { host: string; database: string },
-  logger: Logger = new Logger("Db2Error")
+  logger: Logger = new Logger('Db2Error'),
 ): void {
   const formattedError = formatDb2Error(error, context, options);
 
@@ -152,7 +152,7 @@ export function handleDb2Error(
       `Unknown error occurred in ${context}`,
       JSON.stringify({
         originalError: formattedError,
-      })
+      }),
     );
   }
 }

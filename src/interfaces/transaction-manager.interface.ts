@@ -1,4 +1,4 @@
-import { Db2IsolationLevel } from "../";
+import { Db2IsolationLevel } from '../';
 
 export interface ITransactionManager {
   /**
@@ -41,7 +41,7 @@ export interface ITransactionManager {
   retryOperation<T>(
     operation: () => Promise<T>,
     attempts?: number,
-    delay?: number
+    delay?: number,
   ): Promise<T>;
 
   /**

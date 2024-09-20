@@ -1,11 +1,11 @@
-import { Db2ConnectionState } from "../enums";
+import { Db2ConnectionState } from '../enums';
 import {
   Db2ClientState,
   IConnectionManager,
   IPoolManager,
-} from "../interfaces";
-import { Connection } from "ibm_db";
-import { Injectable, Logger } from "@nestjs/common";
+} from '../interfaces';
+import { Connection } from 'ibm_db';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class Db2ConnectionManager implements IConnectionManager {
@@ -29,17 +29,17 @@ export class Db2ConnectionManager implements IConnectionManager {
    * Initialize the connection pool.
    */
   public async init(): Promise<void> {
-    this.logger.log("Initializing Db2ConnectionManager...");
+    this.logger.log('Initializing Db2ConnectionManager...');
 
     if (this.poolManager.isPoolInitialized) {
       this.state.poolInitialized = true;
       this.state.connectionState = Db2ConnectionState.CONNECTED;
       this.logger.log(
-        "Connection Manager initialized successfully. Connection pool is ready."
+        'Connection Manager initialized successfully. Connection pool is ready.',
       );
     } else {
-      this.logger.error("DB2 connection pool is not initialized.");
-      throw new Error("DB2 connection pool is not initialized.");
+      this.logger.error('DB2 connection pool is not initialized.');
+      throw new Error('DB2 connection pool is not initialized.');
     }
   }
   /**
@@ -52,28 +52,28 @@ export class Db2ConnectionManager implements IConnectionManager {
       if (
         this.isValidStateTransition(
           this.state.connectionState,
-          newState.connectionState
+          newState.connectionState,
         )
       ) {
         this.state = { ...this.state, ...newState };
         this.logger.log(
-          `Connection state updated to: ${this.state.connectionState}`
+          `Connection state updated to: ${this.state.connectionState}`,
         );
       } else {
         this.logger.warn(
-          `Invalid state transition from ${this.state.connectionState} to ${newState.connectionState}`
+          `Invalid state transition from ${this.state.connectionState} to ${newState.connectionState}`,
         );
       }
     } else {
       this.logger.log(
-        `State is already ${this.state.connectionState}, skipping transition.`
+        `State is already ${this.state.connectionState}, skipping transition.`,
       );
     }
   }
 
   private isValidStateTransition(
     currentState: Db2ConnectionState,
-    newState?: Db2ConnectionState
+    newState?: Db2ConnectionState,
   ): boolean {
     // Define valid state transitions here
     const validTransitions = {
@@ -112,26 +112,26 @@ export class Db2ConnectionManager implements IConnectionManager {
 
   public async getConnection(): Promise<Connection> {
     if (!this.poolManager.isPoolInitialized) {
-      this.logger.error("Connection pool is not initialized.");
-      throw new Error("Connection pool is not initialized.");
+      this.logger.error('Connection pool is not initialized.');
+      throw new Error('Connection pool is not initialized.');
     }
 
     // Only acquire a connection if we're not already connected
     if (this.state.connectionState === Db2ConnectionState.CONNECTED) {
-      this.logger.log("Already connected, returning existing connection.");
+      this.logger.log('Already connected, returning existing connection.');
       return; // Or handle this case as necessary
     }
 
     try {
-      this.logger.log("Acquiring connection from pool...");
+      this.logger.log('Acquiring connection from pool...');
       const connection = await this.poolManager.getConnection();
       this.activeConnections.push(connection);
       this.setState({ connectionState: Db2ConnectionState.CONNECTED });
-      this.logger.log("Connection acquired successfully.");
+      this.logger.log('Connection acquired successfully.');
       return connection;
     } catch (error: any) {
-      this.logger.error("Failed to acquire connection:", error.message);
-      throw new Error("Failed to acquire connection: " + error.message);
+      this.logger.error('Failed to acquire connection:', error.message);
+      throw new Error('Failed to acquire connection: ' + error.message);
     }
   }
 
@@ -139,29 +139,29 @@ export class Db2ConnectionManager implements IConnectionManager {
    * Get a connection from the pool based on the provided connection string.
    */
   public async getConnectionFromPool(
-    connectionString: string
+    connectionString: string,
   ): Promise<Connection> {
     this.logger.log(
-      `Fetching connection from pool with connection string: ${connectionString}`
+      `Fetching connection from pool with connection string: ${connectionString}`,
     );
 
     // Ensure the pool manager is initialized and the pool is ready
     if (!this.poolManager.getPool) {
-      this.logger.error("Connection pool is not initialized.");
-      throw new Error("Connection pool is not initialized.");
+      this.logger.error('Connection pool is not initialized.');
+      throw new Error('Connection pool is not initialized.');
     }
 
     // Check if the connection state is CONNECTED
     if (this.state.connectionState !== Db2ConnectionState.CONNECTED) {
-      this.logger.error("Cannot get a connection. The pool is not connected.");
-      throw new Error("Connection pool is not connected.");
+      this.logger.error('Cannot get a connection. The pool is not connected.');
+      throw new Error('Connection pool is not connected.');
     }
 
     try {
       // Fetch connection from the pool
       this.setState({ connectionState: Db2ConnectionState.INITIALIZING });
       const connection = await this.poolManager.getConnection();
-      this.logger.log("Connection acquired successfully.");
+      this.logger.log('Connection acquired successfully.');
       this.activeConnections.push(connection); // Track the active connection
       this.setState({
         connectionState: Db2ConnectionState.CONNECTED,
@@ -169,11 +169,11 @@ export class Db2ConnectionManager implements IConnectionManager {
       });
       return connection;
     } catch (error: any) {
-      this.logger.error("Failed to get connection from pool", error.message);
+      this.logger.error('Failed to get connection from pool', error.message);
       this.setState({
         recentErrors: [...this.state.recentErrors, error.message],
       });
-      throw new Error("Failed to get connection from pool: " + error.message);
+      throw new Error('Failed to get connection from pool: ' + error.message);
     }
   }
 
@@ -183,7 +183,7 @@ export class Db2ConnectionManager implements IConnectionManager {
   public async closeConnection(connection: Connection): Promise<void> {
     if (connection) {
       try {
-        this.logger.log("Closing DB2 connection...");
+        this.logger.log('Closing DB2 connection...');
         this.setState({ connectionState: Db2ConnectionState.DISCONNECTING });
         await this.poolManager.closeConnection(connection);
         const index = this.activeConnections.indexOf(connection);
@@ -193,10 +193,10 @@ export class Db2ConnectionManager implements IConnectionManager {
         }
         this.setState({ connectionState: Db2ConnectionState.DISCONNECTED });
         this.logger.log(
-          "Connection closed and removed from active connections."
+          'Connection closed and removed from active connections.',
         );
       } catch (error: any) {
-        this.logger.error("Error closing DB2 connection", error.message);
+        this.logger.error('Error closing DB2 connection', error.message);
         this.setState({
           recentErrors: [...this.state.recentErrors, error.message],
         });
@@ -212,17 +212,17 @@ export class Db2ConnectionManager implements IConnectionManager {
    */
   public async disconnect(): Promise<void> {
     if (this.state.connectionState === Db2ConnectionState.DISCONNECTED) {
-      this.logger.warn("Already disconnected from DB2.");
+      this.logger.warn('Already disconnected from DB2.');
       return;
     }
 
     try {
-      this.logger.log("Attempting to disconnect from DB2...");
+      this.logger.log('Attempting to disconnect from DB2...');
       await this.poolManager.drainPool(); // Drains the connection pool
       this.setState({ connectionState: Db2ConnectionState.DISCONNECTED });
-      this.logger.log("Successfully disconnected from DB2.");
+      this.logger.log('Successfully disconnected from DB2.');
     } catch (error: any) {
-      this.logger.error("Failed to disconnect from DB2:", error.message);
+      this.logger.error('Failed to disconnect from DB2:', error.message);
       this.setState({
         recentErrors: [...this.state.recentErrors, error.message],
       });
@@ -235,11 +235,11 @@ export class Db2ConnectionManager implements IConnectionManager {
    */
   public async drainPool(): Promise<void> {
     if (this.state.connectionState === Db2ConnectionState.DISCONNECTED) {
-      this.logger.warn("Pool is already disconnected.");
+      this.logger.warn('Pool is already disconnected.');
       return;
     }
 
-    this.logger.log("Draining DB2 connection pool...");
+    this.logger.log('Draining DB2 connection pool...');
     this.setState({ connectionState: Db2ConnectionState.DISCONNECTING });
 
     try {
@@ -248,9 +248,9 @@ export class Db2ConnectionManager implements IConnectionManager {
         connectionState: Db2ConnectionState.DISCONNECTED,
         activeConnections: 0,
       });
-      this.logger.log("DB2 connection pool drained successfully.");
+      this.logger.log('DB2 connection pool drained successfully.');
     } catch (error: any) {
-      this.logger.error("Error draining DB2 connection pool", error.message);
+      this.logger.error('Error draining DB2 connection pool', error.message);
       this.state.recentErrors.push(error.message);
       if (this.state.recentErrors.length > 10) {
         this.state.recentErrors.shift();
@@ -276,7 +276,7 @@ export class Db2ConnectionManager implements IConnectionManager {
     this.logger.log(
       `Connection Pool Status: Active=${activeConnections}, State=${
         Db2ConnectionState[this.state.connectionState]
-      }`
+      }`,
     );
   }
 
@@ -284,7 +284,7 @@ export class Db2ConnectionManager implements IConnectionManager {
    * Check the health of the connection pool.
    */
   public async checkHealth(): Promise<{ status: boolean; details?: any }> {
-    this.logger.log("Checking DB2 connection pool health...");
+    this.logger.log('Checking DB2 connection pool health...');
     const activeConnections = this.getActiveConnectionsCount();
     return { status: activeConnections > 0, details: { activeConnections } };
   }

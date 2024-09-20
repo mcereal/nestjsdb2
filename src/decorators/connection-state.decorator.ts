@@ -1,8 +1,8 @@
 // src/decorators/db2-connection-state.decorator.ts
 
-import { Db2Service } from "../services";
-import { Db2ConnectionState } from "../enums";
-import { Logger } from "@nestjs/common";
+import { Db2Service } from '../services';
+import { Db2ConnectionState } from '../enums';
+import { Logger } from '@nestjs/common';
 
 /**
  * @function CheckDb2ConnectionState
@@ -27,14 +27,14 @@ import { Logger } from "@nestjs/common";
  * }
  */
 export const CheckDb2ConnectionState = (
-  requiredStates: Db2ConnectionState | Db2ConnectionState[]
+  requiredStates: Db2ConnectionState | Db2ConnectionState[],
 ): MethodDecorator => {
-  const logger = new Logger("CheckDb2ConnectionStateDecorator");
+  const logger = new Logger('CheckDb2ConnectionStateDecorator');
 
   return (
-    _target: Object,
+    _target: new (...args: any[]) => any,
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) => {
     const originalMethod = descriptor.value;
 
@@ -60,7 +60,7 @@ export const CheckDb2ConnectionState = (
       // Check if the current state is one of the required states
       if (!requiredStatesArray.includes(currentState.connectionState)) {
         const errorMessage = `DB2 connection state must be one of [${requiredStatesArray.join(
-          ", "
+          ', ',
         )}] but is currently ${currentState}`;
         logger.warn(errorMessage);
         throw new Error(errorMessage);
@@ -68,7 +68,7 @@ export const CheckDb2ConnectionState = (
 
       // Log the successful state check
       logger.debug(
-        `DB2 connection state check passed for method ${propertyKey.toString()}`
+        `DB2 connection state check passed for method ${propertyKey.toString()}`,
       );
 
       // Proceed with the original method execution if the state check passes

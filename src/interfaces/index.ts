@@ -30,14 +30,14 @@
  * @exports IAuthManager
  */
 
-export * from "./db2.interface";
-export * from "./db2-client.interface";
-export * from "./db2-service.interface";
-export * from "./transaction-manager.interface";
-export * from "./db2-query-builder.interface";
-export * from "./db2-migration-service.interface";
-export * from "./connection-mannager.interface";
-export * from "./pool-manager.interface";
-export * from "./transaction-manager.interface";
-export * from "./db2-config-options.interface";
-export * from "./auth-manager.interface";
+export * from './db2.interface';
+export * from './db2-client.interface';
+export * from './db2-service.interface';
+export * from './transaction-manager.interface';
+export * from './db2-query-builder.interface';
+export * from './db2-migration-service.interface';
+export * from './connection-mannager.interface';
+export * from './pool-manager.interface';
+export * from './transaction-manager.interface';
+export * from './db2-config-options.interface';
+export * from './auth-manager.interface';

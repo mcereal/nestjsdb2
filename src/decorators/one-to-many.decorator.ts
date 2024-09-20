@@ -1,18 +1,21 @@
 // decorators/one-to-many.decorator.ts
 
-import "reflect-metadata";
-import { OneToManyMetadata } from "../metadata";
-import { OneToManyOptions, ONE_TO_MANY_RELATIONS_METADATA_KEY } from "../types";
+import 'reflect-metadata';
+import { OneToManyMetadata } from '../metadata';
+import { OneToManyOptions, ONE_TO_MANY_RELATIONS_METADATA_KEY } from '../types';
 
 export function OneToMany(options: OneToManyOptions): PropertyDecorator {
   // Validate the provided options
-  if (typeof options.target !== "function") {
+  if (typeof options.target !== 'function') {
     throw new Error(
-      "OneToMany decorator requires a 'target' option that is a function (constructor of the target entity)."
+      "OneToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  return (target: Object, propertyKey: string | symbol) => {
+  return (
+    target: new (...args: any[]) => any,
+    propertyKey: string | symbol,
+  ) => {
     const constructor = target.constructor;
 
     // Retrieve existing one-to-many relations metadata or initialize if none exists
@@ -22,7 +25,7 @@ export function OneToMany(options: OneToManyOptions): PropertyDecorator {
 
     // Check if the relation already exists to avoid duplicates
     const existingRelation = oneToManyRelations.find(
-      (relation) => relation.oneToManyOptions.propertyKey === propertyKey
+      (relation) => relation.oneToManyOptions.propertyKey === propertyKey,
     );
 
     if (!existingRelation) {
@@ -35,9 +38,9 @@ export function OneToMany(options: OneToManyOptions): PropertyDecorator {
 
       // Define or update metadata with the new one-to-many relations
       Reflect.defineMetadata(
-        "oneToManyRelations",
+        'oneToManyRelations',
         oneToManyRelations,
-        constructor
+        constructor,
       );
     }
   };

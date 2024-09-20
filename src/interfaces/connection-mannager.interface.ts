@@ -1,6 +1,6 @@
-import { Db2ClientState } from "./db2-client.interface";
+import { Db2ClientState } from './db2-client.interface';
 
-import { Connection } from "ibm_db";
+import { Connection } from 'ibm_db';
 
 export interface IConnectionManager {
   setState(newState: Partial<Db2ClientState>): void;

@@ -1,5 +1,5 @@
-import { validateOrReject, ValidationError } from "class-validator";
-import { Logger, BadRequestException } from "@nestjs/common";
+import { validateOrReject, ValidationError } from 'class-validator';
+import { Logger, BadRequestException } from '@nestjs/common';
 
 /**
  * @function Db2EntityValidation
@@ -22,15 +22,13 @@ import { Logger, BadRequestException } from "@nestjs/common";
  *   }
  * }
  */
-export const Db2EntityValidation = (
-  throwException: boolean = true
-): MethodDecorator => {
-  const logger = new Logger("Db2EntityValidationDecorator");
+export const Db2EntityValidation = (throwException = true): MethodDecorator => {
+  const logger = new Logger('Db2EntityValidationDecorator');
 
   return function (
-    _target: Object,
+    _target: new (...args: any[]) => any,
     _propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
@@ -38,7 +36,7 @@ export const Db2EntityValidation = (
       try {
         // Validate each argument (assumed to be an entity)
         for (const arg of args) {
-          if (arg && typeof arg === "object") {
+          if (arg && typeof arg === 'object') {
             await validateOrReject(arg);
           }
         }
@@ -50,14 +48,14 @@ export const Db2EntityValidation = (
           // Format validation errors
           const errorMessages = error
             .map((err: ValidationError) =>
-              Object.values(err.constraints || {}).join(", ")
+              Object.values(err.constraints || {}).join(', '),
             )
-            .join("; ");
+            .join('; ');
           logger.error(`Entity validation failed: ${errorMessages}`);
 
           if (throwException) {
             throw new BadRequestException(
-              `Validation failed: ${errorMessages}`
+              `Validation failed: ${errorMessages}`,
             );
           }
         } else {

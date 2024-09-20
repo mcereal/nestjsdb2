@@ -30,13 +30,13 @@ interface EntityMetadata {
 
 interface ForeignKeyOptions {
   reference: string; // Format: 'referenced_table(referenced_column)'
-  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT";
+  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
 interface ForeignKeyMetadata {
   propertyKey: string | symbol;
   reference: string;
-  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT";
+  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
 interface IndexMetadata {
@@ -45,51 +45,51 @@ interface IndexMetadata {
 
 interface ManyToManyOptions {
   propertyKey: string | symbol;
-  target: Function; // Target entity class
+  target: new (...args: any[]) => any; // Target entity class
   joinTable?: string; // Optional join table name
   cascade?: boolean; // Cascade operations
 }
 
 interface ManyToManyMetadata {
   propertyKey: string | symbol;
-  target: Function;
+  target: new (...args: any[]) => any;
   joinTable?: string;
   cascade?: boolean;
 }
 
 interface ManyToOneOptions {
   propertyKey: string | symbol;
-  target: Function; // Target entity class
+  target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
 interface ManyToOneMetadata {
   propertyKey: string | symbol;
-  target: Function;
+  target: new (...args: any[]) => any;
   cascade?: boolean;
 }
 
 interface OneToManyOptions {
   propertyKey: string | symbol;
-  target: Function; // Target entity class
+  target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
 interface OneToManyMetadata {
   propertyKey: string | symbol;
-  target: Function;
+  target: new (...args: any[]) => any;
   cascade?: boolean;
 }
 
 interface OneToOneOptions {
   propertyKey: string | symbol;
-  target: Function; // Target entity class
+  target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
 interface OneToOneMetadata {
   propertyKey: string | symbol;
-  target: Function;
+  target: new (...args: any[]) => any;
   cascade?: boolean;
 }
 

@@ -1,16 +1,23 @@
-// src/decorators/composite-key.decorator.ts
+import 'reflect-metadata';
+import { CompositeKeyMetadata } from '../types';
 
-import "reflect-metadata";
-import { CompositeKeyMetadata } from "../types";
-
+/**
+ * Class decorator to mark a composite key in an entity.
+ * @param keys - An array of strings representing the properties that form the composite key.
+ * @returns A class decorator.
+ */
 export function CompositeKey(keys: string[]): ClassDecorator {
   if (!Array.isArray(keys) || keys.length === 0) {
     throw new Error(
-      "CompositeKey must be initialized with a non-empty array of strings."
+      'CompositeKey must be initialized with a non-empty array of strings.',
     );
   }
 
-  return (target: Function) => {
+  return (target: unknown) => {
+    if (typeof target !== 'function') {
+      throw new Error('CompositeKey decorator can only be applied to classes.');
+    }
+
     // Get the prototype of the target to access defined properties
     const prototype = target.prototype;
 
@@ -22,19 +29,19 @@ export function CompositeKey(keys: string[]): ClassDecorator {
     if (invalidKeys.length > 0) {
       throw new Error(
         `Invalid composite key properties: ${invalidKeys.join(
-          ", "
-        )}. Make sure all keys are valid class properties.`
+          ', ',
+        )}. Make sure all keys are valid class properties.`,
       );
     }
 
     // Retrieve existing composite keys metadata or initialize if none exists
     const compositeKeysMetadata: CompositeKeyMetadata[] =
-      Reflect.getMetadata("compositeKeys", target) || [];
+      Reflect.getMetadata('compositeKeys', target) || [];
 
     // Add new composite key metadata
     compositeKeysMetadata.push({ keys });
 
     // Define or update metadata with the new composite key metadata array
-    Reflect.defineMetadata("compositeKeys", compositeKeysMetadata, target);
+    Reflect.defineMetadata('compositeKeys', compositeKeysMetadata, target);
   };
 }

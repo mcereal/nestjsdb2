@@ -1,6 +1,6 @@
 // src/decorators/log-execution-time.decorator.ts
 
-import { Logger } from "@nestjs/common";
+import { Logger } from '@nestjs/common';
 
 /**
  * @function LogExecutionTime
@@ -29,13 +29,13 @@ import { Logger } from "@nestjs/common";
  * }
  */
 export const LogExecutionTime = (
-  threshold: number = 0,
-  logLevel: "log" | "warn" | "error" | "debug" | "verbose" = "log"
+  threshold = 0,
+  logLevel: 'log' | 'warn' | 'error' | 'debug' | 'verbose' = 'log',
 ): MethodDecorator => {
   return function (
-    target: Object,
+    target: new (...args: any[]) => any,
     propertyKey: string | symbol,
-    descriptor: PropertyDescriptor
+    descriptor: PropertyDescriptor,
   ) {
     const originalMethod = descriptor.value;
 
@@ -50,7 +50,7 @@ export const LogExecutionTime = (
         // Log if the duration exceeds the threshold
         if (duration > threshold) {
           logger[logLevel](
-            `Execution time for ${String(propertyKey)}: ${duration}ms`
+            `Execution time for ${String(propertyKey)}: ${duration}ms`,
           );
         }
 
@@ -58,12 +58,12 @@ export const LogExecutionTime = (
       };
 
       // Check if the method is asynchronous
-      if (originalMethod.constructor.name === "AsyncFunction") {
+      if (originalMethod.constructor.name === 'AsyncFunction') {
         return execute()
           .then((result) => result)
           .catch((error) => {
             logger.error(
-              `Error in method ${String(propertyKey)}: ${error.message}`
+              `Error in method ${String(propertyKey)}: ${error.message}`,
             );
             throw error;
           });
@@ -74,7 +74,7 @@ export const LogExecutionTime = (
         return execute();
       } catch (error) {
         logger.error(
-          `Error in method ${String(propertyKey)}: ${error.message}`
+          `Error in method ${String(propertyKey)}: ${error.message}`,
         );
         throw error;
       }

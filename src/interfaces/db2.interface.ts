@@ -1,4 +1,4 @@
-import { Db2AuthType } from "../enums";
+import { Db2AuthType } from '../enums';
 
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
@@ -71,14 +71,14 @@ export interface Db2LoggingOptions {
   logErrors?: boolean;
   profileSql?: boolean;
   traceFilePath?: string;
-  traceLevel?: "error" | "info" | "debug" | "trace";
+  traceLevel?: 'error' | 'info' | 'debug' | 'trace';
 }
 
 /**
  * Interface for retry and failover options.
  */
 export interface Db2RetryOptions {
-  retryPolicy?: "none" | "simple" | "exponentialBackoff";
+  retryPolicy?: 'none' | 'simple' | 'exponentialBackoff';
   retryAttempts?: number;
   retryInterval?: number;
   connectionRetries?: number;
@@ -110,7 +110,7 @@ export interface Db2MigrationOptions {
  */
 export interface Db2CacheOptions {
   enabled: boolean;
-  store: "memory" | "redis";
+  store: 'memory' | 'redis';
   ttl?: number; // Time to live for cached items, in seconds
   max?: number; // Maximum number of items to cache
   redisHost?: string; // For Redis configuration

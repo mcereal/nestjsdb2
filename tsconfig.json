@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -9,7 +9,6 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./",
-    "moduleResolution": "node",
     "baseUrl": ".",
     "incremental": true,
     "skipLibCheck": true,
@@ -23,11 +22,16 @@
     "paths": {
       "*": ["node_modules/*"],
       "src/*": ["./src/*"]
-    }
+    },
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": [
     "src/**/*.ts",
     "testconnection/app.module.ts",
-    "testconnection/main.ts"
+    "testconnection/main.ts",
+    "testconnection/Connection.ts",
+    "testconnection/drda.constants.ts",
+    "testconnection/drda.interface.ts",
+    "testconnection/Pool.ts"
   ]
 }
