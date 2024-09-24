@@ -1,3 +1,11 @@
+## [1.0.1](https://github.com/mcereal/nestjsdb2/compare/v1.0.0...v1.0.1) (2024-09-24)
+
+
+### Bug Fixes
+
+* modify eslint config and update package.json ([2e8c71b](https://github.com/mcereal/nestjsdb2/commit/2e8c71b08058a7d42021c797115ebf9bec79f1f5))
+* resolution for testing ([ea0d143](https://github.com/mcereal/nestjsdb2/commit/ea0d143b40dffd919c86daddcf0e3b7a0b9370ba))
+
 # 1.0.0 (2024-09-20)
 
 

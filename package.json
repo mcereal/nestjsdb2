@@ -1,6 +1,6 @@
 {
   "name": "@mcereal/nestjsdb2",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "author": "Michael Curtis <mpbcurtis@gmail.com>",
   "main": "dist/index.js",
