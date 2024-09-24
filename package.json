@@ -3,16 +3,19 @@
   "version": "1.0.1",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "author": "Michael Curtis <mpbcurtis@gmail.com>",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "licenses": [
+  "contributors": [
     {
-      "type": "MIT",
-      "url": "https://opensource.org/licenses/MIT"
+      "name": "Michael Curtis",
+      "email": "mpbcurtis@gmail.com",
+      "url": "https://github.com/mcereal"
     }
   ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "commonjs",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mcereal/nestjsDb/issues"
+    "url": "https://github.com/mcereal/nestjsdb2/issues"
   },
   "homepage": "https://github.com/mcereal/nestjsdb2#readme",
   "repository": {
@@ -26,22 +29,27 @@
     "database",
     "decorators",
     "typescript",
-    "transaction",
-    "query-builder"
+    "transactions",
+    "query-builder",
+    "sql",
+    "migrations",
+    "cache",
+    "health-check",
+    "security"
   ],
   "scripts": {
     "build": "tsc",
-    "install-driver": "ts-node src/cli/db2-cli.ts",
     "test": "jest --detectOpenHandles --forceExit --config jest.config.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --detectOpenHandles --forceExit --config jest.config.ts --coverage",
     "start:dev": "nest start --watch",
-    "lint": "eslint",
-    "lint:fix": "eslint --fix",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "npm run lint && npm run test && npm run build",
     "prepare": "npm run build",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "doc": "typedoc"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.2.2",
@@ -60,6 +68,11 @@
     "kerberos": "^2.2.0",
     "ldapjs": "^3.0.7",
     "reflect-metadata": "^0.2.2"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "typescript": ">=4.0.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.1",
@@ -81,12 +94,15 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typedoc": "^0.26.6",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "prettier": "^3.0.0"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "package.json"
   ],
   "engines": {
     "node": ">=20.0.0",
@@ -94,5 +110,16 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/mcereal"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   }
 }
