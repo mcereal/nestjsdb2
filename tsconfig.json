@@ -27,9 +27,10 @@
   },
   "include": [
     "src/**/*.ts",
-    "testconnection/**/*.ts",
     "tests/**/*.ts",
-    "jest.config.ts"
+    "jest.config.ts",
+    "testconnection/app.module.ts",
+    "testconnection/main.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
