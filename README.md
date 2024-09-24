@@ -40,6 +40,12 @@ The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that
 npm install @mcereal/nestjsdb2 --save
 ```
 
+**Note**: The `@mcereal/nestjsdb2` package relies on the ibm_db package, which requires Rosetta 2 to run on Apple Silicon Macs. Please ensure Rosetta 2 is installed on your system. You can install Rosetta 2 by running:
+
+```bash
+softwareupdate --install-rosetta --agree-to-license
+```
+
 ## Getting Started
 
 To get started, import the Db2Module into your NestJS application and configure it using the provided options.
