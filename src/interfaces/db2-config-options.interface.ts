@@ -12,7 +12,7 @@ export interface IDb2ConfigOptions extends Db2BasicConnectionOptions {
   useTls?: boolean;
   sslCertificatePath?: string;
 
-  auth: Db2AuthOptions; // Authentication section (now a union of multiple auth types)
+  auth: Db2AuthOptions;
   logging?: Db2LoggingOptions;
   retry?: Db2RetryOptions;
   migration?: Db2MigrationOptions;

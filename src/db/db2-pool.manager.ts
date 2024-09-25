@@ -1,22 +1,33 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { forwardRef, Inject, Logger, OnModuleInit } from '@nestjs/common';
 import { Connection } from 'ibm_db';
-import { IDb2ConfigOptions, IPoolManager } from '../interfaces';
+import {
+  IConnectionManager,
+  IDb2ConfigOptions,
+  IPoolManager,
+} from '../interfaces';
 import * as ibm_db from 'ibm_db';
-import { buildConnectionString } from '../utils/buildConnectionString';
 import { Pool, Factory, createPool } from 'generic-pool';
+import {
+  I_CONNECTION_MANAGER,
+  I_DB2_CONFIG,
+} from '../constants/injection-token.constant';
+import { Db2ConnectionState } from '../enums';
+import { Db2AuthStrategy } from '../auth';
 
-@Injectable()
 export class Db2PoolManager implements IPoolManager, OnModuleInit {
   private readonly logger = new Logger(Db2PoolManager.name);
   private pool: Pool<Connection>;
   private poolInitialized = false;
   private ibm_db: ibm_db;
 
-  constructor(private config: IDb2ConfigOptions) {
+  constructor(
+    @Inject(I_DB2_CONFIG) private config: IDb2ConfigOptions,
+    @Inject('DB2_AUTH_STRATEGY') private authStrategy: Db2AuthStrategy,
+  ) {
     this.ibm_db = ibm_db;
   }
 
-  public async onModuleInit(): Promise<void> {
+  async onModuleInit() {
     await this.init();
   }
 
@@ -29,9 +40,12 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
     this.logger.log('Initializing Db2PoolManager...');
     this.validateConfig(this.config);
 
+    // Authenticate before creating the pool
+    await this.authStrategy.authenticate();
+
     const factory: Factory<Connection> = {
       create: async () => {
-        const connectionString = buildConnectionString(this.config);
+        const connectionString = this.authStrategy.getConnectionString();
         this.logger.debug(
           `Attempting to connect with connection string: ${connectionString}`,
         );
@@ -39,7 +53,7 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
           this.ibm_db.open(connectionString, (err, connection) => {
             if (err) {
               this.logger.error('Error opening connection', err.message);
-              reject(err); // Capture more details here
+              reject(err);
             } else {
               this.logger.log('Connection successfully established');
               resolve(connection);
@@ -63,7 +77,7 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
       this.logger.log('Connection pool initialized successfully.');
     } catch (error) {
       this.logger.error('Error during pool initialization:', error.message);
-      throw error; // Ensure that the error is rethrown
+      throw error;
     }
   }
 

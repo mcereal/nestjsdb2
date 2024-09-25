@@ -3,7 +3,6 @@ import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   Db2AuthOptions,
   IDb2Client,
-  Db2ClientState,
   IDb2ConfigOptions,
   Db2ConnectionDetails,
   Db2ConnectionStats,
@@ -20,29 +19,20 @@ import {
 } from '../errors';
 import { Db2AuthStrategy } from '../auth/db2-auth.strategy';
 import { Db2ConfigManager } from './db2-config.manager';
-import { Db2AuthManager } from './db2-auth.manager';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
-import { I_DB2_CONFIG } from '../constants/injection-token.constant';
+import {
+  I_CONNECTION_MANAGER,
+  I_DB2_CONFIG,
+  I_POOL_MANAGER,
+} from '../constants/injection-token.constant';
 
-export class Db2Client
-  implements IConnectionManager, IDb2Client, OnModuleInit, OnModuleDestroy
-{
+export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   protected readonly config: IDb2ConfigOptions;
   protected readonly authConfig: Db2AuthOptions;
   protected readonly authStrategy: Db2AuthStrategy;
-  protected readonly authManager: Db2AuthManager;
   readonly logger = new Logger(Db2Client.name);
   private pool: Pool;
   protected connection?: Connection;
-  protected state: Db2ClientState = {
-    connectionState: Db2ConnectionState.DISCONNECTED,
-    activeConnections: 0,
-    totalConnections: 0,
-    reconnectionAttempts: 0,
-    recentErrors: [],
-    lastUsed: new Date().toISOString(),
-    poolInitialized: false,
-  };
   private idleTimeoutInterval: NodeJS.Timeout;
   private activeConnectionsList: Connection[] = [];
   private totalConnections = 0;
@@ -56,67 +46,87 @@ export class Db2Client
   public constructor(
     @Inject(I_DB2_CONFIG) // Inject the config
     config: IDb2ConfigOptions,
+    @Inject(I_CONNECTION_MANAGER)
     private readonly connectionManager: IConnectionManager,
+    @Inject(I_POOL_MANAGER)
     private readonly poolManager: IPoolManager,
   ) {
     const configManager = new Db2ConfigManager(config);
     this.config = configManager.getConfig();
-
-    this.authManager = new Db2AuthManager(this.config, connectionManager);
   }
 
   public async onModuleInit(): Promise<void> {
     try {
-      // PoolManager is already initialized via OnModuleInit in Db2PoolManager
-      this.poolInitialized = this.poolManager.isPoolInitialized;
-      if (this.poolInitialized) {
-        this.connectionManager.setState({
-          poolInitialized: true,
-          connectionState: Db2ConnectionState.CONNECTED,
-        });
-        this.logger.log('Db2 client module initialized successfully.');
-        this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
-      } else {
-        this.logger.error('Failed to initialize connection pool.');
-        this.setState({ connectionState: Db2ConnectionState.ERROR });
+      // Wait for the pool to be initialized
+      while (!this.poolManager.isPoolInitialized) {
+        this.logger.log('Waiting for the connection pool to be initialized...');
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
       }
+
+      this.connectionManager.setState({
+        poolInitialized: true,
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
+      this.logger.log('Db2 client module initialized successfully.');
+      this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
     } catch (error) {
-      this.setState({ connectionState: Db2ConnectionState.ERROR });
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
       this.logger.error('Error during Db2 client initialization:', error);
       throw error; // Re-throw to propagate the error
     }
   }
-  public onModuleDestroy(): void {
-    this.drainPool();
-    this.setState({ connectionState: Db2ConnectionState.DISCONNECTED });
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.drainPool();
+    this.connectionManager.setState({
+      connectionState: Db2ConnectionState.DISCONNECTED,
+    });
     this.logger.log('Db2 client disconnected and destroyed');
   }
 
   public async drainPool(): Promise<void> {
-    this.setState({ connectionState: Db2ConnectionState.POOL_DRAINING });
+    this.connectionManager.setState({
+      connectionState: Db2ConnectionState.POOL_DRAINING,
+    });
     this.logger.log('Draining the connection pool...');
 
     try {
       this.stopIdleTimeoutCheck();
       await this.poolManager.drainPool(); // Use PoolManager to drain the pool
-      this.setState({ connectionState: Db2ConnectionState.POOL_DRAINED });
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.POOL_DRAINED,
+      });
       this.logger.log('Connection pool drained successfully.');
-    } catch (error) {
-      this.setState({ connectionState: Db2ConnectionState.ERROR });
+    } catch (error: any) {
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
       this.logger.error('Error during shutdown:', error.message);
     }
   }
 
   public async getConnection(): Promise<Connection> {
+    // Ensure that the pool is initialized before getting a connection
+    while (!this.poolManager.isPoolInitialized) {
+      this.logger.log('Waiting for the connection pool to be initialized...');
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
+    }
+
     try {
       const connection = await this.poolManager.getConnection();
       this.activeConnectionsList.push(connection);
       this.totalConnections++;
-      this.setState({ activeConnections: this.activeConnectionsList.length });
+      this.connectionManager.setState({
+        activeConnections: this.activeConnectionsList.length,
+      });
       return connection;
-    } catch (error) {
-      this.setState({ connectionState: Db2ConnectionState.ERROR });
-      this.logger.error('Failed to get connection:', error);
+    } catch (error: any) {
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
+      this.logger.error('Failed to get connection:', error.message);
       throw new Db2ConnectionError('Failed to get connection');
     }
   }
@@ -124,37 +134,26 @@ export class Db2Client
   public async closePool(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.logger.log('Closing DB2 connection pool...');
-      this.setState({ connectionState: Db2ConnectionState.DISCONNECTING });
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.DISCONNECTING,
+      });
 
       this.pool.close((err) => {
         if (err) {
-          this.setState({ connectionState: Db2ConnectionState.ERROR });
+          this.connectionManager.setState({
+            connectionState: Db2ConnectionState.ERROR,
+          });
           this.logger.error('Error closing DB2 connection pool', err);
           reject(new Db2ConnectionError('Failed to close DB2 connection pool'));
         } else {
-          this.setState({ connectionState: Db2ConnectionState.POOL_DRAINED });
+          this.connectionManager.setState({
+            connectionState: Db2ConnectionState.POOL_DRAINED,
+          });
           this.logger.log('DB2 connection pool closed successfully');
           resolve();
         }
       });
     });
-  }
-
-  /**
-   * Set the DB2 connection state
-   */
-  public setState(newState: Partial<Db2ClientState>): void {
-    this.state = { ...this.state, ...newState };
-    this.logger.log(
-      `Connection state updated to: ${JSON.stringify(this.state)}`,
-    );
-  }
-
-  /**
-   * Get the DB2 connection state
-   */
-  public getState(): Db2ClientState {
-    return this.state;
   }
 
   private async handleConnectionError(error: Error): Promise<void> {
@@ -165,7 +164,9 @@ export class Db2Client
       this.currentReconnectAttempts > this.config.retry?.maxReconnectAttempts
     ) {
       this.logger.error('Maximum reconnect attempts reached.');
-      this.setState({ connectionState: Db2ConnectionState.ERROR });
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.ERROR,
+      });
       throw new Db2ConnectionError('All reconnection attempts failed.');
     }
 
@@ -236,14 +237,18 @@ export class Db2Client
 
         // Ensure the connection is properly set to null
         this.connection = null;
-        this.setState({ connectionState: Db2ConnectionState.DISCONNECTED });
+        this.connectionManager.setState({
+          connectionState: Db2ConnectionState.DISCONNECTED,
+        });
 
         this.logger.log('Db2 database connection closed and reset to null.');
 
         // Stop the idle timeout and lifetime checks after disconnection
         this.stopIdleTimeoutCheck();
       } catch (error) {
-        this.setState({ connectionState: Db2ConnectionState.ERROR });
+        this.connectionManager.setState({
+          connectionState: Db2ConnectionState.ERROR,
+        });
         this.logError('Error disconnecting from Db2 database', error);
         throw new Db2ConnectionError('Failed to disconnect from Db2 database');
       }
@@ -260,7 +265,9 @@ export class Db2Client
     const index = this.activeConnectionsList.indexOf(connection);
     if (index > -1) {
       this.activeConnectionsList.splice(index, 1);
-      this.setState({ activeConnections: this.activeConnectionsList.length });
+      this.connectionManager.setState({
+        activeConnections: this.activeConnectionsList.length,
+      });
     }
     this.logger.log('Connection released back to the pool.');
   }
@@ -271,22 +278,30 @@ export class Db2Client
    */
   private async reconnect(): Promise<void> {
     if (
-      this.state.connectionState !== Db2ConnectionState.CONNECTED &&
-      this.state.connectionState !== Db2ConnectionState.RECONNECTING
+      this.connectionManager.getState().connectionState !==
+        Db2ConnectionState.CONNECTED &&
+      this.connectionManager.getState().connectionState !==
+        Db2ConnectionState.RECONNECTING
     ) {
       try {
         this.logger.log('Attempting to reconnect to DB2...');
-        this.setState({ connectionState: Db2ConnectionState.RECONNECTING });
+        this.connectionManager.setState({
+          connectionState: Db2ConnectionState.RECONNECTING,
+        });
         this.reconnectionAttempts += 1;
         const connection = await this.getConnection();
         await this.closeConnection(connection);
         this.logger.log('Reconnection successful');
-        this.setState({ connectionState: Db2ConnectionState.CONNECTED });
+        this.connectionManager.setState({
+          connectionState: Db2ConnectionState.CONNECTED,
+        });
       } catch (error) {
         this.logger.error('Reconnection failed:', error);
         this.recentErrors.push(error.message);
         await this.handleConnectionError(error); // Handle the error and retry
-        this.setState({ connectionState: Db2ConnectionState.ERROR });
+        this.connectionManager.setState({
+          connectionState: Db2ConnectionState.ERROR,
+        });
       }
     }
   }
@@ -415,7 +430,10 @@ export class Db2Client
    * Begins a transaction.
    */
   public async beginTransaction(): Promise<void> {
-    if (this.state.connectionState !== Db2ConnectionState.CONNECTED) {
+    if (
+      this.connectionManager.getState().connectionState !==
+      Db2ConnectionState.CONNECTED
+    ) {
       throw new Db2Error('Cannot begin transaction. No active connection.');
     }
     await this.query('BEGIN');
@@ -426,7 +444,10 @@ export class Db2Client
    * Commits the current transaction.
    */
   public async commitTransaction(): Promise<void> {
-    if (this.state.connectionState !== Db2ConnectionState.CONNECTED) {
+    if (
+      this.connectionManager.getState().connectionState !==
+      Db2ConnectionState.CONNECTED
+    ) {
       throw new Db2Error('Cannot commit transaction. No active connection.');
     }
     await this.query('COMMIT');
@@ -437,7 +458,10 @@ export class Db2Client
    * Rolls back the current transaction.
    */
   public async rollbackTransaction(): Promise<void> {
-    if (this.state.connectionState !== Db2ConnectionState.CONNECTED) {
+    if (
+      this.connectionManager.getState().connectionState !==
+      Db2ConnectionState.CONNECTED
+    ) {
       throw new Db2Error('Cannot rollback transaction. No active connection.');
     }
     await this.query('ROLLBACK');

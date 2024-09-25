@@ -13,4 +13,5 @@ export abstract class Db2AuthStrategy {
   }
 
   abstract authenticate(): Promise<void>;
+  abstract getConnectionString(): string;
 }

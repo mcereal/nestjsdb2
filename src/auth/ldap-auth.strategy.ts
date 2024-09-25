@@ -1,22 +1,29 @@
+// src/auth/ldap-auth.strategy.ts
+
+import { Inject, Logger } from '@nestjs/common';
 import { Db2AuthStrategy } from './db2-auth.strategy';
+import { Db2ConnectionState } from '../enums';
+import { Db2AuthenticationError, Db2Error } from '../errors';
 import {
   IDb2ConfigOptions,
   IConnectionManager,
   Db2LdapAuthOptions,
 } from '../interfaces';
-import { Db2AuthenticationError } from '../errors';
-import { Db2ConnectionState } from '../enums';
-import { Logger } from '@nestjs/common';
-import * as ldap from 'ldapjs'; // Import ldapjs for LDAP authentication
+import { Connection } from 'ibm_db';
+import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
+import * as ldap from 'ldapjs';
 
 export class LdapAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
 
   constructor(
     config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager,
+    @Inject(I_CONNECTION_MANAGER) connectionManager: IConnectionManager,
   ) {
-    super(config, connectionManager); // Add the connectionManager argument
+    super(config, connectionManager);
+    if (!connectionManager) {
+      throw new Error('ConnectionManager is not defined in LdapAuthStrategy');
+    }
   }
 
   /**
@@ -24,55 +31,62 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
    * Binds to an LDAP server and attempts to authenticate with the DB2 server.
    */
   async authenticate(): Promise<void> {
+    if (
+      this.connectionManager.getState().connectionState ===
+      Db2ConnectionState.CONNECTED
+    ) {
+      this.logger.log('Already authenticated. Skipping...');
+      return;
+    }
+
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
     this.logger.log('Starting LDAP authentication...');
 
-    // Ensure the authType is 'ldap' and cast config.auth to Db2LdapAuthOptions
-    if (this.config.auth?.authType === 'ldap') {
-      const { username, password } = this.config.auth as Db2LdapAuthOptions;
+    try {
+      // Perform LDAP bind (authentication)
+      await this.ldapBind();
 
-      if (!username || !password) {
-        this.connectionManager.setState({
-          connectionState: Db2ConnectionState.AUTH_FAILED,
-        });
-        throw new Db2AuthenticationError(
-          'LDAP username and password are required.',
-        );
-      }
-
-      try {
-        // Perform LDAP bind (authentication)
-        await this.ldapBind(username, password);
-        this.connectionManager.setState({
-          connectionState: Db2ConnectionState.CONNECTED,
-        });
-        this.logger.log('LDAP authentication successful.');
-      } catch (error) {
-        this.connectionManager.setState({
-          connectionState: Db2ConnectionState.AUTH_FAILED,
-        });
-        this.logger.error('LDAP authentication failed:', error.message);
-        throw new Db2AuthenticationError('LDAP authentication failed.');
-      }
-    } else {
+      this.logger.log('LDAP authentication successful.');
+    } catch (error: any) {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
-      throw new Db2AuthenticationError(
-        'Invalid authentication type for LDAP strategy.',
-      );
+      this.logger.error('LDAP authentication failed:', error.message);
+      throw new Db2AuthenticationError('LDAP authentication failed.');
     }
   }
+
+  /**
+   * Generates the DB2 connection string using LDAP authentication.
+   */
+  public getConnectionString(): string {
+    const { host, port, database } = this.config;
+    const authOptions = this.config.auth as Db2LdapAuthOptions;
+
+    if (authOptions.authType !== 'ldap') {
+      throw new Db2Error(
+        'Expected LDAP authentication options, but received a different auth type.',
+      );
+    }
+
+    const { username, password } = authOptions;
+
+    if (!username || !password) {
+      throw new Db2Error('LDAP username and password are required.');
+    }
+
+    // The connection string may include LDAP-specific parameters
+    return `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};Authentication=SERVER_ENCRYPT;`;
+  }
+
   /**
    * Performs LDAP bind (authentication) using the provided username and password.
-   * @param username - The LDAP username (Distinguished Name or User Principal Name).
-   * @param password - The LDAP password.
    */
-  private async ldapBind(username: string, password: string): Promise<void> {
-    const ldapAuthConfig = this.config.auth as Db2LdapAuthOptions;
-    const ldapUrl = process.env.LDAP_URL || ldapAuthConfig.ldapUrl;
+  private async ldapBind(): Promise<void> {
+    const authOptions = this.config.auth as Db2LdapAuthOptions;
+    const { username, password, ldapUrl } = authOptions;
 
     if (!ldapUrl) {
       throw new Db2AuthenticationError(
