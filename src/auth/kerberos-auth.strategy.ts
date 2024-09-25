@@ -9,12 +9,12 @@ import {
   IConnectionManager,
   Db2KerberosAuthOptions,
 } from '../interfaces';
-import { Connection } from 'ibm_db';
 import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
-import * as kerberos from 'kerberos';
+import { KerberosClient } from './kerberos.client';
 
 export class KerberosAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(KerberosAuthStrategy.name);
+  private kerberosClient: KerberosClient | null = null;
 
   constructor(
     config: IDb2ConfigOptions,
@@ -46,10 +46,31 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     });
     this.logger.log('Starting Kerberos authentication...');
 
+    const authOptions = this.config.auth as Db2KerberosAuthOptions;
+    const { krbServiceName, username, krbKeytab, krbKdc, password } =
+      authOptions;
+
+    if (!krbServiceName || !username) {
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.AUTH_FAILED,
+      });
+      this.logger.error(
+        'Kerberos service name and username are required for Kerberos authentication.',
+      );
+      throw new Db2Error(
+        'Kerberos service name and username are required for Kerberos authentication.',
+      );
+    }
+
+    this.kerberosClient = new KerberosClient(authOptions);
+
     try {
-      // Initialize Kerberos client and acquire ticket
-      await this.initializeKerberosClient();
+      await this.kerberosClient.initializeClient();
+      await this.kerberosClient.acquireKerberosTicket();
       this.logger.log('Authentication successful using Kerberos strategy.');
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
     } catch (error: any) {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
@@ -58,6 +79,8 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
       throw new Db2AuthenticationError(
         'Authentication failed during Kerberos strategy.',
       );
+    } finally {
+      this.cleanup();
     }
   }
 
@@ -88,56 +111,13 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
   }
 
   /**
-   * Initializes the Kerberos client and acquires a ticket.
+   * Cleanup Kerberos client resources.
    */
-  private async initializeKerberosClient(): Promise<void> {
-    const authOptions = this.config.auth as Db2KerberosAuthOptions;
-
-    const { krbServiceName, username, krbKeytab } = authOptions;
-
-    try {
-      // Initialize Kerberos client
-      const client = await kerberos.initializeClient(krbServiceName, {
-        principal: username,
-        keytab: krbKeytab,
-        kdc: process.env.KRB_KDC, // Optional KDC host
-      });
-      this.logger.log('Kerberos client initialized successfully.');
-
-      // Acquire Kerberos ticket
-      await this.acquireKerberosTicket(client);
-    } catch (error: any) {
-      this.logger.error('Failed to initialize Kerberos client:', error.message);
-      throw new Db2AuthenticationError(
-        'Kerberos client initialization failed.',
-      );
-    }
-  }
-
-  /**
-   * Acquires a Kerberos ticket using the initialized Kerberos client.
-   */
-  private async acquireKerberosTicket(client: kerberos.Client): Promise<void> {
-    try {
-      // Send an authentication request to obtain a ticket
-      await new Promise((resolve, reject) => {
-        client.step('', (error, response) => {
-          if (error) {
-            this.logger.error(
-              'Failed to acquire Kerberos ticket:',
-              error.message,
-            );
-            return reject(
-              new Db2AuthenticationError('Failed to acquire Kerberos ticket.'),
-            );
-          }
-          this.logger.log('Kerberos ticket acquired successfully.');
-          resolve(response);
-        });
-      });
-    } catch (error: any) {
-      this.logger.error('Failed to acquire Kerberos ticket:', error.message);
-      throw new Db2AuthenticationError('Failed to acquire Kerberos ticket.');
+  private cleanup(): void {
+    if (this.kerberosClient) {
+      // If the KerberosClient needs any cleanup, implement it here.
+      // Currently, no cleanup is needed.
+      this.kerberosClient = null;
     }
   }
 }

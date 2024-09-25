@@ -67,8 +67,7 @@
     "cache-manager": "^5.7.6",
     "class-validator": "^0.14.1",
     "generic-pool": "^3.9.0",
-    "ibm_db": "^3.2.4",
-    "kerberos": "^2.2.0"
+    "ibm_db": "^3.2.4"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0",
