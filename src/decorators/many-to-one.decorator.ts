@@ -1,45 +1,65 @@
-// decorators/many-to-one.decorator.ts
+// src/decorators/manyToOne.decorator.ts
 
-import 'reflect-metadata';
-import { ManyToOneMetadata } from '../metadata';
-import { ManyToOneOptions, MANY_TO_ONE_RELATIONS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { ManyToOneMetadata, ManyToOneOptions } from '../interfaces';
+import { getMetadata } from './utils';
 
-export function ManyToOne(options: ManyToOneOptions): PropertyDecorator {
-  // Validate the provided options
+/**
+ * Validates the options provided to the @ManyToOne decorator.
+ * @param options - The many-to-one relationship options.
+ */
+const validateManyToOneOptions = (options: ManyToOneOptions) => {
   if (typeof options.target !== 'function') {
     throw new Error(
       "ManyToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  // Additional validations can be added here if necessary
+};
 
-    // Retrieve existing many-to-one relations metadata or initialize if none exists
-    const manyToOneRelations: ManyToOneMetadata[] =
-      Reflect.getMetadata(MANY_TO_ONE_RELATIONS_METADATA_KEY, constructor) ||
-      [];
+/**
+ * Creates many-to-one metadata from the provided options.
+ * @param propertyKey - The property key of the relationship.
+ * @param options - The many-to-one relationship options.
+ * @returns The many-to-one metadata.
+ */
+const createManyToOneMetadata = (
+  propertyKey: string | symbol,
+  options: ManyToOneOptions,
+): ManyToOneMetadata => ({
+  propertyKey,
+  options,
+});
 
-    // Check for existing relation for the same property key to avoid duplicates
-    const existingRelation = manyToOneRelations.find(
-      (relation) => relation.manyToOneOptions.propertyKey === propertyKey,
-    );
+/**
+ * Ensures that the property key is unique within many-to-one relations.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckManyToOne = (
+  existing: ManyToOneMetadata,
+  newEntry: ManyToOneMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
 
-    if (!existingRelation) {
-      // Add new many-to-one relation metadata
-      manyToOneRelations.push({
-        manyToOneOptions: { propertyKey, ...options },
-      });
+/**
+ * @ManyToOne decorator to define a many-to-one relationship between entities.
+ * @param options - Configuration options for the relationship.
+ * @returns PropertyDecorator
+ */
+export const ManyToOne = createPropertyDecorator<ManyToOneOptions>(
+  'manyToOneRelations',
+  validateManyToOneOptions,
+  createManyToOneMetadata,
+  uniqueCheckManyToOne,
+);
 
-      // Define or update metadata with the new many-to-one relations
-      Reflect.defineMetadata(
-        'manyToOneRelations',
-        manyToOneRelations,
-        constructor,
-      );
-    }
-  };
-}
+/**
+ * Retrieves many-to-one relations metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns ManyToOneMetadata[]
+ */
+export const getManyToOneMetadata = (target: any): ManyToOneMetadata[] => {
+  return getMetadata<ManyToOneMetadata>(target, 'manyToOneRelations');
+};

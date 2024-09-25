@@ -1,39 +1,54 @@
 // src/decorators/column.decorator.ts
 
-import 'reflect-metadata';
-import { ColumnMetadata, ColumnOptions } from '../metadata';
-import { COLUMNS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { ColumnOptions, ColumnMetadata } from '../interfaces';
+import { getMetadata } from './utils';
+
+/**
+ * Validates the options provided to the @Column decorator.
+ * @param options - The column options.
+ */
+const validateColumnOptions = (options: ColumnOptions) => {
+  if (!options.type || typeof options.type !== 'string') {
+    throw new Error('Column type must be a non-empty string.');
+  }
+};
+
+/**
+ * Creates column metadata from the provided options.
+ * @param propertyKey - The property key of the column.
+ * @param options - The column options.
+ * @returns The column metadata.
+ */
+const createColumnMetadata = (
+  propertyKey: string | symbol,
+  options: ColumnOptions,
+): ColumnMetadata => ({
+  propertyKey,
+  options: {
+    type: options.type,
+    length: options.length,
+    nullable: options.nullable,
+    default: options.default,
+  },
+});
 
 /**
  * @Column decorator to define a database column.
  * @param options - Configuration options for the column.
  * @returns PropertyDecorator
  */
-export function Column(options: ColumnOptions): PropertyDecorator {
-  if (!options.type || typeof options.type !== 'string') {
-    throw new Error('Column type must be a non-empty string.');
-  }
+export const Column = createPropertyDecorator<ColumnOptions>(
+  'columns',
+  validateColumnOptions,
+  createColumnMetadata,
+);
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
-
-    // Retrieve existing columns metadata or initialize if none exists
-    const existingColumns: ColumnMetadata[] =
-      Reflect.getMetadata(COLUMNS_METADATA_KEY, constructor) || [];
-
-    // Add new column metadata
-    existingColumns.push({
-      propertyKey,
-      type: options.type,
-      length: options.length,
-      nullable: options.nullable,
-      default: options.default,
-    });
-
-    // Define or update metadata with new columns array
-    Reflect.defineMetadata(COLUMNS_METADATA_KEY, existingColumns, constructor);
-  };
-}
+/**
+ * Retrieves column metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns ColumnMetadata[]
+ */
+export const getColumnMetadata = (target: any): ColumnMetadata[] => {
+  return getMetadata<ColumnMetadata>(target, 'columns');
+};

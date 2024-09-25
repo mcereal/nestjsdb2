@@ -1,38 +1,51 @@
-// decorators/primary-key.decorator.ts
+// src/decorators/primaryKey.decorator.ts
 
-import 'reflect-metadata';
-import { PrimaryKeyMetadata } from '../metadata';
-import { primeKeyOptions, PRIMARY_KEYS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { PrimaryKeyMetadata, primeKeyOptions } from '../interfaces';
+import { getMetadata } from './utils';
 
-export function PrimaryKey(options?: primeKeyOptions): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+/**
+ * Creates primary key metadata for the property.
+ * @param propertyKey - The property key of the primary key.
+ * @param options - Optional configuration options for the primary key.
+ * @returns The primary key metadata.
+ */
+const createPrimaryKeyMetadata = (
+  propertyKey: string | symbol,
+  options?: primeKeyOptions,
+): PrimaryKeyMetadata => ({
+  propertyKey,
+  options: options || {},
+});
 
-    // Retrieve existing primary keys metadata or initialize if none exists
-    const primaryKeys: PrimaryKeyMetadata[] =
-      Reflect.getMetadata(PRIMARY_KEYS_METADATA_KEY, constructor) || [];
+/**
+ * Ensures that the property key is unique within primary keys.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckPrimaryKey = (
+  existing: PrimaryKeyMetadata,
+  newEntry: PrimaryKeyMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
 
-    // Check if the property key is already marked as a primary key
-    const existingKey = primaryKeys.find(
-      (key) => key.propertyKey === propertyKey,
-    );
+/**
+ * @PrimaryKey decorator to mark a property as a primary key.
+ * @param options - Optional configuration options for the primary key.
+ * @returns PropertyDecorator
+ */
+export const PrimaryKey = createPropertyDecorator<primeKeyOptions | undefined>(
+  'primaryKeys',
+  () => {}, // No validation needed for now
+  createPrimaryKeyMetadata,
+  uniqueCheckPrimaryKey,
+);
 
-    if (!existingKey) {
-      // Add new primary key metadata
-      primaryKeys.push({
-        propertyKey,
-        primeKeyOptions: options || {},
-      });
-
-      // Define or update metadata with the new primary keys
-      Reflect.defineMetadata(
-        PRIMARY_KEYS_METADATA_KEY,
-        primaryKeys,
-        constructor,
-      );
-    }
-  };
-}
+/**
+ * Retrieves primary keys metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns PrimaryKeyMetadata[]
+ */
+export const getPrimaryKeyMetadata = (target: any): PrimaryKeyMetadata[] => {
+  return getMetadata<PrimaryKeyMetadata>(target, 'primaryKeys');
+};

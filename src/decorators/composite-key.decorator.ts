@@ -1,22 +1,26 @@
-import 'reflect-metadata';
-import { CompositeKeyMetadata } from '../types';
+import { CompositeKeyMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 /**
  * Class decorator to mark a composite key in an entity.
  * @param keys - An array of strings representing the properties that form the composite key.
  * @returns A class decorator.
  */
-export function CompositeKey(keys: string[]): ClassDecorator {
+export const CompositeKey = (keys: string[]): ClassDecorator => {
   if (!Array.isArray(keys) || keys.length === 0) {
     throw new Error(
       'CompositeKey must be initialized with a non-empty array of strings.',
     );
   }
 
-  return (target: unknown) => {
+  return (target: Function) => {
+    // Using Function type as expected by ClassDecorator
     if (typeof target !== 'function') {
       throw new Error('CompositeKey decorator can only be applied to classes.');
     }
+
+    // Ensure that the constructor is treated as a class constructor
+    const constructor = target as new (...args: any[]) => any;
 
     // Get the prototype of the target to access defined properties
     const prototype = target.prototype;
@@ -34,14 +38,48 @@ export function CompositeKey(keys: string[]): ClassDecorator {
       );
     }
 
-    // Retrieve existing composite keys metadata or initialize if none exists
-    const compositeKeysMetadata: CompositeKeyMetadata[] =
-      Reflect.getMetadata('compositeKeys', target) || [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
+
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Add new composite key metadata
-    compositeKeysMetadata.push({ keys });
+    const compositeKeyMetadata: CompositeKeyMetadata = { keys };
+    entityMetadata.compositeKeys.push(compositeKeyMetadata);
 
-    // Define or update metadata with the new composite key metadata array
-    Reflect.defineMetadata('compositeKeys', compositeKeysMetadata, target);
+    // Store the updated metadata
+    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   };
-}
+};
+
+/**
+ * Function to retrieve composite key metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns CompositeKeyMetadata[]
+ */
+export const getCompositeKeyMetadata = (
+  target: Function, // Using Function type here as well
+): CompositeKeyMetadata[] => {
+  const constructor = target as new (...args: any[]) => any;
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
+  return entityMetadata ? entityMetadata.compositeKeys : [];
+};
