@@ -1,6 +1,6 @@
 // src/decorators/log-execution-time.decorator.ts
 
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * @function LogExecutionTime

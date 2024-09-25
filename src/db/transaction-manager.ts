@@ -1,4 +1,4 @@
-import { Inject, Logger } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import {
   IDb2Client,
   IDb2ConfigOptions,
@@ -10,6 +10,7 @@ import {
   I_DB2_CLIENT,
   I_DB2_CONFIG,
 } from '../constants/injection-token.constant';
+import { Logger } from '../utils';
 
 export class TransactionManager implements ITransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
@@ -51,7 +52,7 @@ export class TransactionManager implements ITransactionManager {
         await this.client.query(
           `SET TRANSACTION ISOLATION LEVEL ${this.isolationLevel}`,
         );
-        this.logger.log(
+        this.logger.info(
           `Transaction isolation level set to ${this.isolationLevel}.`,
         );
       }
@@ -60,7 +61,7 @@ export class TransactionManager implements ITransactionManager {
       await this.client.query('BEGIN TRANSACTION');
       this.transactionActive = true;
       const duration = Date.now() - startTime;
-      this.logger.log(`Transaction started in ${duration}ms.`);
+      this.logger.info(`Transaction started in ${duration}ms.`);
     } catch (error) {
       this.logger.error('Failed to start transaction.', error);
       this.transactionActive = false; // Reset the transaction state
@@ -83,7 +84,7 @@ export class TransactionManager implements ITransactionManager {
       await this.client.query('COMMIT');
       this.transactionActive = false;
       const duration = Date.now() - startTime;
-      this.logger.log(`Transaction committed in ${duration}ms.`);
+      this.logger.info(`Transaction committed in ${duration}ms.`);
     } catch (error) {
       this.logger.error('Failed to commit transaction.', error);
       throw new Db2Error('Transaction commit error');
@@ -105,7 +106,7 @@ export class TransactionManager implements ITransactionManager {
       await this.client.query('ROLLBACK');
       this.transactionActive = false;
       const duration = Date.now() - startTime;
-      this.logger.log(`Transaction rolled back in ${duration}ms.`);
+      this.logger.info(`Transaction rolled back in ${duration}ms.`);
     } catch (error) {
       this.logger.error('Failed to rollback transaction.', error);
       throw new Db2Error('Transaction rollback error');
@@ -128,7 +129,7 @@ export class TransactionManager implements ITransactionManager {
     }
 
     this.isolationLevel = level;
-    this.logger.log(`Transaction isolation level set to ${level}.`);
+    this.logger.info(`Transaction isolation level set to ${level}.`);
   }
 
   /**

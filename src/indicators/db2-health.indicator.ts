@@ -1,9 +1,10 @@
 // src/indicators/db2-health.indicator.ts
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Db2Service } from '../services/db2.service';
 import { Db2ConnectionState } from '../enums';
 import { HealthCheckError } from '../errors/health-check.error';
+import { Logger } from '../utils';
 
 /**
  * @class Db2HealthIndicator
@@ -23,7 +24,7 @@ export class Db2HealthIndicator {
    * @throws HealthCheckError if the health check fails.
    */
   async checkHealth(key = 'db2'): Promise<Record<string, any>> {
-    this.logger.log('Performing Db2 health check...');
+    this.logger.info('Performing Db2 health check...');
 
     try {
       // Check the current connection state
@@ -53,7 +54,7 @@ export class Db2HealthIndicator {
         throw new HealthCheckError('Db2 health check failed', healthStatus);
       }
 
-      this.logger.log('Db2 is healthy.', healthStatus);
+      this.logger.info('Db2 is healthy.', healthStatus);
       return healthStatus;
     } catch (error) {
       const healthStatus = this.getStatus(key, false, {

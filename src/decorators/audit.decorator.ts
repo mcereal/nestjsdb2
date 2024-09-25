@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 import * as _ from 'lodash';
 
 /**
@@ -59,11 +59,11 @@ export function Db2Audit(ignoreProperties: string[] = []): MethodDecorator {
 
         // Log the differences
         if (Object.keys(changes).length > 0) {
-          logger.log(`Audit log for method ${String(propertyKey)}`);
-          logger.log(`Changes: ${JSON.stringify(changes)}`);
+          logger.info(`Audit log for method ${String(propertyKey)}`);
+          logger.info(`Changes: ${JSON.stringify(changes)}`);
           // Optionally, save the audit log to a database or external system here
         } else {
-          logger.log(`No changes detected for method ${String(propertyKey)}`);
+          logger.info(`No changes detected for method ${String(propertyKey)}`);
         }
 
         return result;

@@ -1,5 +1,6 @@
 import { validateOrReject, ValidationError } from 'class-validator';
-import { Logger, BadRequestException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * @function Db2EntityValidation

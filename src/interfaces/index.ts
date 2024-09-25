@@ -41,3 +41,4 @@ export * from './transaction-manager.interface';
 export * from './db2-config-options.interface';
 export * from './entity-decorators.interface';
 export * from './kerberos-client.interface';
+export * from './logger.interface';
