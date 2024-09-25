@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/mcereal/nestjsdb2/compare/v1.1.1...v1.1.2) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove redis cache dependency ([fea8966](https://github.com/mcereal/nestjsdb2/commit/fea89663f139aca40324567a663fd4d626db1529))
+
 ## [1.1.1](https://github.com/mcereal/nestjsdb2/compare/v1.1.0...v1.1.1) (2024-09-25)
 
 
