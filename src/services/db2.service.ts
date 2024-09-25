@@ -7,7 +7,6 @@ import {
   Optional,
 } from '@nestjs/common';
 import {
-  Db2CacheOptions,
   Db2ClientState,
   IDb2ConfigOptions,
   Db2HealthDetails,
@@ -19,10 +18,9 @@ import {
 } from '../interfaces';
 import { Db2QueryBuilder } from '../db';
 import { handleDb2Error } from '../errors/db2.error';
-import { Cache, caching } from 'cache-manager';
+import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { IConnectionManager } from '../interfaces';
-import { redisStore } from 'cache-manager-redis-yet';
 import {
   I_CONNECTION_MANAGER,
   I_DB2_CLIENT,
@@ -51,11 +49,9 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
     @Inject(I_DB2_CLIENT)
     private readonly client: IDb2Client,
   ) {
-    // Initialize cache if enabled
     if (this.options.cache?.enabled && this.cacheManager) {
       this.cache = this.cacheManager;
       this.logger.log('Cache manager initialized.');
-      this.initializeCache(this.options.cache);
     } else {
       this.logger.log('Caching is disabled.');
     }
@@ -158,9 +154,15 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
         }
 
         const cacheStore = this.cache.store as any;
-        if (typeof cacheStore.disconnect === 'function') {
+        if (typeof cacheStore?.disconnect === 'function') {
           await cacheStore.disconnect();
           this.logger.log('Cache store connection closed.');
+        } else if (
+          typeof cacheStore?.getClient === 'function' &&
+          typeof cacheStore.getClient()?.disconnect === 'function'
+        ) {
+          await cacheStore.getClient().disconnect();
+          this.logger.log('Cache store client connection closed.');
         }
       } catch (error) {
         const options = {
@@ -277,28 +279,6 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
 
   public getActiveConnectionsCount(): number {
     return this.connectionManager.getActiveConnectionsCount();
-  }
-
-  /**
-   * Initialize the cache based on the provided cache options.
-   */
-  private async initializeCache(cacheOptions: Db2CacheOptions): Promise<void> {
-    if (cacheOptions.store === 'redis') {
-      this.cache = await caching(redisStore, {
-        host: cacheOptions.redisHost,
-        port: cacheOptions.redisPort,
-        password: cacheOptions.redisPassword,
-        ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
-      });
-      this.logger.log('Redis cache initialized.');
-    } else {
-      // Default to in-memory cache
-      this.cache = await caching('memory', {
-        max: cacheOptions.max || 100, // Default max items
-        ttl: cacheOptions.ttl || 600, // Default to 10 minutes if not set
-      });
-      this.logger.log('In-memory cache initialized.');
-    }
   }
 
   /**
