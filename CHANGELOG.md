@@ -1,3 +1,11 @@
+## [1.1.5](https://github.com/mcereal/nestjsdb2/compare/v1.1.4...v1.1.5) (2024-09-25)
+
+
+### Bug Fixes
+
+* refactor to reduce duplications ([2846c07](https://github.com/mcereal/nestjsdb2/commit/2846c07d22adb7ae55cc2b94285daf2878e9cdf6))
+* remove reflect-metadata ([a88a2bb](https://github.com/mcereal/nestjsdb2/commit/a88a2bbd99ac364e4af8b6d62e026679de98d869))
+
 ## [1.1.4](https://github.com/mcereal/nestjsdb2/compare/v1.1.3...v1.1.4) (2024-09-25)
 
 
