@@ -2,7 +2,7 @@ import { Db2QueryBuilder } from '../db';
 import { Db2ClientState } from './db2-client.interface';
 import { Connection } from 'ibm_db';
 
-export interface Db2ServiceInterface {
+export interface IDb2Service {
   // Lifecycle hooks
   onModuleInit(): Promise<void>;
   onModuleDestroy(): Promise<void>;

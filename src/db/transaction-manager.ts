@@ -1,8 +1,15 @@
 import { Inject, Logger } from '@nestjs/common';
-import { IDb2Client, ITransactionManager } from '../interfaces';
+import {
+  IDb2Client,
+  IDb2ConfigOptions,
+  ITransactionManager,
+} from '../interfaces';
 import { Db2Error } from '../errors';
 import { Db2IsolationLevel } from '../enums';
-import { I_DB2_CLIENT } from '../constants/injection-token.constant';
+import {
+  I_DB2_CLIENT,
+  I_DB2_CONFIG,
+} from '../constants/injection-token.constant';
 
 export class TransactionManager implements ITransactionManager {
   private readonly logger = new Logger(TransactionManager.name);
@@ -12,7 +19,8 @@ export class TransactionManager implements ITransactionManager {
   public constructor(
     @Inject(I_DB2_CLIENT)
     private readonly client: IDb2Client,
-    private defaultIsolationLevel?: Db2IsolationLevel,
+    @Inject(I_DB2_CONFIG) // Inject the config
+    private readonly config: IDb2ConfigOptions,
   ) {}
 
   /**
@@ -34,7 +42,7 @@ export class TransactionManager implements ITransactionManager {
       // Use the provided isolation level or fallback to the default or READ_COMMITTED
       this.isolationLevel =
         isolationLevel ||
-        this.defaultIsolationLevel ||
+        this.config.defaultIsolationLevel ||
         Db2IsolationLevel.READ_COMMITTED;
 
       const startTime = Date.now();

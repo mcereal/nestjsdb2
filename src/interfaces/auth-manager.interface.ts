@@ -1,7 +1,6 @@
 // src/type/auth-manager.interface.ts
 
 import { Db2AuthStrategy } from '../auth';
-import { Db2AuthOptions } from './db2.interface';
 
 /**
  * Interface for the authentication manager.

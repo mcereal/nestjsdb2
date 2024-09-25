@@ -33,10 +33,6 @@ export interface IDb2Client {
     whereClause: string,
   ): Promise<void>;
 
-  // Connection state management
-  setState(state: Partial<Db2ClientState>): void;
-  getState(): Db2ClientState;
-
   // Pool monitoring
   logPoolStatus(): void;
 
