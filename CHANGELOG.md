@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/mcereal/nestjsdb2/compare/v1.1.2...v1.1.3) (2024-09-25)
+
+
+### Bug Fixes
+
+* @nestjs/config not needed ([c4b2227](https://github.com/mcereal/nestjsdb2/commit/c4b2227e3d36a6b7b68eeb7f71de1b958e005857))
+
 ## [1.1.2](https://github.com/mcereal/nestjsdb2/compare/v1.1.1...v1.1.2) (2024-09-25)
 
 
