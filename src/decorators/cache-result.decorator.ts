@@ -1,5 +1,5 @@
 import { Cache } from 'cache-manager';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 export const CacheResult = (ttl = 60): MethodDecorator => {
   const logger = new Logger('CacheResultDecorator');

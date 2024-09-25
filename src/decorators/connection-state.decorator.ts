@@ -2,7 +2,7 @@
 
 import { Db2Service } from '../services';
 import { Db2ConnectionState } from '../enums';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * @function CheckDb2ConnectionState

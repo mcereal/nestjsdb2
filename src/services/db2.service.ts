@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Logger,
   OnModuleInit,
   OnModuleDestroy,
   Inject,
@@ -30,6 +29,7 @@ import {
   I_TRANSACTION_MANAGER,
 } from '../constants/injection-token.constant';
 import { Db2ConnectionState } from '../enums';
+import { Logger } from '../utils';
 
 @Injectable()
 export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
@@ -51,40 +51,40 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   ) {
     if (this.options.cache?.enabled && this.cacheManager) {
       this.cache = this.cacheManager;
-      this.logger.log('Cache manager initialized.');
+      this.logger.info('Cache manager initialized.');
     } else {
-      this.logger.log('Caching is disabled.');
+      this.logger.info('Caching is disabled.');
     }
   }
 
   // Lifecycle Hooks
 
   public async onModuleInit(): Promise<void> {
-    this.logger.log('Initializing Db2Service...');
+    this.logger.info('Initializing Db2Service...');
 
     // Wait for the pool to be initialized
     while (!this.poolManager.isPoolInitialized) {
-      this.logger.log('Waiting for the connection pool to be initialized...');
+      this.logger.info('Waiting for the connection pool to be initialized...');
       await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
     }
 
     // Validate configuration
     this.validateConfig(this.options);
-    this.logger.log('Configuration validated.');
+    this.logger.info('Configuration validated.');
 
     try {
       // Connect to DB2
-      this.logger.log('Connecting to DB2...');
+      this.logger.info('Connecting to DB2...');
       await this.connect();
-      this.logger.log('Connected to DB2 successfully.');
+      this.logger.info('Connected to DB2 successfully.');
 
       // Run migrations if enabled
       if (this.options.migration?.enabled) {
-        this.logger.log('Migrations are enabled. Running migrations...');
+        this.logger.info('Migrations are enabled. Running migrations...');
         await this.migrationService.runMigrations();
-        this.logger.log('Migrations completed successfully.');
+        this.logger.info('Migrations completed successfully.');
       } else {
-        this.logger.log('Migrations are disabled. Skipping migration step.');
+        this.logger.info('Migrations are disabled. Skipping migration step.');
       }
 
       // Set state to CONNECTED
@@ -92,7 +92,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
         connectionState: Db2ConnectionState.CONNECTED,
       });
 
-      this.logger.log('Db2Service initialization complete.');
+      this.logger.info('Db2Service initialization complete.');
     } catch (error) {
       // Set state to ERROR on failure
       this.connectionManager.setState({
@@ -109,7 +109,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   }
 
   public async onModuleDestroy(): Promise<void> {
-    this.logger.log('Destroying Db2Service...');
+    this.logger.info('Destroying Db2Service...');
 
     // Set state to DISCONNECTING
     this.connectionManager.setState({
@@ -150,19 +150,19 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       try {
         if (this.options.cache?.resetOnDestroy) {
           await this.cache.reset();
-          this.logger.log('Cache reset successfully.');
+          this.logger.info('Cache reset successfully.');
         }
 
         const cacheStore = this.cache.store as any;
         if (typeof cacheStore?.disconnect === 'function') {
           await cacheStore.disconnect();
-          this.logger.log('Cache store connection closed.');
+          this.logger.info('Cache store connection closed.');
         } else if (
           typeof cacheStore?.getClient === 'function' &&
           typeof cacheStore.getClient()?.disconnect === 'function'
         ) {
           await cacheStore.getClient().disconnect();
-          this.logger.log('Cache store client connection closed.');
+          this.logger.info('Cache store client connection closed.');
         }
       } catch (error) {
         const options = {
@@ -188,7 +188,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   public async connect(): Promise<void> {
     const currentState = this.connectionManager.getState().connectionState;
     if (currentState === Db2ConnectionState.CONNECTED) {
-      this.logger.log('Already connected. Skipping connect.');
+      this.logger.info('Already connected. Skipping connect.');
       return;
     }
 
@@ -199,7 +199,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       });
 
       await this.connectionManager.getConnection(); // Now this should succeed
-      this.logger.log('Db2Service connected successfully.');
+      this.logger.info('Db2Service connected successfully.');
 
       // Set state to CONNECTED on successful connection
       this.connectionManager.setState({
@@ -228,7 +228,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       });
 
       await this.connectionManager.disconnect(); // Delegate to connectionManager
-      this.logger.log('Db2Service disconnected successfully.');
+      this.logger.info('Db2Service disconnected successfully.');
 
       // Set state to DISCONNECTED
       this.connectionManager.setState({
@@ -252,7 +252,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       });
 
       await this.connectionManager.drainPool(); // Delegate to connectionManager
-      this.logger.log('Db2Service drained the connection pool successfully.');
+      this.logger.info('Db2Service drained the connection pool successfully.');
 
       // Set state to POOL_DRAINED
       this.connectionManager.setState({
@@ -289,7 +289,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       try {
         const cacheKey = this.generateCacheKey(sql, params);
         await this.cache.del(cacheKey);
-        this.logger.log(`Cache cleared for query: ${sql}`);
+        this.logger.info(`Cache cleared for query: ${sql}`);
         return true;
       } catch (error) {
         const options = {
@@ -320,7 +320,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
     details?: Db2HealthDetails;
     error?: string; // Add error at the top level
   }> {
-    this.logger.log('Performing service-level health check...');
+    this.logger.info('Performing service-level health check...');
 
     try {
       // Get the full health check details from the client
@@ -366,7 +366,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       error: error ? error.message : null,
     };
 
-    this.logger.log(JSON.stringify(logMessage));
+    this.logger.info(JSON.stringify(logMessage));
   }
 
   /**
@@ -384,7 +384,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       const cacheKey = this.generateCacheKey(sql, params);
       const cachedResult = await this.cache.get<T>(cacheKey);
       if (cachedResult) {
-        this.logger.log(`Cache hit for query: ${sql}`);
+        this.logger.info(`Cache hit for query: ${sql}`);
         return cachedResult;
       }
     }
@@ -397,7 +397,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       if (this.cache) {
         const cacheKey = this.generateCacheKey(sql, params);
         await this.cache.set(cacheKey, result);
-        this.logger.log(`Cache set for query: ${sql}`);
+        this.logger.info(`Cache set for query: ${sql}`);
       }
 
       const duration = Date.now() - start;
@@ -554,7 +554,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   public async beginTransaction(): Promise<void> {
     try {
       await this.transactionManager.beginTransaction();
-      this.logger.log('Transaction started.');
+      this.logger.info('Transaction started.');
     } catch (error) {
       const options = {
         host: this.options.host,
@@ -571,7 +571,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   public async commitTransaction(): Promise<void> {
     try {
       await this.transactionManager.commitTransaction();
-      this.logger.log('Transaction committed.');
+      this.logger.info('Transaction committed.');
     } catch (error) {
       const options = {
         host: this.options.host,
@@ -588,7 +588,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   public async rollbackTransaction(): Promise<void> {
     try {
       await this.transactionManager.rollbackTransaction();
-      this.logger.log('Transaction rolled back.');
+      this.logger.info('Transaction rolled back.');
     } catch (error) {
       const options = {
         host: this.options.host,
@@ -605,7 +605,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   public async runMigration(script: string): Promise<void> {
     try {
       await this.query(script); // Use the existing query method
-      this.logger.log('Migration script executed successfully.');
+      this.logger.info('Migration script executed successfully.');
     } catch (error) {
       const options = {
         host: this.options.host,

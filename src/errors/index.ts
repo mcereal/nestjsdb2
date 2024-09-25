@@ -10,6 +10,7 @@
  *
  * @exports Db2Error
  * @exports HealthCheckError
+ *
  */
 
 export * from './db2.error';

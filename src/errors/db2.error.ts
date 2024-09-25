@@ -15,7 +15,7 @@
  * @exports Db2ConnectionError
  */
 
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * Custom error class for Db2-related errors.

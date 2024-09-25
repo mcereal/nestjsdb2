@@ -1,7 +1,7 @@
 // src/decorators/db2-query.decorator.ts
 
 import { Db2Service } from 'src/services/db2.service';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 export const Db2Query = (
   query: string,
@@ -28,7 +28,7 @@ export const Db2Query = (
       if (executeQuery) {
         try {
           queryResult = await db2Service.query(query, args);
-          logger.log(`Query executed successfully: ${query}`);
+          logger.info(`Query executed successfully: ${query}`);
         } catch (error) {
           logger.error(`Error executing query: ${query} - ${error.message}`);
           throw new Error(`Error executing query: ${error.message}`);
