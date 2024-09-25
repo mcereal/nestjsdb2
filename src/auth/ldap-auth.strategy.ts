@@ -55,10 +55,21 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       throw new Db2AuthenticationError('LDAP credentials are incomplete.');
     }
 
+    // Configure TLS options if needed (e.g., custom CA)
+    const tlsOptions = authOptions.tlsOptions
+      ? {
+          rejectUnauthorized: authOptions.tlsOptions.rejectUnauthorized ?? true,
+          ca: authOptions.tlsOptions.ca,
+          key: authOptions.tlsOptions.key,
+          cert: authOptions.tlsOptions.cert,
+        }
+      : undefined;
+
     const ldapConfig: LdapConfig = {
       ldapUrl,
       username,
       password,
+      tlsOptions,
     };
 
     this.ldapClient = new LdapClient(ldapConfig);

@@ -13,7 +13,7 @@ export interface LdapConfig {
   tlsOptions?: ConnectionOptions; // Optional TLS configurations
 }
 
-export class SimpleLdapClient {
+export class LdapClient {
   private socket: Socket | TLSSocket;
   private logger: Logger;
   private messageID: number;
@@ -22,7 +22,7 @@ export class SimpleLdapClient {
   private rejectBind!: (reason?: any) => void;
 
   constructor(private config: LdapConfig) {
-    this.logger = new Logger(SimpleLdapClient.name);
+    this.logger = new Logger(LdapClient.name);
     this.socket = new Socket();
     this.messageID = 1;
     this.responseBuffer = Buffer.alloc(0);
