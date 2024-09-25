@@ -44,14 +44,6 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
     });
     this.logger.log('Starting LDAP authentication...');
 
-    if (!this.connectionManager.getState().poolInitialized) {
-      this.logger.error('Connection pool is not ready for authentication.');
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.ERROR,
-      });
-      throw new Error('Connection pool is not ready for authentication.');
-    }
-
     try {
       // Perform LDAP bind (authentication)
       await this.ldapBind();

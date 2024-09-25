@@ -44,14 +44,6 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
     });
     this.logger.log('Starting JWT authentication...');
 
-    if (!this.connectionManager.getState().poolInitialized) {
-      this.logger.error('Connection pool is not ready for authentication.');
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.ERROR,
-      });
-      throw new Error('Connection pool is not ready for authentication.');
-    }
-
     try {
       // Proceed to open a connection, which will internally verify the JWT token
       const connection: Connection =

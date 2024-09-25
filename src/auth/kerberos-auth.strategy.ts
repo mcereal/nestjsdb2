@@ -46,14 +46,6 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     });
     this.logger.log('Starting Kerberos authentication...');
 
-    if (!this.connectionManager.getState().poolInitialized) {
-      this.logger.error('Connection pool is not ready for authentication.');
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.ERROR,
-      });
-      throw new Error('Connection pool is not ready for authentication.');
-    }
-
     try {
       // Initialize Kerberos client and acquire ticket
       await this.initializeKerberosClient();

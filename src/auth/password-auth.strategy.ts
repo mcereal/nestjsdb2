@@ -3,13 +3,11 @@
 import { Inject, Logger } from '@nestjs/common';
 import { Db2AuthStrategy } from './db2-auth.strategy';
 import { Db2ConnectionState } from '../enums';
-import { Db2AuthenticationError } from '../errors';
 import {
   IDb2ConfigOptions,
   IConnectionManager,
   Db2PasswordAuthOptions,
 } from '../interfaces';
-import { Connection } from 'ibm_db';
 import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
 
 export class PasswordAuthStrategy extends Db2AuthStrategy {
