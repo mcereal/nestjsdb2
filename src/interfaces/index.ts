@@ -27,7 +27,6 @@
  * @exports IDb2MigrationService
  * @exports IDb2Client
  * @exports IDb2ConfigOptions
- * @exports IAuthManager
  */
 
 export * from './db2.interface';
@@ -40,4 +39,3 @@ export * from './connection-mannager.interface';
 export * from './pool-manager.interface';
 export * from './transaction-manager.interface';
 export * from './db2-config-options.interface';
-export * from './auth-manager.interface';

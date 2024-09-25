@@ -12,3 +12,4 @@ export * from './auth'; // Export the authentication functions
 export * from './metadata'; // Export the metadata storage classes
 export * from './utils'; // Export any utility functions
 export * from './types'; // Export any custom types
+export * from './auth'; // Export the authentication functions
