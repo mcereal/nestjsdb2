@@ -68,8 +68,7 @@
     "class-validator": "^0.14.1",
     "generic-pool": "^3.9.0",
     "ibm_db": "^3.2.4",
-    "kerberos": "^2.2.0",
-    "ldapjs": "^3.0.7"
+    "kerberos": "^2.2.0"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0",

@@ -52,6 +52,12 @@ export interface Db2LdapAuthOptions extends Db2BaseAuthOptions {
   username: string;
   password: string;
   ldapUrl: string; // URL for the LDAP server
+  tlsOptions?: {
+    rejectUnauthorized?: boolean; // Reject unauthorized TLS connections
+    ca?: string; // Custom CA certificate
+    key?: string; // Private key
+    cert?: string; // Public certificate
+  };
 }
 
 /**
