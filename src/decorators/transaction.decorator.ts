@@ -1,7 +1,7 @@
 // src/decorators/db2-transaction.decorator.ts
 
 import { Db2Service } from '../services';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * @function Transaction

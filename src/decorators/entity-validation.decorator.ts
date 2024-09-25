@@ -1,9 +1,12 @@
-import { validateOrReject, ValidationError } from 'class-validator';
-import { Logger, BadRequestException } from '@nestjs/common';
+// src/decorators/db2-entity-validation.decorator.ts
+import { BadRequestException } from '@nestjs/common';
+import { Logger } from '../utils';
+import { validateOrReject } from '../validation/validateOrReject';
+import { ValidationError } from '../validation/ValidationError';
 
 /**
  * @function Db2EntityValidation
- * @description A method decorator that validates entities using class-validator before executing the decorated method.
+ * @description A method decorator that validates entities using custom validation functions before executing the decorated method.
  * This ensures that data integrity rules are followed, and any validation errors are logged and thrown as exceptions.
  *
  * @param {boolean} [throwException=true] - Whether to throw an exception on validation failure. Defaults to true.
@@ -26,7 +29,7 @@ export const Db2EntityValidation = (throwException = true): MethodDecorator => {
   const logger = new Logger('Db2EntityValidationDecorator');
 
   return function (
-    _target: new (...args: any[]) => any,
+    _target: Object,
     _propertyKey: string | symbol,
     descriptor: PropertyDescriptor,
   ) {

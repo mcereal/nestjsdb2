@@ -1,5 +1,5 @@
 import { Pool, Connection } from 'ibm_db';
-import { Inject, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   Db2AuthOptions,
   IDb2Client,
@@ -25,6 +25,7 @@ import {
   I_DB2_CONFIG,
   I_POOL_MANAGER,
 } from '../constants/injection-token.constant';
+import { Logger } from '../utils';
 
 export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   protected readonly config: IDb2ConfigOptions;
@@ -59,7 +60,9 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     try {
       // Wait for the pool to be initialized
       while (!this.poolManager.isPoolInitialized) {
-        this.logger.log('Waiting for the connection pool to be initialized...');
+        this.logger.info(
+          'Waiting for the connection pool to be initialized...',
+        );
         await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
       }
 
@@ -67,7 +70,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
         poolInitialized: true,
         connectionState: Db2ConnectionState.CONNECTED,
       });
-      this.logger.log('Db2 client module initialized successfully.');
+      this.logger.info('Db2 client module initialized successfully.');
       this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
     } catch (error) {
       this.connectionManager.setState({
@@ -83,14 +86,14 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.DISCONNECTED,
     });
-    this.logger.log('Db2 client disconnected and destroyed');
+    this.logger.info('Db2 client disconnected and destroyed');
   }
 
   public async drainPool(): Promise<void> {
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.POOL_DRAINING,
     });
-    this.logger.log('Draining the connection pool...');
+    this.logger.info('Draining the connection pool...');
 
     try {
       this.stopIdleTimeoutCheck();
@@ -98,7 +101,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.POOL_DRAINED,
       });
-      this.logger.log('Connection pool drained successfully.');
+      this.logger.info('Connection pool drained successfully.');
     } catch (error: any) {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.ERROR,
@@ -110,7 +113,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   public async getConnection(): Promise<Connection> {
     // Ensure that the pool is initialized before getting a connection
     while (!this.poolManager.isPoolInitialized) {
-      this.logger.log('Waiting for the connection pool to be initialized...');
+      this.logger.info('Waiting for the connection pool to be initialized...');
       await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
     }
 
@@ -133,7 +136,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
 
   public async closePool(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.logger.log('Closing DB2 connection pool...');
+      this.logger.info('Closing DB2 connection pool...');
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.DISCONNECTING,
       });
@@ -149,7 +152,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
           this.connectionManager.setState({
             connectionState: Db2ConnectionState.POOL_DRAINED,
           });
-          this.logger.log('DB2 connection pool closed successfully');
+          this.logger.info('DB2 connection pool closed successfully');
           resolve();
         }
       });
@@ -184,13 +187,13 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     this.idleTimeoutInterval = setInterval(() => {
       this.checkIdleTimeout();
     }, idleTimeoutCheckInterval);
-    this.logger.log('Started idle timeout checks.');
+    this.logger.info('Started idle timeout checks.');
   }
 
   private stopIdleTimeoutCheck() {
     if (this.idleTimeoutInterval) {
       clearInterval(this.idleTimeoutInterval);
-      this.logger.log('Stopped idle timeout checks.');
+      this.logger.info('Stopped idle timeout checks.');
     }
   }
 
@@ -205,11 +208,11 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
 
       try {
         await this.disconnect();
-        this.logger.log('Connection closed due to idle timeout.');
+        this.logger.info('Connection closed due to idle timeout.');
 
-        this.logger.log('Attempting to reconnect after idle timeout...');
+        this.logger.info('Attempting to reconnect after idle timeout...');
         await this.reconnect();
-        this.logger.log('Reconnection successful after idle timeout.');
+        this.logger.info('Reconnection successful after idle timeout.');
       } catch (error) {
         const errorMessage = formatDb2Error(error, 'Idle Timeout Check', {
           host: this.config.host,
@@ -232,7 +235,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   public async disconnect(): Promise<void> {
     if (this.connection) {
       try {
-        this.logger.log('Disconnecting from DB2 database...');
+        this.logger.info('Disconnecting from DB2 database...');
         await this.poolManager.releaseConnection(this.connection);
 
         // Ensure the connection is properly set to null
@@ -241,7 +244,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
           connectionState: Db2ConnectionState.DISCONNECTED,
         });
 
-        this.logger.log('Db2 database connection closed and reset to null.');
+        this.logger.info('Db2 database connection closed and reset to null.');
 
         // Stop the idle timeout and lifetime checks after disconnection
         this.stopIdleTimeoutCheck();
@@ -269,7 +272,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
         activeConnections: this.activeConnectionsList.length,
       });
     }
-    this.logger.log('Connection released back to the pool.');
+    this.logger.info('Connection released back to the pool.');
   }
 
   /**
@@ -284,14 +287,14 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
         Db2ConnectionState.RECONNECTING
     ) {
       try {
-        this.logger.log('Attempting to reconnect to DB2...');
+        this.logger.info('Attempting to reconnect to DB2...');
         this.connectionManager.setState({
           connectionState: Db2ConnectionState.RECONNECTING,
         });
         this.reconnectionAttempts += 1;
         const connection = await this.getConnection();
         await this.closeConnection(connection);
-        this.logger.log('Reconnection successful');
+        this.logger.info('Reconnection successful');
         this.connectionManager.setState({
           connectionState: Db2ConnectionState.CONNECTED,
         });
@@ -319,7 +322,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   ): Promise<T> {
     const connection = await this.getConnection();
     try {
-      this.logger.log(`Executing query: ${sql}`);
+      this.logger.info(`Executing query: ${sql}`);
 
       return new Promise<T>((resolve, reject) => {
         // Apply a query timeout if provided
@@ -330,7 +333,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
         connection.query(sql, params, (err: Error, result: T) => {
           clearTimeout(queryTimeout); // Clear the timeout once the query resolves
           if (err) {
-            this.logger.error('Error executing query', err);
+            this.logger.error('Error executing query', err.message);
             reject(new Db2ConnectionError('Failed to execute query'));
           } else {
             resolve(result);
@@ -353,7 +356,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     columns: string[],
     valuesArray: any[][],
   ): Promise<void> {
-    this.logger.log(`Starting batch insert into table: ${tableName}`);
+    this.logger.info(`Starting batch insert into table: ${tableName}`);
 
     const columnsString = columns.join(', ');
     const placeholders = columns.map(() => '?').join(', ');
@@ -364,7 +367,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       stmt.executeSync(values);
     }
     stmt.closeSync();
-    this.logger.log(`Batch insert completed for table: ${tableName}`);
+    this.logger.info(`Batch insert completed for table: ${tableName}`);
   }
 
   /**
@@ -377,7 +380,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     sql: string,
     params: any[] = [],
   ): Promise<T> {
-    this.logger.log(`Executing prepared statement: ${sql}`);
+    this.logger.info(`Executing prepared statement: ${sql}`);
     if (!this.connection) {
       this.logger.warn(
         'No active connection to execute the prepared statement. Attempting to reconnect...',
@@ -437,7 +440,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       throw new Db2Error('Cannot begin transaction. No active connection.');
     }
     await this.query('BEGIN');
-    this.logger.log('Transaction started successfully.');
+    this.logger.info('Transaction started successfully.');
   }
 
   /**
@@ -451,7 +454,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       throw new Db2Error('Cannot commit transaction. No active connection.');
     }
     await this.query('COMMIT');
-    this.logger.log('Transaction committed successfully.');
+    this.logger.info('Transaction committed successfully.');
   }
 
   /**
@@ -465,7 +468,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       throw new Db2Error('Cannot rollback transaction. No active connection.');
     }
     await this.query('ROLLBACK');
-    this.logger.log('Transaction rolled back successfully.');
+    this.logger.info('Transaction rolled back successfully.');
   }
 
   public async batchUpdate(
@@ -474,7 +477,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     valuesArray: any[][],
     whereClause: string,
   ): Promise<void> {
-    this.logger.log(`Starting batch update on table: ${tableName}`);
+    this.logger.info(`Starting batch update on table: ${tableName}`);
 
     if (!this.connection) {
       this.logger.warn(
@@ -494,7 +497,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       }
 
       stmt.closeSync(); // Close the statement after execution
-      this.logger.log(`Batch update completed for table: ${tableName}`);
+      this.logger.info(`Batch update completed for table: ${tableName}`);
     } catch (error) {
       this.logError('Batch update error', error);
       throw new Db2TransactionError('Batch update failed');
@@ -514,7 +517,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   public getActiveConnectionsCount(): number {
     try {
       const activeConnections = this.activeConnectionsList?.length || 0;
-      this.logger.log(`Active connections: ${activeConnections}`);
+      this.logger.info(`Active connections: ${activeConnections}`);
       return activeConnections;
     } catch (error) {
       this.logger.error(
@@ -531,7 +534,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     const activeConnections = this.getActiveConnectionsCount();
     const idleConnections = this.idleConnections;
 
-    this.logger.log(
+    this.logger.info(
       `Connection Pool Status: Active=${activeConnections}, Idle=${idleConnections}`,
     );
   }
@@ -556,12 +559,12 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     details?: Db2HealthDetails;
     error?: string; // Add error at the top-level
   }> {
-    this.logger.log('Performing extended health check...');
+    this.logger.info('Performing extended health check...');
 
     try {
       // Execute a test query to verify base health check
       await this.query('SELECT 1 FROM SYSIBM.SYSDUMMY1');
-      this.logger.log('DB2 base health check passed');
+      this.logger.info('DB2 base health check passed');
 
       // Get pool statistics
       const poolStats: Db2PoolStats = this.getPoolStats();
@@ -627,7 +630,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
    * Get DB2 connection details from the system catalog
    */
   public async getDbConnectionDetails(): Promise<any> {
-    this.logger.log('Getting DB connection details...');
+    this.logger.info('Getting DB connection details...');
 
     const query = `
         SELECT 
@@ -647,10 +650,10 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       `;
 
     try {
-      this.logger.log('Executing query: ' + query);
+      this.logger.info('Executing query: ' + query);
       const connection = await this.getConnection();
       const result = await this.query(query);
-      this.logger.log('DB2 connection details retrieved successfully');
+      this.logger.info('DB2 connection details retrieved successfully');
       return result;
     } catch (error) {
       this.logger.error('Failed to get DB connection details:', error);

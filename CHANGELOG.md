@@ -1,3 +1,50 @@
+## [1.1.9](https://github.com/mcereal/nestjsdb2/compare/v1.1.8...v1.1.9) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove class validator ([8d8e09d](https://github.com/mcereal/nestjsdb2/commit/8d8e09d596aedf40452f2eebcf6f5ffd4c0f2e7b))
+
+## [1.1.8](https://github.com/mcereal/nestjsdb2/compare/v1.1.7...v1.1.8) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove nest logger ([c017c87](https://github.com/mcereal/nestjsdb2/commit/c017c8775ec6342354d41f2c77f08ad376112b21))
+
+## [1.1.7](https://github.com/mcereal/nestjsdb2/compare/v1.1.6...v1.1.7) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove kerberos ([21f57cf](https://github.com/mcereal/nestjsdb2/commit/21f57cf21344997c04b3c67fdaa47c58a0dc3dc2))
+* security hotspots ([ccaaa74](https://github.com/mcereal/nestjsdb2/commit/ccaaa74ed73d237fb18d395b92817fdb3e53254a))
+
+## [1.1.6](https://github.com/mcereal/nestjsdb2/compare/v1.1.5...v1.1.6) (2024-09-25)
+
+
+### Bug Fixes
+
+* codesmell ([6aecaeb](https://github.com/mcereal/nestjsdb2/commit/6aecaeb0000690ee79cc44635ae2b977535e7fdf))
+* export ldap client ([62470c7](https://github.com/mcereal/nestjsdb2/commit/62470c7b8714baa0e54a107bbe5043516c05698b))
+* refactor to remove regex hotspot ([275c7b7](https://github.com/mcereal/nestjsdb2/commit/275c7b7b96489faf53b4b0cdab5334852c7c26e2))
+* remove ldapjs ([7c575a8](https://github.com/mcereal/nestjsdb2/commit/7c575a855fea18ecc35f1f2afc972af459357aeb))
+
+## [1.1.5](https://github.com/mcereal/nestjsdb2/compare/v1.1.4...v1.1.5) (2024-09-25)
+
+
+### Bug Fixes
+
+* refactor to reduce duplications ([2846c07](https://github.com/mcereal/nestjsdb2/commit/2846c07d22adb7ae55cc2b94285daf2878e9cdf6))
+* remove reflect-metadata ([a88a2bb](https://github.com/mcereal/nestjsdb2/commit/a88a2bbd99ac364e4af8b6d62e026679de98d869))
+
+## [1.1.4](https://github.com/mcereal/nestjsdb2/compare/v1.1.3...v1.1.4) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove jsonwebtoken dep ([0945ce3](https://github.com/mcereal/nestjsdb2/commit/0945ce38a169b4ea69a43e8077d09a22f62eadde))
+
 ## [1.1.3](https://github.com/mcereal/nestjsdb2/compare/v1.1.2...v1.1.3) (2024-09-25)
 
 

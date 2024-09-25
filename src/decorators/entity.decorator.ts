@@ -1,25 +1,19 @@
-import 'reflect-metadata';
-import { EntityMetadata } from '../metadata/entity-metadata.storage';
-
-// Define a unique metadata key to store all entities
-const ENTITIES_METADATA_KEY = Symbol('entities');
-
-// Define a type that represents a class constructor
-type ClassConstructor<T = any> = new (...args: any[]) => T;
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { ClassConstructor } from '../types';
 
 /**
  * Db2Entity decorator to mark a class as a database entity with a specified table name.
  * @param tableName - The name of the table in the database.
  * @returns ClassDecorator
  */
-export function Db2Entity(tableName: string): ClassDecorator {
+export const Db2Entity = (tableName: string): ClassDecorator => {
   if (typeof tableName !== 'string' || tableName.trim().length === 0) {
     throw new Error(
       'Db2Entity decorator requires a non-empty string as a table name.',
     );
   }
 
-  return (target: unknown) => {
+  return (target: Function) => {
     // Ensure the target is a class constructor
     if (typeof target !== 'function' || !target.prototype) {
       throw new Error('Db2Entity decorator can only be applied to classes.');
@@ -27,29 +21,17 @@ export function Db2Entity(tableName: string): ClassDecorator {
 
     const classConstructor = target as ClassConstructor;
 
-    // Define metadata for the table name on the class
-    Reflect.defineMetadata('tableName', tableName, classConstructor);
-
-    // Retrieve existing entities metadata or initialize if none exists
-    const existingEntities: ClassConstructor[] =
-      Reflect.getMetadata(ENTITIES_METADATA_KEY, globalThis) || [];
-
-    // Avoid duplicate registrations by checking if the target already exists
-    if (!existingEntities.includes(classConstructor)) {
-      existingEntities.push(classConstructor);
-      Reflect.defineMetadata(
-        ENTITIES_METADATA_KEY,
-        existingEntities,
-        globalThis,
-      );
+    // Check if the class constructor is already registered
+    if (!EntityMetadataStorage.getEntities().includes(classConstructor)) {
+      EntityMetadataStorage.getEntities().push(classConstructor);
     }
 
-    // Optionally, store additional entity metadata for other purposes
+    // Define and store entity metadata for the class
     const entityMetadata: EntityMetadata = {
       tableName,
-      columns: [], // Define this as needed
-      primaryKeys: [], // Define this as needed
-      uniqueColumns: [], // Define this as needed
+      columns: [],
+      primaryKeys: [],
+      uniqueColumns: [],
       indexedColumns: [],
       foreignKeys: [],
       oneToOneRelations: [],
@@ -62,6 +44,26 @@ export function Db2Entity(tableName: string): ClassDecorator {
       uniqueColumnMetadada: [],
     };
 
-    Reflect.defineMetadata('entityMetadata', entityMetadata, classConstructor);
+    // Store the metadata in the EntityMetadataStorage
+    EntityMetadataStorage.setEntityMetadata(classConstructor, entityMetadata);
   };
-}
+};
+
+/**
+ * Function to retrieve entity metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns EntityMetadata | undefined
+ */
+export const getEntityMetadata = (
+  target: ClassConstructor,
+): EntityMetadata | undefined => {
+  return EntityMetadataStorage.getEntityMetadata(target);
+};
+
+/**
+ * Function to retrieve all registered entities
+ * @returns Array of ClassConstructors
+ */
+export const getRegisteredEntities = (): ClassConstructor[] => {
+  return EntityMetadataStorage.getEntities();
+};

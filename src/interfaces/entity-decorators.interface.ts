@@ -1,102 +1,124 @@
-interface CheckConstraintMetadata {
+// src/interfaces/entity-decorators.interface.ts
+
+export interface CheckConstraintMetadata {
   propertyKey: string | symbol;
   constraint: string;
 }
 
-interface ColumnOptions {
+export interface ColumnOptions {
   type: string;
   length?: number;
   nullable?: boolean;
   default?: any;
 }
 
-interface ColumnMetadata {
+export interface ColumnMetadata {
   propertyKey: string | symbol;
   options: ColumnOptions;
 }
 
-interface CompositeKeyMetadata {
+export interface CompositeKeyMetadata {
   keys: string[];
 }
 
-interface DefaultMetadata {
+export interface DefaultMetadata {
   propertyKey: string | symbol;
   value: any;
 }
 
-interface EntityMetadata {
-  tableName: string;
-}
-
-interface ForeignKeyOptions {
+export interface ForeignKeyOptions {
   reference: string; // Format: 'referenced_table(referenced_column)'
   onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
-interface ForeignKeyMetadata {
+export interface ForeignKeyMetadata {
   propertyKey: string | symbol;
-  reference: string;
-  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
+  options: ForeignKeyOptions;
 }
 
-interface IndexMetadata {
-  propertyKey: string | symbol;
+export interface IndexOptions {
+  name: string;
+  unique?: boolean;
 }
 
-interface ManyToManyOptions {
+/**
+ * Interface defining the options for the IndexedColumn decorator.
+ */
+export interface IndexedColumnMetadata {
+  propertyKey: string | symbol;
+  options: IndexOptions;
+}
+
+export interface ManyToManyOptions {
   propertyKey: string | symbol;
   target: new (...args: any[]) => any; // Target entity class
   joinTable?: string; // Optional join table name
   cascade?: boolean; // Cascade operations
 }
 
-interface ManyToManyMetadata {
+export interface ManyToManyMetadata {
   propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  joinTable?: string;
-  cascade?: boolean;
+  options: ManyToManyOptions;
 }
 
-interface ManyToOneOptions {
+export interface ManyToOneOptions {
   propertyKey: string | symbol;
   target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
-interface ManyToOneMetadata {
+export interface ManyToOneMetadata {
   propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
+  options: ManyToOneOptions;
 }
 
-interface OneToManyOptions {
+export interface OneToManyOptions {
   propertyKey: string | symbol;
   target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
-interface OneToManyMetadata {
+export interface OneToManyMetadata {
   propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
+  options: OneToManyOptions;
 }
 
-interface OneToOneOptions {
+export interface OneToOneOptions {
   propertyKey: string | symbol;
   target: new (...args: any[]) => any; // Target entity class
   cascade?: boolean; // Optional cascade operations
 }
 
-interface OneToOneMetadata {
+export interface OneToOneMetadata {
   propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
+  options: OneToOneOptions;
 }
 
-interface PrimaryKeyMetadata {
+/**
+ * Interface defining the options for the PrimaryKey decorator.
+ */
+export interface primeKeyOptions {
+  name?: string;
+  type?: string;
+  generated?: boolean;
+  unique?: boolean;
+}
+
+export interface PrimaryKeyMetadata {
+  propertyKey: string | symbol;
+  options: primeKeyOptions;
+}
+
+export interface UniqueMetadata {
   propertyKey: string | symbol;
 }
 
-interface UniqueMetadata {
+export interface UniqueColumnMetadata {
   propertyKey: string | symbol;
+  options: UniqueColumnMetadataOptions;
+}
+
+export interface UniqueColumnMetadataOptions {
+  name?: string;
+  columns: string[];
 }

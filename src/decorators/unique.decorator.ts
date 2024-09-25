@@ -1,42 +1,56 @@
-// decorators/unique.decorator.ts
+// src/decorators/unique.decorator.ts
 
-import 'reflect-metadata';
-import { UniqueColumnMetadata } from '../metadata';
+import { createPropertyDecorator } from './base.decorator';
 import {
+  UniqueColumnMetadata,
   UniqueColumnMetadataOptions,
-  UNIQUE_COLUMNS_METADATA_KEY,
-} from '../types';
+} from '../interfaces';
+import { getMetadata } from './utils';
 
-export function Unique(
+/**
+ * Creates unique column metadata from the provided options.
+ * @param propertyKey - The property key of the unique column.
+ * @param options - The unique column configuration options.
+ * @returns The unique column metadata.
+ */
+const createUniqueColumnMetadata = (
+  propertyKey: string | symbol,
   options: UniqueColumnMetadataOptions,
-): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+): UniqueColumnMetadata => ({
+  propertyKey,
+  options,
+});
 
-    // Retrieve existing unique columns metadata or initialize if none exists
-    const uniqueColumns: UniqueColumnMetadata[] =
-      Reflect.getMetadata(UNIQUE_COLUMNS_METADATA_KEY, constructor) || [];
+/**
+ * Ensures that the property key is unique within unique columns.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckUniqueColumn = (
+  existing: UniqueColumnMetadata,
+  newEntry: UniqueColumnMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
 
-    // Check if the property key is already marked as unique
-    const existingColumn = uniqueColumns.find(
-      (column) => column.propertyKey === propertyKey,
-    );
+/**
+ * @Unique decorator to mark a property as unique in the database.
+ * @param options - Configuration options for the unique column.
+ * @returns PropertyDecorator
+ */
+export const Unique = createPropertyDecorator<UniqueColumnMetadataOptions>(
+  'uniqueColumns',
+  () => {}, // No additional validation needed
+  createUniqueColumnMetadata,
+  uniqueCheckUniqueColumn,
+);
 
-    if (!existingColumn) {
-      // Add new unique column metadata
-      uniqueColumns.push({
-        propertyKey,
-        uniqueKeyOptions: {
-          name: options.name || '',
-          columns: options.columns || [],
-        },
-      });
-
-      // Define or update metadata with the new unique columns
-      Reflect.defineMetadata('uniqueColumns', uniqueColumns, constructor);
-    }
-  };
-}
+/**
+ * Retrieves unique column metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns UniqueColumnMetadata[]
+ */
+export const getUniqueColumnMetadata = (
+  target: any,
+): UniqueColumnMetadata[] => {
+  return getMetadata<UniqueColumnMetadata>(target, 'uniqueColumns');
+};

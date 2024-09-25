@@ -11,3 +11,4 @@
  */
 
 export * from './db2.enums';
+export * from './log-level.enum';

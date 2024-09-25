@@ -1,47 +1,68 @@
-// decorators/one-to-many.decorator.ts
+// src/decorators/oneToMany.decorator.ts
 
-import 'reflect-metadata';
-import { OneToManyMetadata } from '../metadata';
-import { OneToManyOptions, ONE_TO_MANY_RELATIONS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { OneToManyOptions, OneToManyMetadata } from '../interfaces';
+import { getMetadata } from './utils';
 
-export function OneToMany(options: OneToManyOptions): PropertyDecorator {
-  // Validate the provided options
+/**
+ * Validates the options provided to the @OneToMany decorator.
+ * @param options - The one-to-many relationship options.
+ */
+const validateOneToManyOptions = (options: OneToManyOptions) => {
   if (typeof options.target !== 'function') {
     throw new Error(
       "OneToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  // You can add more validations here if needed, for example:
+  // if (!options.inverseSide || typeof options.inverseSide !== 'string') {
+  //   throw new Error("OneToMany decorator requires an 'inverseSide' option that is a string.");
+  // }
+};
 
-    // Retrieve existing one-to-many relations metadata or initialize if none exists
-    const oneToManyRelations: OneToManyMetadata[] =
-      Reflect.getMetadata(ONE_TO_MANY_RELATIONS_METADATA_KEY, constructor) ||
-      [];
+/**
+ * Creates one-to-many metadata from the provided options.
+ * @param propertyKey - The property key of the relationship.
+ * @param options - The one-to-many relationship options.
+ * @returns The one-to-many metadata.
+ */
+const createOneToManyMetadata = (
+  propertyKey: string | symbol,
+  options: OneToManyOptions,
+): OneToManyMetadata => ({
+  propertyKey,
+  options,
+});
 
-    // Check if the relation already exists to avoid duplicates
-    const existingRelation = oneToManyRelations.find(
-      (relation) => relation.oneToManyOptions.propertyKey === propertyKey,
-    );
+/**
+ * Ensures that the property key is unique within one-to-many relations.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckOneToMany = (
+  existing: OneToManyMetadata,
+  newEntry: OneToManyMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
 
-    if (!existingRelation) {
-      // Add new one-to-many relation metadata
-      oneToManyRelations.push({
-        propertyKey,
-        ...options,
-        oneToManyOptions: options,
-      });
+/**
+ * @OneToMany decorator to define a one-to-many relationship between entities.
+ * @param options - Configuration options for the relationship.
+ * @returns PropertyDecorator
+ */
+export const OneToMany = createPropertyDecorator<OneToManyOptions>(
+  'oneToManyRelations',
+  validateOneToManyOptions,
+  createOneToManyMetadata,
+  uniqueCheckOneToMany,
+);
 
-      // Define or update metadata with the new one-to-many relations
-      Reflect.defineMetadata(
-        'oneToManyRelations',
-        oneToManyRelations,
-        constructor,
-      );
-    }
-  };
-}
+/**
+ * Retrieves one-to-many relations metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns OneToManyMetadata[]
+ */
+export const getOneToManyMetadata = (target: any): OneToManyMetadata[] => {
+  return getMetadata<OneToManyMetadata>(target, 'oneToManyRelations');
+};

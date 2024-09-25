@@ -1,6 +1,6 @@
 // migration/migration.service.ts
 
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {
@@ -36,7 +36,7 @@ export class Db2MigrationService implements IDb2MigrationService {
     }
 
     if (!this.migrationConfig.runOnStart) {
-      this.logger.log(
+      this.logger.info(
         'Migrations are not configured to run on start. Skipping migration execution.',
       );
       return;
@@ -78,16 +78,16 @@ export class Db2MigrationService implements IDb2MigrationService {
 
         // Execute or log the SQL script as required
         if (this.migrationConfig.dryRun) {
-          this.logger.log(
+          this.logger.info(
             `Dry run enabled. Migration script not executed: ${createTableSQL}`,
           );
         } else {
           try {
-            this.logger.log(
+            this.logger.info(
               `Executing migration script for table: ${metadata.tableName}`,
             );
             await this.db2Client.query(createTableSQL);
-            this.logger.log(
+            this.logger.info(
               `Migration for table ${metadata.tableName} applied successfully.`,
             );
           } catch (error) {
@@ -140,9 +140,9 @@ export class Db2MigrationService implements IDb2MigrationService {
     const columnDefinitions = metadata.columns.map((column) => {
       let columnDef = `${String(
         column.propertyKey,
-      )} ${column.type.toUpperCase()}`;
-      if (column.length) columnDef += `(${column.length})`;
-      if (column.nullable === false) columnDef += ` NOT NULL`;
+      )} ${column.options.type.toUpperCase()}`;
+      if (column.options.length) columnDef += `(${column.options.length})`;
+      if (column.options.nullable === false) columnDef += ` NOT NULL`;
       if (
         metadata.defaultValues.some(
           (def) => def.propertyKey === column.propertyKey,
@@ -174,10 +174,10 @@ export class Db2MigrationService implements IDb2MigrationService {
     if (metadata.foreignKeys.length) {
       metadata.foreignKeys.forEach((fk) => {
         sql += `, FOREIGN KEY (${String(fk.propertyKey)}) REFERENCES ${
-          fk.foreignKeyOptions.reference
+          fk.options.reference
         }`;
-        if (fk.foreignKeyOptions.onDelete) {
-          sql += ` ON DELETE ${fk.foreignKeyOptions.onDelete}`;
+        if (fk.options.onDelete) {
+          sql += ` ON DELETE ${fk.options.onDelete}`;
         }
       });
     }
@@ -243,14 +243,14 @@ export class Db2MigrationService implements IDb2MigrationService {
       this.migrationConfig.tableName &&
       (await this.isMigrationExecuted(file))
     ) {
-      this.logger.log(`Skipping executed migration: ${file}`);
+      this.logger.info(`Skipping executed migration: ${file}`);
       return;
     }
 
     const script = await fs.readFile(file, 'utf-8');
 
     if (this.migrationConfig.dryRun) {
-      this.logger.log(
+      this.logger.info(
         `Dry run enabled. Migration script not executed: ${file}`,
       );
       return;
@@ -258,7 +258,7 @@ export class Db2MigrationService implements IDb2MigrationService {
 
     try {
       if (this.migrationConfig.logQueries) {
-        this.logger.log(`Executing migration script: ${file}`);
+        this.logger.info(`Executing migration script: ${file}`);
       }
 
       await this.db2Client.query(script);
@@ -270,7 +270,7 @@ export class Db2MigrationService implements IDb2MigrationService {
         await this.markMigrationAsExecuted(file);
       }
 
-      this.logger.log(`Migration applied successfully: ${file}`);
+      this.logger.info(`Migration applied successfully: ${file}`);
     } catch (error) {
       handleDb2Error(
         error,
@@ -342,7 +342,7 @@ export class Db2MigrationService implements IDb2MigrationService {
 
     try {
       await this.db2Client.query(sql, [file]);
-      this.logger.log(`Migration marked as executed: ${file}`);
+      this.logger.info(`Migration marked as executed: ${file}`);
     } catch (error) {
       handleDb2Error(
         error,

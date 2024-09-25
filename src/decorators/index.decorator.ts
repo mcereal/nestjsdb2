@@ -1,40 +1,52 @@
 // src/decorators/index.decorator.ts
 
-import 'reflect-metadata';
-import { IndexMetadata } from '../metadata/entity-metadata.storage';
-import { INDEXED_COLUMNS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { IndexedColumnMetadata } from '../interfaces';
+import { getMetadata } from './utils';
+
+/**
+ * Creates index metadata for the property.
+ * @param propertyKey - The property key of the indexed column.
+ * @returns The index metadata.
+ */
+const createIndexMetadata = (
+  propertyKey: string | symbol,
+): IndexedColumnMetadata => ({
+  propertyKey,
+  options: {
+    name: '', // Default to empty string
+    unique: false, // Default to non-unique index
+  },
+});
+
+/**
+ * Ensures that the property key is unique within indexed columns.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckIndex = (
+  existing: IndexedColumnMetadata,
+  newEntry: IndexedColumnMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
 
 /**
  * @Index decorator to mark a property as indexed.
  * Can be extended with additional options if needed.
  * @returns PropertyDecorator
  */
-export function Index(): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+export const Index = createPropertyDecorator<void>(
+  'indexedColumns',
+  () => {}, // No validation required for now
+  createIndexMetadata,
+  uniqueCheckIndex,
+);
 
-    // Retrieve existing index metadata or initialize if none exists
-    const indexColumns: IndexMetadata[] =
-      Reflect.getMetadata(INDEXED_COLUMNS_METADATA_KEY, constructor) || [];
-
-    // Check if the property is already marked as an index to avoid duplicates
-    const isAlreadyIndexed = indexColumns.some(
-      (index) => index.propertyKey === propertyKey,
-    );
-
-    if (!isAlreadyIndexed) {
-      // Add new index metadata
-      indexColumns.push({ propertyKey, name: propertyKey.toString() });
-
-      // Define or update metadata with the new index columns
-      Reflect.defineMetadata(
-        INDEXED_COLUMNS_METADATA_KEY,
-        indexColumns,
-        constructor,
-      );
-    }
-  };
-}
+/**
+ * Retrieves index metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns IndexedColumnMetadata[]
+ */
+export const getIndexMetadata = (target: any): IndexedColumnMetadata[] => {
+  return getMetadata<IndexedColumnMetadata>(target, 'indexedColumns');
+};

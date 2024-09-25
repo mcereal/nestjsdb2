@@ -1,6 +1,6 @@
 // src/decorators/db2-retry-operation.decorator.ts
 
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils';
 
 /**
  * @function RetryOperation

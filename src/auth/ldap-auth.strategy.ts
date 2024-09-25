@@ -9,12 +9,12 @@ import {
   IConnectionManager,
   Db2LdapAuthOptions,
 } from '../interfaces';
-import { Connection } from 'ibm_db';
 import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
-import * as ldap from 'ldapjs';
+import { LdapClient, LdapConfig } from './ldap.client';
 
 export class LdapAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
+  private ldapClient: LdapClient | null = null;
 
   constructor(
     config: IDb2ConfigOptions,
@@ -28,7 +28,7 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
 
   /**
    * Perform the LDAP authentication process.
-   * Binds to an LDAP server and attempts to authenticate with the DB2 server.
+   * Connects to an LDAP server and attempts to authenticate with the DB2 server.
    */
   async authenticate(): Promise<void> {
     if (
@@ -44,17 +44,51 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
     });
     this.logger.log('Starting LDAP authentication...');
 
-    try {
-      // Perform LDAP bind (authentication)
-      await this.ldapBind();
+    const authOptions = this.config.auth as Db2LdapAuthOptions;
+    const { username, password, ldapUrl } = authOptions;
 
+    if (!username || !password || !ldapUrl) {
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.AUTH_FAILED,
+      });
+      this.logger.error('LDAP username, password, and URL are required.');
+      throw new Db2AuthenticationError('LDAP credentials are incomplete.');
+    }
+
+    // Configure TLS options if needed (e.g., custom CA)
+    const tlsOptions = authOptions.tlsOptions
+      ? {
+          rejectUnauthorized: authOptions.tlsOptions.rejectUnauthorized ?? true,
+          ca: authOptions.tlsOptions.ca,
+          key: authOptions.tlsOptions.key,
+          cert: authOptions.tlsOptions.cert,
+        }
+      : undefined;
+
+    const ldapConfig: LdapConfig = {
+      ldapUrl,
+      username,
+      password,
+      tlsOptions,
+    };
+
+    this.ldapClient = new LdapClient(ldapConfig);
+
+    try {
+      await this.ldapClient.connect();
+      await this.ldapClient.bind();
       this.logger.log('LDAP authentication successful.');
+      this.connectionManager.setState({
+        connectionState: Db2ConnectionState.CONNECTED,
+      });
     } catch (error: any) {
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.AUTH_FAILED,
       });
       this.logger.error('LDAP authentication failed:', error.message);
       throw new Db2AuthenticationError('LDAP authentication failed.');
+    } finally {
+      this.cleanup();
     }
   }
 
@@ -82,31 +116,12 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
   }
 
   /**
-   * Performs LDAP bind (authentication) using the provided username and password.
+   * Cleanup LDAP client connection.
    */
-  private async ldapBind(): Promise<void> {
-    const authOptions = this.config.auth as Db2LdapAuthOptions;
-    const { username, password, ldapUrl } = authOptions;
-
-    if (!ldapUrl) {
-      throw new Db2AuthenticationError(
-        'LDAP URL is required for authentication.',
-      );
+  private cleanup(): void {
+    if (this.ldapClient) {
+      this.ldapClient.close();
+      this.ldapClient = null;
     }
-
-    return new Promise<void>((resolve, reject) => {
-      const client = ldap.createClient({ url: ldapUrl });
-
-      client.bind(username, password, (err) => {
-        if (err) {
-          this.logger.error('Failed to bind to LDAP server:', err.message);
-          return reject(new Db2AuthenticationError('LDAP bind failed.'));
-        }
-
-        this.logger.log('LDAP bind successful.');
-        client.unbind(); // Unbind after successful authentication
-        resolve();
-      });
-    });
   }
 }

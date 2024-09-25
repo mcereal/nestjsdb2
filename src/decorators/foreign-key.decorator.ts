@@ -1,16 +1,15 @@
-// src/decorators/foreign-key.decorator.ts
+// src/decorators/foreignKey.decorator.ts
 
-import 'reflect-metadata';
-import { ForeignKeyMetadata, ForeignKeyOptions } from '../metadata';
-import { FOREIGN_KEYS_METADATA_KEY } from '../types';
+import { createPropertyDecorator } from './base.decorator';
+import { ForeignKeyMetadata, ForeignKeyOptions } from '../interfaces';
+import { getMetadata } from './utils';
 
 /**
- * @ForeignKey decorator to define a foreign key relationship.
- * @param options - Configuration options for the foreign key.
- * @returns PropertyDecorator
+ * Validates the options provided to the @ForeignKey decorator.
+ * @param options - The foreign key relationship options.
  */
-export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
-  // Validate options
+const validateForeignKeyOptions = (options: ForeignKeyOptions) => {
+  // Validate that the reference is a properly formatted string
   if (
     typeof options.reference !== 'string' ||
     !options.reference.includes('(') ||
@@ -21,6 +20,7 @@ export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
     );
   }
 
+  // Validate that the onDelete option, if provided, is one of the allowed values
   if (
     options.onDelete &&
     !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
@@ -29,21 +29,38 @@ export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
       "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
     );
   }
+};
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+/**
+ * Creates foreign key metadata from the provided options.
+ * @param propertyKey - The property key of the foreign key.
+ * @param options - The foreign key relationship options.
+ * @returns The foreign key metadata.
+ */
+const createForeignKeyMetadata = (
+  propertyKey: string | symbol,
+  options: ForeignKeyOptions,
+): ForeignKeyMetadata => ({
+  propertyKey,
+  options,
+});
 
-    // Retrieve existing foreign keys metadata or initialize if none exists
-    const foreignKeys: ForeignKeyMetadata[] =
-      Reflect.getMetadata(FOREIGN_KEYS_METADATA_KEY, constructor) || [];
+/**
+ * @ForeignKey decorator to define a foreign key relationship.
+ * @param options - Configuration options for the foreign key.
+ * @returns PropertyDecorator
+ */
+export const ForeignKey = createPropertyDecorator<ForeignKeyOptions>(
+  'foreignKeys',
+  validateForeignKeyOptions,
+  createForeignKeyMetadata,
+);
 
-    // Add new foreign key metadata
-    foreignKeys.push({ propertyKey, foreignKeyOptions: options });
-
-    // Define or update metadata with the new foreign keys array
-    Reflect.defineMetadata(FOREIGN_KEYS_METADATA_KEY, foreignKeys, constructor);
-  };
-}
+/**
+ * Retrieves foreign key metadata for a given class.
+ * @param target - The constructor of the entity class.
+ * @returns ForeignKeyMetadata[]
+ */
+export const getForeignKeyMetadata = (target: any): ForeignKeyMetadata[] => {
+  return getMetadata<ForeignKeyMetadata>(target, 'foreignKeys');
+};
