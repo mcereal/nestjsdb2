@@ -13,7 +13,6 @@ export default [
       'dist/**/*',
       'node_modules/**/*',
       'jest.config.ts',
-      'tsconfig.json',
       'coverage/**/*',
     ],
   },

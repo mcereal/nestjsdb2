@@ -11,10 +11,11 @@ import {
   Db2ClientState,
   IDb2ConfigOptions,
   Db2HealthDetails,
-  Db2ServiceInterface,
+  IDb2Service,
   IDb2Client,
   ITransactionManager,
   IDb2MigrationService,
+  IPoolManager,
 } from '../interfaces';
 import { Db2QueryBuilder } from '../db';
 import { handleDb2Error } from '../errors/db2.error';
@@ -27,14 +28,13 @@ import {
   I_DB2_CLIENT,
   I_DB2_CONFIG,
   I_DB2_MIGRATION_SERVICE,
+  I_POOL_MANAGER,
   I_TRANSACTION_MANAGER,
 } from '../constants/injection-token.constant';
 import { Db2ConnectionState } from '../enums';
 
 @Injectable()
-export class Db2Service
-  implements Db2ServiceInterface, OnModuleInit, OnModuleDestroy
-{
+export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(Db2Service.name);
   private cache?: Cache;
 
@@ -47,6 +47,7 @@ export class Db2Service
     private readonly migrationService: IDb2MigrationService,
     @Inject(I_CONNECTION_MANAGER)
     private readonly connectionManager: IConnectionManager,
+    @Inject(I_POOL_MANAGER) private readonly poolManager: IPoolManager,
     @Inject(I_DB2_CLIENT)
     private readonly client: IDb2Client,
   ) {
@@ -65,10 +66,11 @@ export class Db2Service
   public async onModuleInit(): Promise<void> {
     this.logger.log('Initializing Db2Service...');
 
-    // Set state to INITIALIZING
-    this.connectionManager.setState({
-      connectionState: Db2ConnectionState.INITIALIZING,
-    });
+    // Wait for the pool to be initialized
+    while (!this.poolManager.isPoolInitialized) {
+      this.logger.log('Waiting for the connection pool to be initialized...');
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
+    }
 
     // Validate configuration
     this.validateConfig(this.options);
@@ -181,8 +183,13 @@ export class Db2Service
   }
 
   // Connection Management
-  // Connection Management
   public async connect(): Promise<void> {
+    const currentState = this.connectionManager.getState().connectionState;
+    if (currentState === Db2ConnectionState.CONNECTED) {
+      this.logger.log('Already connected. Skipping connect.');
+      return;
+    }
+
     try {
       // Set state to CONNECTING
       this.connectionManager.setState({

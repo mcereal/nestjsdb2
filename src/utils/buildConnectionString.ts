@@ -1,4 +1,5 @@
 // src/utils/db2-connection-string.util.ts
+import { Db2AuthType } from '../enums';
 import {
   Db2JwtAuthOptions,
   Db2KerberosAuthOptions,
@@ -56,13 +57,13 @@ export function buildConnectionString(config: IDb2ConfigOptions): string {
 
 const buildAuthSection = (authType: string, authConfig: any): string => {
   switch (authType) {
-    case 'password':
+    case Db2AuthType.PASSWORD:
       return buildPasswordAuth(authConfig);
-    case 'kerberos':
+    case Db2AuthType.KERBEROS:
       return buildKerberosAuth(authConfig);
-    case 'jwt':
+    case Db2AuthType.JWT:
       return buildJwtAuth(authConfig);
-    case 'ldap':
+    case Db2AuthType.LDAP:
       return buildLdapAuth(authConfig);
     default:
       throw new Error(`Unsupported authentication type: ${authType}`);

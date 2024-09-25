@@ -1,3 +1,18 @@
+# [1.1.0](https://github.com/mcereal/nestjsdb2/compare/v1.0.1...v1.1.0) (2024-09-25)
+
+
+### Bug Fixes
+
+* auth strat duplications ([eed6c40](https://github.com/mcereal/nestjsdb2/commit/eed6c4038a7178a581368462bdbca952e94260d6))
+* code duplications in module ([4ea9840](https://github.com/mcereal/nestjsdb2/commit/4ea98406a7cf3ef68ccbc884cc3b42579bc1bc8c))
+* module initiation flow handled as singletons ([29862a9](https://github.com/mcereal/nestjsdb2/commit/29862a9321001826a7ba55543cb7009c06b87f11))
+* update package lint script ([358199b](https://github.com/mcereal/nestjsdb2/commit/358199b6b4f395b40953303d77a7fa7bb1c91952))
+
+
+### Features
+
+* add arch check ([00bc950](https://github.com/mcereal/nestjsdb2/commit/00bc950ea0cf01ad7eb8f84782568124afed501c))
+
 ## [1.0.1](https://github.com/mcereal/nestjsdb2/compare/v1.0.0...v1.0.1) (2024-09-24)
 
 
