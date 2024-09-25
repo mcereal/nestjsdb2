@@ -179,11 +179,15 @@ export class LdapClient {
       }
 
       const hostname = url.hostname;
-      const port = url.port
-        ? parseInt(url.port, 10)
-        : protocol === 'ldaps'
-          ? 636
-          : 389;
+      let port: number;
+
+      if (url.port) {
+        port = parseInt(url.port, 10);
+      } else if (protocol === 'ldaps') {
+        port = 636;
+      } else {
+        port = 389;
+      }
 
       // Optional: Configure TLS options if using ldaps
       let tlsOptions: ConnectionOptions | undefined = undefined;
