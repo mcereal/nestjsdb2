@@ -1,41 +1,71 @@
-// src/auth/ldap.client.ts
+// src/auth/simple-ldap-client.ts
 
-import { Socket } from 'net';
+import { Socket, connect as netConnect } from 'net';
+import { TLSSocket, connect as tlsConnect, ConnectionOptions } from 'tls';
 import { Logger } from '@nestjs/common';
 import { BerEncoder } from './ber-encoder';
+import { URL } from 'url';
 
 export interface LdapConfig {
-  ldapUrl: string;
+  ldapUrl: string; // e.g., ldap://localhost:389 or ldaps://localhost:636
   username: string;
   password: string;
+  tlsOptions?: ConnectionOptions; // Optional TLS configurations
 }
 
-export class LdapClient {
-  private socket: Socket;
+export class SimpleLdapClient {
+  private socket: Socket | TLSSocket;
   private logger: Logger;
   private messageID: number;
   private responseBuffer: Buffer;
-  private resolveBind: () => void;
-  private rejectBind: (reason?: any) => void;
+  private resolveBind!: () => void;
+  private rejectBind!: (reason?: any) => void;
 
   constructor(private config: LdapConfig) {
-    this.logger = new Logger(LdapClient.name);
+    this.logger = new Logger(SimpleLdapClient.name);
     this.socket = new Socket();
     this.messageID = 1;
     this.responseBuffer = Buffer.alloc(0);
   }
 
+  /**
+   * Establishes a connection to the LDAP server.
+   * Supports both LDAP (plain TCP) and LDAPS (TLS).
+   */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const { hostname, port, protocol } = this.parseLdapUrl(
+      const { hostname, port, protocol, tlsOptions } = this.parseLdapUrl(
         this.config.ldapUrl,
       );
 
-      this.socket.connect(port, hostname, () => {
-        this.logger.log(`Connected to LDAP server at ${hostname}:${port}`);
-        resolve();
-      });
+      if (protocol === 'ldaps') {
+        // Establish a secure TLS connection
+        this.socket = tlsConnect(port, hostname, tlsOptions || {}, () => {
+          if ((this.socket as TLSSocket).authorized) {
+            this.logger.log(
+              `Securely connected to LDAPS server at ${hostname}:${port}`,
+            );
+            resolve();
+          } else {
+            this.logger.warn(
+              `TLS connection not authorized: ${(this.socket as TLSSocket).authorizationError}`,
+            );
+            reject(
+              new Error(
+                `TLS connection not authorized: ${(this.socket as TLSSocket).authorizationError}`,
+              ),
+            );
+          }
+        });
+      } else {
+        // Establish a plain TCP connection
+        this.socket = netConnect(port, hostname, () => {
+          this.logger.log(`Connected to LDAP server at ${hostname}:${port}`);
+          resolve();
+        });
+      }
 
+      // Handle connection errors
       this.socket.on('error', (err) => {
         this.logger.error(`LDAP connection error: ${err.message}`);
         reject(err);
@@ -43,6 +73,9 @@ export class LdapClient {
     });
   }
 
+  /**
+   * Performs the LDAP bind (authentication) operation.
+   */
   bind(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.resolveBind = resolve;
@@ -62,26 +95,31 @@ export class LdapClient {
     });
   }
 
+  /**
+   * Closes the LDAP connection gracefully.
+   */
   close(): void {
-    this.socket.end();
-    this.socket.destroy();
-    this.logger.log('LDAP connection closed');
+    if (this.socket) {
+      this.socket.end();
+      this.socket.destroy();
+      this.logger.log('LDAP connection closed');
+    }
   }
 
+  /**
+   * Handles incoming data from the LDAP server.
+   */
   private handleData(data: Buffer): void {
     this.responseBuffer = Buffer.concat([this.responseBuffer, data]);
 
     // Minimal parsing to detect the LDAP Bind Response
-    // LDAP Bind Response has a tag of 0x61 (Application 1)
-    // It should contain a resultCode
-
-    // Check if we have at least the header (first 2 bytes for tag and length)
     if (this.responseBuffer.length < 2) {
       return; // Wait for more data
     }
 
     const tag = this.responseBuffer[0];
     if (tag !== 0x61) {
+      // BindResponse tag
       this.logger.error(`Unexpected LDAP response tag: ${tag.toString(16)}`);
       this.rejectBind(new Error('Unexpected LDAP response'));
       this.socket.removeListener('data', this.handleData.bind(this));
@@ -89,7 +127,6 @@ export class LdapClient {
     }
 
     const length = this.decodeLength(this.responseBuffer.slice(1));
-
     const totalLength = 1 + this.lengthOfLength(length) + length;
 
     if (this.responseBuffer.length < totalLength) {
@@ -99,14 +136,7 @@ export class LdapClient {
     const response = this.responseBuffer.slice(0, totalLength);
     this.responseBuffer = this.responseBuffer.slice(totalLength);
 
-    // Minimal parsing to extract resultCode
-    // Structure:
-    // BindResponse ::= [APPLICATION 1] SEQUENCE {
-    //   COMPONENTS...
-    //   resultCode      ENUMERATED { ... }
-    // }
-
-    // For simplicity, search for the ENUMERATED type (0x0A)
+    // Extract resultCode (ENUMERATED type 0x0A)
     const resultCodeIndex = response.indexOf(0x0a);
     if (resultCodeIndex === -1 || resultCodeIndex + 2 >= response.length) {
       this.logger.error('Malformed LDAP Bind Response');
@@ -130,27 +160,52 @@ export class LdapClient {
     this.socket.removeListener('data', this.handleData.bind(this));
   }
 
-  private parseLdapUrl(url: string): {
+  /**
+   * Parses the LDAP URL and extracts protocol, hostname, and port.
+   */
+  private parseLdapUrl(urlString: string): {
     protocol: string;
     hostname: string;
     port: number;
+    tlsOptions?: ConnectionOptions;
   } {
-    const match = url.match(/^(ldap|ldaps):\/\/([^:/]+):?(\d+)?$/);
-    if (!match) {
-      throw new Error(`Invalid LDAP URL: ${url}`);
+    try {
+      const url = new URL(urlString);
+
+      // Extract protocol without the trailing colon
+      const protocol = url.protocol.slice(0, -1).toLowerCase();
+      if (protocol !== 'ldap' && protocol !== 'ldaps') {
+        throw new Error(`Unsupported protocol: ${protocol}`);
+      }
+
+      const hostname = url.hostname;
+      const port = url.port
+        ? parseInt(url.port, 10)
+        : protocol === 'ldaps'
+          ? 636
+          : 389;
+
+      // Optional: Configure TLS options if using ldaps
+      let tlsOptions: ConnectionOptions | undefined = undefined;
+      if (protocol === 'ldaps') {
+        tlsOptions = {
+          // Example TLS options (customize as needed)
+          rejectUnauthorized: true, // Ensure server certificate is valid
+          // ca: [fs.readFileSync('path/to/ca.pem')], // Optional: Trusted CA certificates
+          // key: fs.readFileSync('path/to/client-key.pem'), // Optional: Client key
+          // cert: fs.readFileSync('path/to/client-cert.pem'), // Optional: Client certificate
+        };
+      }
+
+      return { protocol, hostname, port, tlsOptions };
+    } catch (error) {
+      throw new Error(`Invalid LDAP URL: ${urlString}`);
     }
-
-    const protocol = match[1];
-    const hostname = match[2];
-    const port = match[3]
-      ? parseInt(match[3], 10)
-      : protocol === 'ldaps'
-        ? 636
-        : 389;
-
-    return { protocol, hostname, port };
   }
 
+  /**
+   * Decodes the ASN.1 BER length field.
+   */
   private decodeLength(buffer: Buffer): number {
     const firstByte = buffer[0];
     if (firstByte < 0x80) {
@@ -164,6 +219,9 @@ export class LdapClient {
     return length;
   }
 
+  /**
+   * Calculates the number of bytes used to encode the length.
+   */
   private lengthOfLength(length: number): number {
     if (length < 0x80) {
       return 1;
