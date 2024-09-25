@@ -9,7 +9,12 @@ const __dirname = dirname(__filename);
 export default [
   {
     // Define ignore patterns first
-    ignores: ['dist/**/*', 'node_modules/**/*', 'jest.config.ts'],
+    ignores: [
+      'dist/**/*',
+      'node_modules/**/*',
+      'jest.config.ts',
+      'coverage/**/*',
+    ],
   },
   {
     // Apply settings to TypeScript files
