@@ -1,3 +1,26 @@
+## [1.1.3](https://github.com/mcereal/nestjsdb2/compare/v1.1.2...v1.1.3) (2024-09-25)
+
+
+### Bug Fixes
+
+* @nestjs/config not needed ([c4b2227](https://github.com/mcereal/nestjsdb2/commit/c4b2227e3d36a6b7b68eeb7f71de1b958e005857))
+
+## [1.1.2](https://github.com/mcereal/nestjsdb2/compare/v1.1.1...v1.1.2) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove redis cache dependency ([fea8966](https://github.com/mcereal/nestjsdb2/commit/fea89663f139aca40324567a663fd4d626db1529))
+
+## [1.1.1](https://github.com/mcereal/nestjsdb2/compare/v1.1.0...v1.1.1) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove terminus dependency ([98f22dc](https://github.com/mcereal/nestjsdb2/commit/98f22dc07501d0e8f233de661fb155fe27765bbc))
+* remove terminus dependency ([12fb8a7](https://github.com/mcereal/nestjsdb2/commit/12fb8a7137c53d8d160363e027cc9883639daf1c))
+* remove unused deps ([dc3c72b](https://github.com/mcereal/nestjsdb2/commit/dc3c72b6d1174f504489918954a4fa8eb8e77ccb))
+
 # [1.1.0](https://github.com/mcereal/nestjsdb2/compare/v1.0.1...v1.1.0) (2024-09-25)
 
 

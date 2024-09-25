@@ -2,14 +2,15 @@
   "compilerOptions": {
     "module": "CommonJS",
     "declaration": true,
+    "declarationMap": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./",
-    "baseUrl": ".",
+    "rootDir": ".",
+    "composite": true,
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
@@ -19,18 +20,12 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
+    "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*"],
       "src/*": ["./src/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]
-  },
-  "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "jest.config.ts",
-    "testconnection/app.module.ts",
-    "testconnection/main.ts"
-  ],
-  "exclude": ["node_modules", "dist"]
+  }
 }
