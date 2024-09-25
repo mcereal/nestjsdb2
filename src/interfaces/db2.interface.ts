@@ -29,10 +29,11 @@ export interface Db2PasswordAuthOptions extends Db2BaseAuthOptions {
  */
 export interface Db2KerberosAuthOptions extends Db2BaseAuthOptions {
   authType: Db2AuthType.KERBEROS;
+  krbServiceName: string;
   username: string;
-  krbServiceName: string; // Service name for Kerberos
-  krb5Config?: string; // Optional path to the krb5.conf file
-  krbKeytab?: string; // Optional path to the keytab file
+  krbKeytab?: string; // Optional path to keytab file
+  krbKdc?: string; // Optional KDC host
+  password?: string; // Optional password for password-based kinit
 }
 
 /**
