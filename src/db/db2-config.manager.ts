@@ -5,7 +5,7 @@ import {
   Db2LoggingOptions,
 } from '../interfaces';
 import { Inject } from '@nestjs/common';
-import { I_DB2_CONFIG } from 'src/constants/injection-token.constant';
+import { I_DB2_CONFIG } from '../constants/injection-token.constant';
 
 export class Db2ConfigManager implements IDb2ConfigManager {
   constructor(private config: IDb2ConfigOptions) {
