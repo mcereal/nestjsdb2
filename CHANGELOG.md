@@ -1,3 +1,10 @@
+## [1.1.9](https://github.com/mcereal/nestjsdb2/compare/v1.1.8...v1.1.9) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove class validator ([8d8e09d](https://github.com/mcereal/nestjsdb2/commit/8d8e09d596aedf40452f2eebcf6f5ffd4c0f2e7b))
+
 ## [1.1.8](https://github.com/mcereal/nestjsdb2/compare/v1.1.7...v1.1.8) (2024-09-25)
 
 
