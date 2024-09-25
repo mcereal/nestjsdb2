@@ -64,7 +64,6 @@
   "dependencies": {
     "@nestjs/cache-manager": "^2.2.2",
     "@nestjs/common": "^10.0.0",
-    "@nestjs/config": "^3.2.3",
     "cache-manager": "^5.7.6",
     "class-validator": "^0.14.1",
     "generic-pool": "^3.9.0",
