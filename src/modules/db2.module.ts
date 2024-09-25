@@ -7,7 +7,6 @@ import { Db2PoolManager } from '../db/db2-pool.manager';
 import { Db2ConnectionManager } from '../db/db2-connection.manger';
 import { IDb2ConfigOptions, IConnectionManager } from '../interfaces';
 import { CacheModule, CacheModuleOptions } from '@nestjs/cache-manager';
-import { redisStore } from 'cache-manager-redis-yet';
 import {
   I_DB2_CONFIG,
   I_CONNECTION_MANAGER,
@@ -68,22 +67,21 @@ export class Db2Module {
           inject: [I_DB2_CONFIG],
           useFactory: (config: IDb2ConfigOptions): CacheModuleOptions => {
             if (config.cache?.enabled) {
-              const cacheConfig: CacheModuleOptions = {
-                store: config.cache.store === 'redis' ? redisStore : 'memory',
-                ...(config.cache.store === 'redis' && {
-                  socket: {
-                    host: config.cache.redisHost,
-                    port: config.cache.redisPort,
-                  },
-                  password: config.cache.redisPassword,
-                  ttl: config.cache.ttl || 600, // Default TTL
-                }),
-                ...(config.cache.store === 'memory' && {
-                  max: config.cache.max || 100,
-                  ttl: config.cache.ttl || 600,
-                }),
+              const cacheOptions: CacheModuleOptions = {
+                store: config.cache.store,
+                ttl: config.cache.ttl || 600, // Default TTL
               };
-              return cacheConfig;
+
+              if (config.cache.store === 'redis') {
+                cacheOptions.url = `redis://${config.cache.redisHost}:${config.cache.redisPort}`;
+                if (config.cache.redisPassword) {
+                  cacheOptions.password = config.cache.redisPassword;
+                }
+              } else if (config.cache.store === 'memory') {
+                cacheOptions.max = config.cache.max || 100;
+              }
+
+              return cacheOptions;
             }
             return {}; // Default cache configuration if caching is disabled
           },
@@ -104,7 +102,6 @@ export class Db2Module {
           ) => createAuthStrategy(config, connectionManager),
           inject: [I_DB2_CONFIG, I_CONNECTION_MANAGER],
         },
-        // Map interface tokens to existing classes
         { provide: I_POOL_MANAGER, useExisting: Db2PoolManager },
         { provide: I_CONNECTION_MANAGER, useExisting: Db2ConnectionManager },
         { provide: I_DB2_CLIENT, useExisting: Db2Client },

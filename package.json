@@ -66,13 +66,11 @@
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.3",
     "cache-manager": "^5.7.6",
-    "cache-manager-redis-yet": "^5.1.4",
     "class-validator": "^0.14.1",
     "generic-pool": "^3.9.0",
     "ibm_db": "^3.2.4",
     "jsonwebtoken": "^9.0.2",
     "kerberos": "^2.2.0",
-    "keyv": "^5.0.3",
     "ldapjs": "^3.0.7",
     "reflect-metadata": "^0.2.2"
   },
