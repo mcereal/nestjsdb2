@@ -1,3 +1,10 @@
+## [1.1.8](https://github.com/mcereal/nestjsdb2/compare/v1.1.7...v1.1.8) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove nest logger ([c017c87](https://github.com/mcereal/nestjsdb2/commit/c017c8775ec6342354d41f2c77f08ad376112b21))
+
 ## [1.1.7](https://github.com/mcereal/nestjsdb2/compare/v1.1.6...v1.1.7) (2024-09-25)
 
 
