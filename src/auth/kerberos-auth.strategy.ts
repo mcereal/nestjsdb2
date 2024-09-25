@@ -49,15 +49,6 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     try {
       // Initialize Kerberos client and acquire ticket
       await this.initializeKerberosClient();
-
-      // Open the DB2 connection after acquiring the ticket
-      const connection: Connection =
-        await this.connectionManager.getConnection();
-      await this.connectionManager.closeConnection(connection);
-
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.CONNECTED,
-      });
       this.logger.log('Authentication successful using Kerberos strategy.');
     } catch (error: any) {
       this.connectionManager.setState({

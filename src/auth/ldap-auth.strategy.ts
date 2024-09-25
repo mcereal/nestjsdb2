@@ -48,14 +48,6 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       // Perform LDAP bind (authentication)
       await this.ldapBind();
 
-      // Open the DB2 connection after successful LDAP authentication
-      const connection: Connection =
-        await this.connectionManager.getConnection();
-      await this.connectionManager.closeConnection(connection);
-
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.CONNECTED,
-      });
       this.logger.log('LDAP authentication successful.');
     } catch (error: any) {
       this.connectionManager.setState({

@@ -45,14 +45,6 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
     this.logger.log('Starting JWT authentication...');
 
     try {
-      // Proceed to open a connection, which will internally verify the JWT token
-      const connection: Connection =
-        await this.connectionManager.getConnection();
-      await this.connectionManager.closeConnection(connection);
-
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.CONNECTED,
-      });
       this.logger.log('Authentication successful using JWT strategy.');
     } catch (error: any) {
       this.connectionManager.setState({
