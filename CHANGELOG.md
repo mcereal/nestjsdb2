@@ -1,3 +1,13 @@
+## [1.1.6](https://github.com/mcereal/nestjsdb2/compare/v1.1.5...v1.1.6) (2024-09-25)
+
+
+### Bug Fixes
+
+* codesmell ([6aecaeb](https://github.com/mcereal/nestjsdb2/commit/6aecaeb0000690ee79cc44635ae2b977535e7fdf))
+* export ldap client ([62470c7](https://github.com/mcereal/nestjsdb2/commit/62470c7b8714baa0e54a107bbe5043516c05698b))
+* refactor to remove regex hotspot ([275c7b7](https://github.com/mcereal/nestjsdb2/commit/275c7b7b96489faf53b4b0cdab5334852c7c26e2))
+* remove ldapjs ([7c575a8](https://github.com/mcereal/nestjsdb2/commit/7c575a855fea18ecc35f1f2afc972af459357aeb))
+
 ## [1.1.5](https://github.com/mcereal/nestjsdb2/compare/v1.1.4...v1.1.5) (2024-09-25)
 
 
