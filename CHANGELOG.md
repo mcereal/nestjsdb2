@@ -1,3 +1,12 @@
+## [1.1.1](https://github.com/mcereal/nestjsdb2/compare/v1.1.0...v1.1.1) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove terminus dependency ([98f22dc](https://github.com/mcereal/nestjsdb2/commit/98f22dc07501d0e8f233de661fb155fe27765bbc))
+* remove terminus dependency ([12fb8a7](https://github.com/mcereal/nestjsdb2/commit/12fb8a7137c53d8d160363e027cc9883639daf1c))
+* remove unused deps ([dc3c72b](https://github.com/mcereal/nestjsdb2/commit/dc3c72b6d1174f504489918954a4fa8eb8e77ccb))
+
 # [1.1.0](https://github.com/mcereal/nestjsdb2/compare/v1.0.1...v1.1.0) (2024-09-25)
 
 
