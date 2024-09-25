@@ -1,13 +1,15 @@
+// src/decorators/foreignKey.decorator.ts
+
+import { createPropertyDecorator } from './base.decorator';
 import { ForeignKeyMetadata, ForeignKeyOptions } from '../interfaces';
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { getMetadata } from './utils';
 
 /**
- * @ForeignKey decorator to define a foreign key relationship.
- * @param options - Configuration options for the foreign key.
- * @returns PropertyDecorator
+ * Validates the options provided to the @ForeignKey decorator.
+ * @param options - The foreign key relationship options.
  */
-export const ForeignKey = (options: ForeignKeyOptions): PropertyDecorator => {
-  // Validate options
+const validateForeignKeyOptions = (options: ForeignKeyOptions) => {
+  // Validate that the reference is a properly formatted string
   if (
     typeof options.reference !== 'string' ||
     !options.reference.includes('(') ||
@@ -18,6 +20,7 @@ export const ForeignKey = (options: ForeignKeyOptions): PropertyDecorator => {
     );
   }
 
+  // Validate that the onDelete option, if provided, is one of the allowed values
   if (
     options.onDelete &&
     !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
@@ -26,53 +29,38 @@ export const ForeignKey = (options: ForeignKeyOptions): PropertyDecorator => {
       "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
     );
   }
-
-  return (target: Object, propertyKey: string | symbol) => {
-    const constructor = target.constructor as new (...args: any[]) => any;
-
-    // Retrieve existing entity metadata or create a new one
-    let entityMetadata: EntityMetadata =
-      EntityMetadataStorage.getEntityMetadata(constructor);
-
-    // If no metadata exists, initialize a new one
-    if (!entityMetadata) {
-      entityMetadata = {
-        tableName: '',
-        columns: [],
-        primaryKeys: [],
-        uniqueColumns: [],
-        indexedColumns: [],
-        foreignKeys: [],
-        oneToOneRelations: [],
-        oneToManyRelations: [],
-        manyToOneRelations: [],
-        manyToManyRelations: [],
-        defaultValues: [],
-        checkConstraints: [],
-        compositeKeys: [],
-        uniqueColumnMetadada: [],
-      };
-    }
-
-    // Add new foreign key metadata
-    const foreignKeyMetadata: ForeignKeyMetadata = {
-      propertyKey,
-      options,
-    };
-
-    entityMetadata.foreignKeys.push(foreignKeyMetadata);
-
-    // Store the updated metadata in the EntityMetadataStorage
-    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
-  };
 };
 
 /**
- * Function to retrieve foreign key metadata for a given class
+ * Creates foreign key metadata from the provided options.
+ * @param propertyKey - The property key of the foreign key.
+ * @param options - The foreign key relationship options.
+ * @returns The foreign key metadata.
+ */
+const createForeignKeyMetadata = (
+  propertyKey: string | symbol,
+  options: ForeignKeyOptions,
+): ForeignKeyMetadata => ({
+  propertyKey,
+  options,
+});
+
+/**
+ * @ForeignKey decorator to define a foreign key relationship.
+ * @param options - Configuration options for the foreign key.
+ * @returns PropertyDecorator
+ */
+export const ForeignKey = createPropertyDecorator<ForeignKeyOptions>(
+  'foreignKeys',
+  validateForeignKeyOptions,
+  createForeignKeyMetadata,
+);
+
+/**
+ * Retrieves foreign key metadata for a given class.
  * @param target - The constructor of the entity class.
  * @returns ForeignKeyMetadata[]
  */
 export const getForeignKeyMetadata = (target: any): ForeignKeyMetadata[] => {
-  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  return entityMetadata ? entityMetadata.foreignKeys : [];
+  return getMetadata<ForeignKeyMetadata>(target, 'foreignKeys');
 };

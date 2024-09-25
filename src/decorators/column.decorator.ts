@@ -1,69 +1,54 @@
 // src/decorators/column.decorator.ts
 
+import { createPropertyDecorator } from './base.decorator';
 import { ColumnOptions, ColumnMetadata } from '../interfaces';
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { getMetadata } from './utils';
+
+/**
+ * Validates the options provided to the @Column decorator.
+ * @param options - The column options.
+ */
+const validateColumnOptions = (options: ColumnOptions) => {
+  if (!options.type || typeof options.type !== 'string') {
+    throw new Error('Column type must be a non-empty string.');
+  }
+};
+
+/**
+ * Creates column metadata from the provided options.
+ * @param propertyKey - The property key of the column.
+ * @param options - The column options.
+ * @returns The column metadata.
+ */
+const createColumnMetadata = (
+  propertyKey: string | symbol,
+  options: ColumnOptions,
+): ColumnMetadata => ({
+  propertyKey,
+  options: {
+    type: options.type,
+    length: options.length,
+    nullable: options.nullable,
+    default: options.default,
+  },
+});
 
 /**
  * @Column decorator to define a database column.
  * @param options - Configuration options for the column.
  * @returns PropertyDecorator
  */
-export const Column = (options: ColumnOptions): PropertyDecorator => {
-  if (!options.type || typeof options.type !== 'string') {
-    throw new Error('Column type must be a non-empty string.');
-  }
-
-  return (target: Object, propertyKey: string | symbol) => {
-    const constructor = target.constructor as new (...args: any[]) => any;
-
-    // Retrieve existing entity metadata or create a new one
-    let entityMetadata: EntityMetadata =
-      EntityMetadataStorage.getEntityMetadata(constructor);
-
-    // If no metadata exists, initialize a new one
-    if (!entityMetadata) {
-      entityMetadata = {
-        tableName: '',
-        columns: [],
-        primaryKeys: [],
-        uniqueColumns: [],
-        indexedColumns: [],
-        foreignKeys: [],
-        oneToOneRelations: [],
-        oneToManyRelations: [],
-        manyToOneRelations: [],
-        manyToManyRelations: [],
-        defaultValues: [],
-        checkConstraints: [],
-        compositeKeys: [],
-        uniqueColumnMetadada: [],
-      };
-    }
-
-    // Add new column metadata
-    const columnMetadata: ColumnMetadata = {
-      propertyKey,
-      options: {
-        type: options.type,
-        length: options.length,
-        nullable: options.nullable,
-        default: options.default,
-      },
-    };
-
-    entityMetadata.columns.push(columnMetadata);
-
-    // Store updated metadata
-    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
-  };
-};
+export const Column = createPropertyDecorator<ColumnOptions>(
+  'columns',
+  validateColumnOptions,
+  createColumnMetadata,
+);
 
 /**
- * Function to retrieve column metadata for a given class
+ * Retrieves column metadata for a given class.
  * @param target - The constructor of the entity class.
  * @returns ColumnMetadata[]
  */
 export const getColumnMetadata = (target: any): ColumnMetadata[] => {
-  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  return entityMetadata ? entityMetadata.columns : [];
+  return getMetadata<ColumnMetadata>(target, 'columns');
 };

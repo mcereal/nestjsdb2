@@ -1,72 +1,68 @@
-import { OneToManyMetadata } from '../interfaces';
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
-import { OneToManyOptions } from '../interfaces';
+// src/decorators/oneToMany.decorator.ts
+
+import { createPropertyDecorator } from './base.decorator';
+import { OneToManyOptions, OneToManyMetadata } from '../interfaces';
+import { getMetadata } from './utils';
 
 /**
- * @OneToMany decorator to define a one-to-many relationship between entities.
- * @param options - Configuration options for the relationship.
- * @returns PropertyDecorator
+ * Validates the options provided to the @OneToMany decorator.
+ * @param options - The one-to-many relationship options.
  */
-export const OneToMany = (options: OneToManyOptions): PropertyDecorator => {
-  // Validate the provided options
+const validateOneToManyOptions = (options: OneToManyOptions) => {
   if (typeof options.target !== 'function') {
     throw new Error(
       "OneToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
     );
   }
 
-  return (target: Object, propertyKey: string | symbol) => {
-    const constructor = target.constructor as new (...args: any[]) => any;
-
-    // Retrieve existing entity metadata or create a new one
-    let entityMetadata: EntityMetadata =
-      EntityMetadataStorage.getEntityMetadata(constructor);
-
-    // If no metadata exists, initialize a new one
-    if (!entityMetadata) {
-      entityMetadata = {
-        tableName: '',
-        columns: [],
-        primaryKeys: [],
-        uniqueColumns: [],
-        indexedColumns: [],
-        foreignKeys: [],
-        oneToOneRelations: [],
-        oneToManyRelations: [],
-        manyToOneRelations: [],
-        manyToManyRelations: [],
-        defaultValues: [],
-        checkConstraints: [],
-        compositeKeys: [],
-        uniqueColumnMetadada: [],
-      };
-    }
-
-    // Check if the relation already exists to avoid duplicates
-    const existingRelation = entityMetadata.oneToManyRelations.find(
-      (relation) => relation.propertyKey === propertyKey,
-    );
-
-    if (!existingRelation) {
-      // Add new one-to-many relation metadata
-      const oneToManyMetadata: OneToManyMetadata = {
-        propertyKey,
-        options,
-      };
-      entityMetadata.oneToManyRelations.push(oneToManyMetadata);
-
-      // Store the updated one-to-many relations metadata in the EntityMetadataStorage
-      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
-    }
-  };
+  // You can add more validations here if needed, for example:
+  // if (!options.inverseSide || typeof options.inverseSide !== 'string') {
+  //   throw new Error("OneToMany decorator requires an 'inverseSide' option that is a string.");
+  // }
 };
 
 /**
- * Function to retrieve one-to-many relations metadata for a given class
+ * Creates one-to-many metadata from the provided options.
+ * @param propertyKey - The property key of the relationship.
+ * @param options - The one-to-many relationship options.
+ * @returns The one-to-many metadata.
+ */
+const createOneToManyMetadata = (
+  propertyKey: string | symbol,
+  options: OneToManyOptions,
+): OneToManyMetadata => ({
+  propertyKey,
+  options,
+});
+
+/**
+ * Ensures that the property key is unique within one-to-many relations.
+ * @param existing - An existing metadata entry.
+ * @param newEntry - A new metadata entry.
+ * @returns Boolean indicating if the entry already exists.
+ */
+const uniqueCheckOneToMany = (
+  existing: OneToManyMetadata,
+  newEntry: OneToManyMetadata,
+) => existing.propertyKey === newEntry.propertyKey;
+
+/**
+ * @OneToMany decorator to define a one-to-many relationship between entities.
+ * @param options - Configuration options for the relationship.
+ * @returns PropertyDecorator
+ */
+export const OneToMany = createPropertyDecorator<OneToManyOptions>(
+  'oneToManyRelations',
+  validateOneToManyOptions,
+  createOneToManyMetadata,
+  uniqueCheckOneToMany,
+);
+
+/**
+ * Retrieves one-to-many relations metadata for a given class.
  * @param target - The constructor of the entity class.
  * @returns OneToManyMetadata[]
  */
 export const getOneToManyMetadata = (target: any): OneToManyMetadata[] => {
-  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  return entityMetadata ? entityMetadata.oneToManyRelations : [];
+  return getMetadata<OneToManyMetadata>(target, 'oneToManyRelations');
 };
