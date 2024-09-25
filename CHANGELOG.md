@@ -1,3 +1,11 @@
+## [1.1.7](https://github.com/mcereal/nestjsdb2/compare/v1.1.6...v1.1.7) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove kerberos ([21f57cf](https://github.com/mcereal/nestjsdb2/commit/21f57cf21344997c04b3c67fdaa47c58a0dc3dc2))
+* security hotspots ([ccaaa74](https://github.com/mcereal/nestjsdb2/commit/ccaaa74ed73d237fb18d395b92817fdb3e53254a))
+
 ## [1.1.6](https://github.com/mcereal/nestjsdb2/compare/v1.1.5...v1.1.6) (2024-09-25)
 
 
