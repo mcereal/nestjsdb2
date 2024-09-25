@@ -1,3 +1,10 @@
+## [1.1.4](https://github.com/mcereal/nestjsdb2/compare/v1.1.3...v1.1.4) (2024-09-25)
+
+
+### Bug Fixes
+
+* remove jsonwebtoken dep ([0945ce3](https://github.com/mcereal/nestjsdb2/commit/0945ce38a169b4ea69a43e8077d09a22f62eadde))
+
 ## [1.1.3](https://github.com/mcereal/nestjsdb2/compare/v1.1.2...v1.1.3) (2024-09-25)
 
 
