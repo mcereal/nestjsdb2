@@ -1,18 +1,13 @@
-// src/decorators/many-to-many.decorator.ts
-
-import 'reflect-metadata';
-import { ManyToManyMetadata } from '../metadata';
-import {
-  ManyToManyOptions,
-  MANY_TO_MANY_RELATIONS_METADATA_KEY,
-} from '../types';
+import { ManyToManyMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { ManyToManyOptions } from '../interfaces';
 
 /**
  * @ManyToMany decorator to define a many-to-many relationship between entities.
  * @param options - Configuration options for the relationship.
  * @returns PropertyDecorator
  */
-export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
+export const ManyToMany = (options: ManyToManyOptions): PropertyDecorator => {
   // Validate the provided options
   if (typeof options.target !== 'function') {
     throw new Error(
@@ -26,34 +21,58 @@ export function ManyToMany(options: ManyToManyOptions): PropertyDecorator {
     );
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-    // Retrieve existing many-to-many relations metadata or initialize if none exists
-    const manyToManyRelations: ManyToManyMetadata[] =
-      Reflect.getMetadata(MANY_TO_MANY_RELATIONS_METADATA_KEY, constructor) ||
-      [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
+
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Check for existing relation for the same property key to avoid duplicates
-    const isAlreadyRelated = manyToManyRelations.some(
-      (relation) => relation.manyToManyOptions.propertyKey === propertyKey,
+    const isAlreadyRelated = entityMetadata.manyToManyRelations.some(
+      (relation) => relation.propertyKey === propertyKey,
     );
 
     if (!isAlreadyRelated) {
       // Add new many-to-many relation metadata
-      manyToManyRelations.push({
-        manyToManyOptions: { propertyKey, ...options },
-      });
+      const manyToManyMetadata: ManyToManyMetadata = {
+        propertyKey,
+        options,
+      };
+      entityMetadata.manyToManyRelations.push(manyToManyMetadata);
 
-      // Define or update metadata with the new many-to-many relations
-      Reflect.defineMetadata(
-        MANY_TO_MANY_RELATIONS_METADATA_KEY,
-        manyToManyRelations,
-        constructor,
-      );
+      // Store the updated many-to-many relations metadata in the EntityMetadataStorage
+      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
     }
   };
-}
+};
+
+/**
+ * Function to retrieve many-to-many relations metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns ManyToManyMetadata[]
+ */
+export const getManyToManyMetadata = (target: any): ManyToManyMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.manyToManyRelations : [];
+};

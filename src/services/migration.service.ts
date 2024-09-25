@@ -140,9 +140,9 @@ export class Db2MigrationService implements IDb2MigrationService {
     const columnDefinitions = metadata.columns.map((column) => {
       let columnDef = `${String(
         column.propertyKey,
-      )} ${column.type.toUpperCase()}`;
-      if (column.length) columnDef += `(${column.length})`;
-      if (column.nullable === false) columnDef += ` NOT NULL`;
+      )} ${column.options.type.toUpperCase()}`;
+      if (column.options.length) columnDef += `(${column.options.length})`;
+      if (column.options.nullable === false) columnDef += ` NOT NULL`;
       if (
         metadata.defaultValues.some(
           (def) => def.propertyKey === column.propertyKey,
@@ -174,10 +174,10 @@ export class Db2MigrationService implements IDb2MigrationService {
     if (metadata.foreignKeys.length) {
       metadata.foreignKeys.forEach((fk) => {
         sql += `, FOREIGN KEY (${String(fk.propertyKey)}) REFERENCES ${
-          fk.foreignKeyOptions.reference
+          fk.options.reference
         }`;
-        if (fk.foreignKeyOptions.onDelete) {
-          sql += ` ON DELETE ${fk.foreignKeyOptions.onDelete}`;
+        if (fk.options.onDelete) {
+          sql += ` ON DELETE ${fk.options.onDelete}`;
         }
       });
     }

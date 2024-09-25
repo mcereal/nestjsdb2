@@ -1,33 +1,63 @@
-// src/decorators/default.decorator.ts
+import { DefaultMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
-import 'reflect-metadata';
-import { DefaultMetadata } from '../types';
+/**
+ * @Default decorator to define a default value for a database column.
+ * @param value - The default value to set.
+ * @returns PropertyDecorator
+ */
+export const Default = (value: any): PropertyDecorator => {
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-export function Default(value: any): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
 
-    // Retrieve existing default values metadata or initialize if none exists
-    const defaultValues: DefaultMetadata[] =
-      Reflect.getMetadata('defaultValues', constructor) || [];
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
-    // Add or update the default value for the specific propertyKey
-    const existingIndex = defaultValues.findIndex(
+    // Check if the propertyKey already exists in the default values metadata
+    const existingIndex = entityMetadata.defaultValues.findIndex(
       (entry) => entry.propertyKey === propertyKey,
     );
 
     if (existingIndex !== -1) {
       // If an entry exists for the property, update it
-      defaultValues[existingIndex] = { propertyKey, value };
+      entityMetadata.defaultValues[existingIndex] = { propertyKey, value };
     } else {
       // Otherwise, add a new entry
-      defaultValues.push({ propertyKey, value });
+      entityMetadata.defaultValues.push({ propertyKey, value });
     }
 
-    // Define or update metadata with the new default values
-    Reflect.defineMetadata('defaultValues', defaultValues, constructor);
+    // Store the updated metadata
+    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   };
-}
+};
+
+/**
+ * Function to retrieve default values metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns DefaultMetadata[]
+ */
+export const getDefaultValuesMetadata = (target: any): DefaultMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.defaultValues : [];
+};

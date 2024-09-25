@@ -1,10 +1,13 @@
-// decorators/one-to-one.decorator.ts
+import { OneToOneMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { OneToOneOptions } from '../interfaces';
 
-import 'reflect-metadata';
-import { OneToOneMetadata } from '../metadata';
-import { OneToOneOptions, ONE_TO_ONE_RELATIONS_METADATA_KEY } from '../types';
-
-export function OneToOne(options: OneToOneOptions): PropertyDecorator {
+/**
+ * @OneToOne decorator to define a one-to-one relationship between entities.
+ * @param options - Configuration options for the relationship.
+ * @returns PropertyDecorator
+ */
+export const OneToOne = (options: OneToOneOptions): PropertyDecorator => {
   // Validate the provided options
   if (typeof options.target !== 'function') {
     throw new Error(
@@ -12,35 +15,58 @@ export function OneToOne(options: OneToOneOptions): PropertyDecorator {
     );
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-    // Retrieve existing one-to-one relations metadata or initialize if none exists
-    const oneToOneRelations: OneToOneMetadata[] =
-      Reflect.getMetadata(ONE_TO_ONE_RELATIONS_METADATA_KEY, constructor) || [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
+
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Check if the relation already exists to avoid duplicates
-    const existingRelation = oneToOneRelations.find(
-      (relation) => relation.oneToOneOptions.propertyKey === propertyKey,
+    const existingRelation = entityMetadata.oneToOneRelations.find(
+      (relation) => relation.propertyKey === propertyKey,
     );
 
     if (!existingRelation) {
       // Add new one-to-one relation metadata
-      oneToOneRelations.push({
+      const oneToOneMetadata: OneToOneMetadata = {
         propertyKey,
-        ...options,
-        oneToOneOptions: options,
-      });
+        options,
+      };
+      entityMetadata.oneToOneRelations.push(oneToOneMetadata);
 
-      // Define or update metadata with the new one-to-one relations
-      Reflect.defineMetadata(
-        'oneToOneRelations',
-        oneToOneRelations,
-        constructor,
-      );
+      // Store the updated one-to-one relations metadata in the EntityMetadataStorage
+      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
     }
   };
-}
+};
+
+/**
+ * Function to retrieve one-to-one relations metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns OneToOneMetadata[]
+ */
+export const getOneToOneMetadata = (target: any): OneToOneMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.oneToOneRelations : [];
+};

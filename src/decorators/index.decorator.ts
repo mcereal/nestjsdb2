@@ -1,40 +1,67 @@
-// src/decorators/index.decorator.ts
-
-import 'reflect-metadata';
-import { IndexMetadata } from '../metadata/entity-metadata.storage';
-import { INDEXED_COLUMNS_METADATA_KEY } from '../types';
+import { IndexedColumnMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 /**
  * @Index decorator to mark a property as indexed.
  * Can be extended with additional options if needed.
  * @returns PropertyDecorator
  */
-export function Index(): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+export const Index = (): PropertyDecorator => {
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-    // Retrieve existing index metadata or initialize if none exists
-    const indexColumns: IndexMetadata[] =
-      Reflect.getMetadata(INDEXED_COLUMNS_METADATA_KEY, constructor) || [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
 
-    // Check if the property is already marked as an index to avoid duplicates
-    const isAlreadyIndexed = indexColumns.some(
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
+
+    // Check if the property is already marked as indexed to avoid duplicates
+    const isAlreadyIndexed = entityMetadata.indexedColumns.some(
       (index) => index.propertyKey === propertyKey,
     );
 
     if (!isAlreadyIndexed) {
       // Add new index metadata
-      indexColumns.push({ propertyKey, name: propertyKey.toString() });
+      const indexMetadata: IndexedColumnMetadata = {
+        propertyKey,
+        options: {
+          name: '', // Default to empty string
+          unique: false, // Default to non-unique index
+        },
+      };
+      entityMetadata.indexedColumns.push(indexMetadata);
 
-      // Define or update metadata with the new index columns
-      Reflect.defineMetadata(
-        INDEXED_COLUMNS_METADATA_KEY,
-        indexColumns,
-        constructor,
-      );
+      // Store the updated metadata in the EntityMetadataStorage
+      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
     }
   };
-}
+};
+
+/**
+ * Function to retrieve index metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns IndexMetadata[]
+ */
+export const getIndexMetadata = (target: any): IndexedColumnMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.indexedColumns : [];
+};

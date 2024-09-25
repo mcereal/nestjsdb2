@@ -1,39 +1,69 @@
 // src/decorators/column.decorator.ts
 
-import 'reflect-metadata';
-import { ColumnMetadata, ColumnOptions } from '../metadata';
-import { COLUMNS_METADATA_KEY } from '../types';
+import { ColumnOptions, ColumnMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 /**
  * @Column decorator to define a database column.
  * @param options - Configuration options for the column.
  * @returns PropertyDecorator
  */
-export function Column(options: ColumnOptions): PropertyDecorator {
+export const Column = (options: ColumnOptions): PropertyDecorator => {
   if (!options.type || typeof options.type !== 'string') {
     throw new Error('Column type must be a non-empty string.');
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-    // Retrieve existing columns metadata or initialize if none exists
-    const existingColumns: ColumnMetadata[] =
-      Reflect.getMetadata(COLUMNS_METADATA_KEY, constructor) || [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
+
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Add new column metadata
-    existingColumns.push({
+    const columnMetadata: ColumnMetadata = {
       propertyKey,
-      type: options.type,
-      length: options.length,
-      nullable: options.nullable,
-      default: options.default,
-    });
+      options: {
+        type: options.type,
+        length: options.length,
+        nullable: options.nullable,
+        default: options.default,
+      },
+    };
 
-    // Define or update metadata with new columns array
-    Reflect.defineMetadata(COLUMNS_METADATA_KEY, existingColumns, constructor);
+    entityMetadata.columns.push(columnMetadata);
+
+    // Store updated metadata
+    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   };
-}
+};
+
+/**
+ * Function to retrieve column metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns ColumnMetadata[]
+ */
+export const getColumnMetadata = (target: any): ColumnMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.columns : [];
+};

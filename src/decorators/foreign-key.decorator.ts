@@ -1,15 +1,12 @@
-// src/decorators/foreign-key.decorator.ts
-
-import 'reflect-metadata';
-import { ForeignKeyMetadata, ForeignKeyOptions } from '../metadata';
-import { FOREIGN_KEYS_METADATA_KEY } from '../types';
+import { ForeignKeyMetadata, ForeignKeyOptions } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
 
 /**
  * @ForeignKey decorator to define a foreign key relationship.
  * @param options - Configuration options for the foreign key.
  * @returns PropertyDecorator
  */
-export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
+export const ForeignKey = (options: ForeignKeyOptions): PropertyDecorator => {
   // Validate options
   if (
     typeof options.reference !== 'string' ||
@@ -30,20 +27,52 @@ export function ForeignKey(options: ForeignKeyOptions): PropertyDecorator {
     );
   }
 
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-    // Retrieve existing foreign keys metadata or initialize if none exists
-    const foreignKeys: ForeignKeyMetadata[] =
-      Reflect.getMetadata(FOREIGN_KEYS_METADATA_KEY, constructor) || [];
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
+
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Add new foreign key metadata
-    foreignKeys.push({ propertyKey, foreignKeyOptions: options });
+    const foreignKeyMetadata: ForeignKeyMetadata = {
+      propertyKey,
+      options,
+    };
 
-    // Define or update metadata with the new foreign keys array
-    Reflect.defineMetadata(FOREIGN_KEYS_METADATA_KEY, foreignKeys, constructor);
+    entityMetadata.foreignKeys.push(foreignKeyMetadata);
+
+    // Store the updated metadata in the EntityMetadataStorage
+    EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   };
-}
+};
+
+/**
+ * Function to retrieve foreign key metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns ForeignKeyMetadata[]
+ */
+export const getForeignKeyMetadata = (target: any): ForeignKeyMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.foreignKeys : [];
+};

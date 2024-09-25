@@ -70,8 +70,7 @@
     "ibm_db": "^3.2.4",
     "jsonwebtoken": "^9.0.2",
     "kerberos": "^2.2.0",
-    "ldapjs": "^3.0.7",
-    "reflect-metadata": "^0.2.2"
+    "ldapjs": "^3.0.7"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0",

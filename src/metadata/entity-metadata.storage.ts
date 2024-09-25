@@ -1,150 +1,61 @@
 // src/metadata/entity-metadata.storage.ts
 
-import 'reflect-metadata';
-
 import {
-  TABLE_NAME_METADATA_KEY,
-  COLUMNS_METADATA_KEY,
-  FOREIGN_KEYS_METADATA_KEY,
-  PRIMARY_KEYS_METADATA_KEY,
-  UNIQUE_COLUMNS_METADATA_KEY,
-  INDEXED_COLUMNS_METADATA_KEY,
-  ONE_TO_ONE_RELATIONS_METADATA_KEY,
-  ONE_TO_MANY_RELATIONS_METADATA_KEY,
-  MANY_TO_ONE_RELATIONS_METADATA_KEY,
-  MANY_TO_MANY_RELATIONS_METADATA_KEY,
-  DEFAULT_VALUES_METADATA_KEY,
-  CHECK_CONSTRAINTS_METADATA_KEY,
-  COMPOSITE_KEYS_METADATA_KEY,
-} from '../types';
-import { primeKeyOptions } from 'src/types/prime-key.types';
-import {
-  ManyToManyOptions,
-  ManyToOneOptions,
-  OneToManyOptions,
-  OneToOneOptions,
-  UniqueColumnMetadataOptions,
-} from '../types';
+  ManyToManyMetadata,
+  ManyToOneMetadata,
+  OneToManyMetadata,
+  OneToOneMetadata,
+  UniqueColumnMetadata,
+  CheckConstraintMetadata,
+  DefaultMetadata,
+  ForeignKeyMetadata,
+  PrimaryKeyMetadata,
+  IndexedColumnMetadata,
+  ColumnMetadata,
+  CompositeKeyMetadata,
+} from '../interfaces';
 
 export interface EntityMetadata {
   tableName: string;
   columns: ColumnMetadata[];
-  primaryKeys: string[];
-  uniqueColumns: string[];
-  indexedColumns: string[];
+  primaryKeys: PrimaryKeyMetadata[];
+  uniqueColumns: UniqueColumnMetadata[];
+  indexedColumns: IndexedColumnMetadata[];
   foreignKeys: ForeignKeyMetadata[];
-  oneToOneRelations: RelationMetadata[];
-  oneToManyRelations: RelationMetadata[];
-  manyToOneRelations: RelationMetadata[];
-  manyToManyRelations: RelationMetadata[];
+  oneToOneRelations: OneToOneMetadata[];
+  oneToManyRelations: OneToManyMetadata[];
+  manyToOneRelations: ManyToOneMetadata[];
+  manyToManyRelations: ManyToManyMetadata[];
   defaultValues: DefaultMetadata[];
-  checkConstraints: CheckMetadata[];
-  compositeKeys: string[];
+  checkConstraints: CheckConstraintMetadata[];
+  compositeKeys: CompositeKeyMetadata[];
   uniqueColumnMetadada: UniqueColumnMetadata[];
 }
 
-export interface ColumnMetadata {
-  propertyKey: string | symbol;
-  type?: string;
-  length?: number;
-  nullable?: boolean;
-  default?: any;
-}
-
-export interface ColumnOptions {
-  type: string;
-  length?: number;
-  nullable?: boolean;
-  default?: any;
-}
-
-export interface ForeignKeyMetadata {
-  propertyKey: string | symbol;
-  foreignKeyOptions: ForeignKeyOptions;
-}
-
-export interface ForeignKeyOptions {
-  reference: string;
-  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
-}
-
-interface RelationMetadata {
-  propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
-  joinTable?: string;
-}
-
-interface DefaultMetadata {
-  propertyKey: string | symbol;
-  value: any;
-}
-
-interface CheckMetadata {
-  propertyKey: string | symbol;
-  constraint: string;
-}
-
-export interface IndexMetadata {
-  propertyKey: string | symbol;
-  name: string;
-}
-
-/**
- * Interface defining the metadata structure for ManyToMany relationships.
- */
-export interface ManyToManyMetadata {
-  manyToManyOptions: ManyToManyOptions;
-}
-
-/**
- * Interface defining the metadata structure for ManyToOne relationships.
- */
-export interface ManyToOneMetadata {
-  manyToOneOptions: ManyToOneOptions;
-}
-
-/**
- * Interface defining the metadata structure for OneToMany relationships.
- */
-export interface OneToManyMetadata {
-  oneToManyOptions: OneToManyOptions;
-}
-
-/**
- * Interface defining the metadata structure for OneToOne relationships.
- */
-export interface OneToOneMetadata {
-  oneToOneOptions: OneToOneOptions;
-}
-
-/**
- * Interface defining the metadata structure for PrimaryKey columns.
- */
-
-export interface PrimaryKeyMetadata {
-  propertyKey: string | symbol;
-  primeKeyOptions: primeKeyOptions;
-}
-
-/**
- * Interface defining the metadata structure for Unique columns.
- */
-export interface UniqueColumnMetadata {
-  propertyKey: string | symbol;
-  uniqueKeyOptions: UniqueColumnMetadataOptions;
-}
+// WeakMaps to store different types of metadata
+const tableNameStore = new WeakMap<any, string>();
+const columnsStore = new WeakMap<any, ColumnMetadata[]>();
+const primaryKeysStore = new WeakMap<any, PrimaryKeyMetadata[]>();
+const uniqueColumnsStore = new WeakMap<any, UniqueColumnMetadata[]>();
+const indexedColumnsStore = new WeakMap<any, IndexedColumnMetadata[]>();
+const foreignKeysStore = new WeakMap<any, ForeignKeyMetadata[]>();
+const oneToOneRelationsStore = new WeakMap<any, OneToOneMetadata[]>();
+const oneToManyRelationsStore = new WeakMap<any, OneToManyMetadata[]>();
+const manyToOneRelationsStore = new WeakMap<any, ManyToOneMetadata[]>();
+const manyToManyRelationsStore = new WeakMap<any, ManyToManyMetadata[]>();
+const defaultValuesStore = new WeakMap<any, DefaultMetadata[]>();
+const checkConstraintsStore = new WeakMap<any, CheckConstraintMetadata[]>();
+const compositeKeysStore = new WeakMap<any, CompositeKeyMetadata[]>();
+const uniqueColumnMetadataStore = new WeakMap<any, UniqueColumnMetadata[]>();
+const entitiesStore = new Set<any>();
 
 export class EntityMetadataStorage {
-  // Unique metadata key used in the decorator
-  private static ENTITIES_METADATA_KEY = Symbol('entities');
-
   /**
    * Retrieves all registered entity classes.
    * @returns Array of entity class constructors.
    */
   static getEntities(): (new (...args: any[]) => any)[] {
-    return Reflect.getMetadata(this.ENTITIES_METADATA_KEY, globalThis) || [];
+    return Array.from(entitiesStore);
   }
 
   /**
@@ -155,42 +66,27 @@ export class EntityMetadataStorage {
   static getEntityMetadata(
     target: new (...args: any[]) => any,
   ): EntityMetadata {
-    const tableName = Reflect.getMetadata(TABLE_NAME_METADATA_KEY, target);
-    const columns: ColumnMetadata[] =
-      Reflect.getMetadata(COLUMNS_METADATA_KEY, target) || [];
-    const primaryKeys: string[] =
-      Reflect.getMetadata(PRIMARY_KEYS_METADATA_KEY, target) || [];
-    const uniqueColumns: string[] =
-      Reflect.getMetadata(UNIQUE_COLUMNS_METADATA_KEY, target) || [];
-    const indexedColumns: IndexMetadata[] =
-      Reflect.getMetadata(INDEXED_COLUMNS_METADATA_KEY, target) || [];
-    const foreignKeys: ForeignKeyMetadata[] =
-      Reflect.getMetadata(FOREIGN_KEYS_METADATA_KEY, target) || [];
-    const oneToOneRelations: RelationMetadata[] =
-      Reflect.getMetadata(ONE_TO_ONE_RELATIONS_METADATA_KEY, target) || [];
-    const oneToManyRelations: RelationMetadata[] =
-      Reflect.getMetadata(ONE_TO_MANY_RELATIONS_METADATA_KEY, target) || [];
-    const manyToOneRelations: RelationMetadata[] =
-      Reflect.getMetadata(MANY_TO_ONE_RELATIONS_METADATA_KEY, target) || [];
-    const manyToManyRelations: RelationMetadata[] =
-      Reflect.getMetadata(MANY_TO_MANY_RELATIONS_METADATA_KEY, target) || [];
-    const defaultValues: DefaultMetadata[] =
-      Reflect.getMetadata(DEFAULT_VALUES_METADATA_KEY, target) || [];
-    const checkConstraints: CheckMetadata[] =
-      Reflect.getMetadata(CHECK_CONSTRAINTS_METADATA_KEY, target) || [];
-    const compositeKeys: string[] =
-      Reflect.getMetadata(COMPOSITE_KEYS_METADATA_KEY, target) || [];
-    const uniqueColumnMetadada: UniqueColumnMetadata[] =
-      Reflect.getMetadata(UNIQUE_COLUMNS_METADATA_KEY, target) || [];
+    const tableName = tableNameStore.get(target) || '';
+    const columns = columnsStore.get(target) || [];
+    const primaryKeys = primaryKeysStore.get(target) || [];
+    const uniqueColumns = uniqueColumnsStore.get(target) || [];
+    const indexedColumns = indexedColumnsStore.get(target) || [];
+    const foreignKeys = foreignKeysStore.get(target) || [];
+    const oneToOneRelations = oneToOneRelationsStore.get(target) || [];
+    const oneToManyRelations = oneToManyRelationsStore.get(target) || [];
+    const manyToOneRelations = manyToOneRelationsStore.get(target) || [];
+    const manyToManyRelations = manyToManyRelationsStore.get(target) || [];
+    const defaultValues = defaultValuesStore.get(target) || [];
+    const checkConstraints = checkConstraintsStore.get(target) || [];
+    const compositeKeys = compositeKeysStore.get(target) || [];
+    const uniqueColumnMetadada = uniqueColumnMetadataStore.get(target) || [];
 
     return {
       tableName,
       columns,
       primaryKeys,
       uniqueColumns,
-      indexedColumns: indexedColumns.map(
-        (index) => index.propertyKey as string,
-      ),
+      indexedColumns,
       foreignKeys,
       oneToOneRelations,
       oneToManyRelations,
@@ -201,5 +97,31 @@ export class EntityMetadataStorage {
       compositeKeys,
       uniqueColumnMetadada,
     };
+  }
+
+  /**
+   * Stores metadata for an entity.
+   * @param target - The constructor of the entity class.
+   * @param metadata - The entity metadata to store.
+   */
+  static setEntityMetadata(
+    target: new (...args: any[]) => any,
+    metadata: EntityMetadata,
+  ) {
+    tableNameStore.set(target, metadata.tableName);
+    columnsStore.set(target, metadata.columns);
+    primaryKeysStore.set(target, metadata.primaryKeys);
+    uniqueColumnsStore.set(target, metadata.uniqueColumns);
+    indexedColumnsStore.set(target, metadata.indexedColumns);
+    foreignKeysStore.set(target, metadata.foreignKeys);
+    oneToOneRelationsStore.set(target, metadata.oneToOneRelations);
+    oneToManyRelationsStore.set(target, metadata.oneToManyRelations);
+    manyToOneRelationsStore.set(target, metadata.manyToOneRelations);
+    manyToManyRelationsStore.set(target, metadata.manyToManyRelations);
+    defaultValuesStore.set(target, metadata.defaultValues);
+    checkConstraintsStore.set(target, metadata.checkConstraints);
+    compositeKeysStore.set(target, metadata.compositeKeys);
+    uniqueColumnMetadataStore.set(target, metadata.uniqueColumnMetadada);
+    entitiesStore.add(target);
   }
 }

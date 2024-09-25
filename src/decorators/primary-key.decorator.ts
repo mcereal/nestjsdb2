@@ -1,38 +1,65 @@
-// decorators/primary-key.decorator.ts
+import { PrimaryKeyMetadata } from '../interfaces';
+import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { primeKeyOptions } from '../interfaces';
 
-import 'reflect-metadata';
-import { PrimaryKeyMetadata } from '../metadata';
-import { primeKeyOptions, PRIMARY_KEYS_METADATA_KEY } from '../types';
+/**
+ * @PrimaryKey decorator to mark a property as a primary key.
+ * @param options - Optional configuration options for the primary key.
+ * @returns PropertyDecorator
+ */
+export const PrimaryKey = (options?: primeKeyOptions): PropertyDecorator => {
+  return (target: Object, propertyKey: string | symbol) => {
+    const constructor = target.constructor as new (...args: any[]) => any;
 
-export function PrimaryKey(options?: primeKeyOptions): PropertyDecorator {
-  return (
-    target: new (...args: any[]) => any,
-    propertyKey: string | symbol,
-  ) => {
-    const constructor = target.constructor;
+    // Retrieve existing entity metadata or create a new one
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(constructor);
 
-    // Retrieve existing primary keys metadata or initialize if none exists
-    const primaryKeys: PrimaryKeyMetadata[] =
-      Reflect.getMetadata(PRIMARY_KEYS_METADATA_KEY, constructor) || [];
+    // If no metadata exists, initialize a new one
+    if (!entityMetadata) {
+      entityMetadata = {
+        tableName: '',
+        columns: [],
+        primaryKeys: [],
+        uniqueColumns: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        checkConstraints: [],
+        compositeKeys: [],
+        uniqueColumnMetadada: [],
+      };
+    }
 
     // Check if the property key is already marked as a primary key
-    const existingKey = primaryKeys.find(
+    const existingKey = entityMetadata.primaryKeys.find(
       (key) => key.propertyKey === propertyKey,
     );
 
     if (!existingKey) {
       // Add new primary key metadata
-      primaryKeys.push({
+      const primaryKeyMetadata: PrimaryKeyMetadata = {
         propertyKey,
-        primeKeyOptions: options || {},
-      });
+        options: options || {},
+      };
+      entityMetadata.primaryKeys.push(primaryKeyMetadata);
 
-      // Define or update metadata with the new primary keys
-      Reflect.defineMetadata(
-        PRIMARY_KEYS_METADATA_KEY,
-        primaryKeys,
-        constructor,
-      );
+      // Store the updated primary keys metadata in the EntityMetadataStorage
+      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
     }
   };
-}
+};
+
+/**
+ * Function to retrieve primary keys metadata for a given class
+ * @param target - The constructor of the entity class.
+ * @returns PrimaryKeyMetadata[]
+ */
+export const getPrimaryKeyMetadata = (target: any): PrimaryKeyMetadata[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  return entityMetadata ? entityMetadata.primaryKeys : [];
+};
