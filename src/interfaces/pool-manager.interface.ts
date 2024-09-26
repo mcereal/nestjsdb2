@@ -1,7 +1,7 @@
 // src/interfaces/pool-manager.interface.ts
 
-import { Pool } from 'generic-pool';
-import { Connection } from 'ibm_db';
+import { Pool } from '../db/Pool';
+import { Connection } from '../db/Connection';
 
 /**
  * PoolManager interface
@@ -9,7 +9,7 @@ import { Connection } from 'ibm_db';
 
 export interface IPoolManager {
   init(): Promise<void>;
-  getPool: Pool<Connection>;
+  getPool: Pool;
   isPoolInitialized: boolean;
   getConnection(): Promise<Connection>;
   closeConnection(connection: Connection): Promise<void>;

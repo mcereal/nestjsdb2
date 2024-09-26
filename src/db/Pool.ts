@@ -1,54 +1,52 @@
 import { Connection } from './Connection';
 
 export interface PoolOptions {
-  maxPoolSize: number;
-  connectionString: string;
-  connectTimeout?: number; // Optional connection timeout
+  max: number;
+  min: number;
+  acquireTimeoutMillis: number;
 }
 
 export class Pool {
-  private poolSize: number;
+  private maxPoolSize: number;
+  private minPoolSize: number;
+  private acquireTimeoutMillis: number;
   private connectionString: string;
   private connections: Connection[] = [];
   private usedConnections: Connection[] = [];
+  private pendingRequests: {
+    resolve: (conn: Connection) => void;
+    reject: (err: Error) => void;
+    timer: NodeJS.Timeout;
+  }[] = [];
 
   constructor() {}
 
-  async init(poolSize: number, connectionString: string): Promise<void> {
-    this.poolSize = poolSize;
+  async init(options: PoolOptions, connectionString: string): Promise<void> {
+    this.maxPoolSize = options.max;
+    this.minPoolSize = options.min;
+    this.acquireTimeoutMillis = options.acquireTimeoutMillis;
     this.connectionString = connectionString;
 
-    console.log(
-      `Initializing connection pool with ${this.poolSize} connections...`,
+    this.log(
+      `Initializing connection pool with min ${this.minPoolSize} and max ${this.maxPoolSize} connections...`,
     );
 
-    for (let i = 0; i < this.poolSize; i++) {
+    // Initialize minPoolSize number of connections
+    for (let i = 0; i < this.minPoolSize; i++) {
       try {
-        console.log(`Initializing connection ${i + 1}...`);
+        this.log(`Initializing connection ${i + 1}...`);
         const conn = new Connection(this.connectionString);
         await conn.open(); // This will open the socket connection
 
-        console.log(`Connection object created: ${JSON.stringify(conn)}`);
         this.connections.push(conn); // Add the opened connection to the pool
-        console.log(`Connection ${i + 1} initialized.`);
+        this.log(`Connection ${i + 1} initialized.`);
       } catch (err) {
-        console.error(`Error initializing connection ${i + 1}:`, err);
+        this.log(`Error initializing connection ${i + 1}: ${err}`);
         throw err; // Ensure the error is propagated
       }
     }
 
-    console.log(`${this.poolSize} connections initialized.`);
-  }
-
-  // Initialize the connection pool with a specified size
-  async open(): Promise<Connection> {
-    if (this.connections.length > 0) {
-      const connection = this.connections.pop()!;
-      this.usedConnections.push(connection);
-      return connection;
-    } else {
-      throw new Error('No available connections');
-    }
+    this.log(`${this.connections.length} connections initialized.`);
   }
 
   // Retrieve an available connection from the pool
@@ -57,23 +55,46 @@ export class Pool {
       const connection = this.connections.pop()!;
       this.usedConnections.push(connection);
       return connection;
+    } else if (
+      this.usedConnections.length + this.connections.length <
+      this.maxPoolSize
+    ) {
+      // Create a new connection
+      const conn = new Connection(this.connectionString);
+      await conn.open();
+      this.usedConnections.push(conn);
+      return conn;
     } else {
-      throw new Error('No available connections');
+      // Wait for a connection to become available
+      return new Promise<Connection>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error('Acquire connection timeout'));
+        }, this.acquireTimeoutMillis);
+
+        this.pendingRequests.push({ resolve, reject, timer });
+      });
     }
   }
 
   // Release a used connection back to the pool
   async releaseConnection(connection: Connection): Promise<void> {
-    // Potentially reset connection state here, if necessary.
     const index = this.usedConnections.indexOf(connection);
     if (index !== -1) {
       this.usedConnections.splice(index, 1);
-      this.connections.push(connection);
+
+      // Check if there are pending requests
+      if (this.pendingRequests.length > 0) {
+        const { resolve, timer } = this.pendingRequests.shift()!;
+        clearTimeout(timer);
+        resolve(connection);
+      } else {
+        this.connections.push(connection);
+      }
     }
   }
 
-  // Close all connections in the pool
-  close(connection: Connection, callback: (err: Error | null) => void): void {
+  // Close a specific connection
+  async closeConnection(connection: Connection): Promise<void> {
     const usedIndex = this.usedConnections.indexOf(connection);
     const availableIndex = this.connections.indexOf(connection);
 
@@ -83,51 +104,23 @@ export class Pool {
       this.connections.splice(availableIndex, 1);
     }
 
-    // Close the specific connection with a callback for error handling
-    connection.close((err) => {
-      if (err) {
-        console.error('Error closing connection:', err);
-        callback(err); // Pass the error to the callback
-      } else {
-        console.log(`Connection closed.`);
-        callback(null); // No error, connection closed successfully
-      }
-    });
+    await connection.close();
+    this.log(`Connection closed.`);
   }
 
-  // Close all connections in the pool with error handling via callback
-  closeAll(callback: (err: Error | null) => void): void {
+  // Close all connections in the pool
+  async closeAll(): Promise<void> {
     const closePromises = this.connections
-      .map(
-        (conn) =>
-          new Promise<void>((resolve, reject) => {
-            conn.close((err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          }),
-      )
-      .concat(
-        this.usedConnections.map(
-          (conn) =>
-            new Promise<void>((resolve, reject) => {
-              conn.close((err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            }),
-        ),
-      );
+      .map((conn) => conn.close())
+      .concat(this.usedConnections.map((conn) => conn.close()));
 
-    Promise.all(closePromises)
-      .then(() => {
-        this.connections = [];
-        this.usedConnections = [];
-        console.log(`All connections closed.`);
-        callback(null); // Success, no error
-      })
-      .catch((err) => {
-        callback(err); // Pass the error to the callback
-      });
+    await Promise.all(closePromises);
+    this.connections = [];
+    this.usedConnections = [];
+    this.log(`All connections closed.`);
+  }
+
+  private log(message: string): void {
+    console.log(`[Pool] ${message}`);
   }
 }

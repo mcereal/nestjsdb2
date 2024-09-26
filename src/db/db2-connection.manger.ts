@@ -4,7 +4,7 @@ import {
   IConnectionManager,
   IPoolManager,
 } from '../interfaces';
-import { Connection } from 'ibm_db';
+import { Connection } from './Connection';
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { I_POOL_MANAGER } from '../constants/injection-token.constant';
 import { Logger } from '../utils';

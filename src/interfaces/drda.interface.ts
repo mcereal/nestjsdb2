@@ -1,4 +1,4 @@
-// DRDA Message Interface
+// DRDA Message Interfaces
 export interface DRDAResponse {
   length: number; // Message length
   type: string | number; // Message type (e.g., EXCSQLSET, SECCHK, etc.)
@@ -7,7 +7,7 @@ export interface DRDAResponse {
 
 export interface EXCSATRDResponse extends DRDAResponse {
   success: boolean;
-  parameters: any; // You can define a more specific type if you know the structure
+  parameters: any; // Define a more specific type if possible
 }
 
 export interface ACCRDBResponse extends DRDAResponse {
@@ -16,7 +16,9 @@ export interface ACCRDBResponse extends DRDAResponse {
 }
 
 export interface EXCSQLSETResponse extends DRDAResponse {
-  result: any[]; // The result of the SQL execution
+  success: boolean;
+  parameters: any; // Define a more specific type if possible
+  result: Row[]; // The result of the SQL execution
 }
 
 export interface SECCHKResponse extends DRDAResponse {
@@ -40,5 +42,16 @@ export type DRDAResponseType =
   | SECCHKResponse
   | ACCRDBResponse
   | EXCSATRDResponse
-  | DRDAResponse
-  | EXCSQLSETResponse;
+  | DRDAResponse;
+
+// Additional Interfaces for Parsing
+export interface ColumnMetadata {
+  name: string;
+  dataType: string; // e.g., INTEGER, VARCHAR
+  length: number;
+  nullable: boolean;
+}
+
+export interface Row {
+  [columnName: string]: any; // Key-value pairs where key is column name
+}

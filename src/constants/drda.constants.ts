@@ -49,4 +49,20 @@ export enum DRDAConstants {
 
   // 0xd043 to mark Chained Request Data Stream (CHNRQSDSS).
   CHNRQSDSS = 0xd043,
+
+  EXCSQLPREP = 0x2416, // Execute SQL Prepare
+  EXCSQLPREPRM = 0x2417, // Execute SQL Prepare Reply Message
+  STMTHDL = 0x2418, // Statement Handle
+  EXCSQLEXPRQ = 0x2419, // Execute SQL Statement Request
+  PARAM = 0x241a, // Parameter Marker Data
+  CLOSESTM = 0x241b, // Close Statement
+
+  CMDCOLNAM = 0x2404, // Command Column Name
+  CMDCOLDAT = 0x2405, // Command Column Data
+  CMDCOLLEN = 0x2406, // Command Column Length
+  CMDCOLNUL = 0x2407, // Command Column Null
+
+  // Server Public Key
+  SRVCLSNM_PK = 0x1148, // Server Class Name Public Key
+  ODBC_ERROR = 0xf289,
 }

@@ -44,6 +44,6 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
   public getConnectionString(): string {
     const { host, port, database } = this.config;
     const { username, password } = this.config.auth as Db2PasswordAuthOptions;
-    return `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};`;
+    return `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};SECURITY=SSL`;
   }
 }

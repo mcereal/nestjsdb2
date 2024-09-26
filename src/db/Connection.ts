@@ -1,14 +1,19 @@
 import { Socket } from 'net';
 import { connect as tlsConnect, TLSSocket } from 'tls';
 import {
+  ColumnMetadata,
   DRDAHeader,
   DRDAResponseType,
   EXCSQLSETResponse,
+  Row,
 } from '../interfaces/drda.interface';
 
 import { readFileSync } from 'fs';
 import { DRDAConstants } from '../constants/drda.constants';
 import { constants, publicEncrypt } from 'crypto';
+import { PreparedStatement } from './PreparedStatement';
+import { Logger } from '../utils';
+import path from 'path';
 
 export class Connection {
   private socket: Socket | TLSSocket | null = null;
@@ -25,10 +30,102 @@ export class Connection {
   private useSSL: boolean;
   private correlationId = 1;
 
+  private rsmd: ColumnMetadata[] = [];
+  private receiveBuffer: Buffer = Buffer.alloc(0);
+  private responseResolvers: Array<(response: DRDAResponseType) => void> = [];
+  private responseRejectors: Array<(error: Error) => void> = [];
+
+  private logger = new Logger(Connection.name);
+
   constructor(connectionString: string, timeout?: number) {
     this.connectionString = connectionString;
     this.connectionTimeout = timeout || 10000;
+    this.useSSL = false;
     this.parseConnectionString();
+    this.setupSocketListeners();
+  }
+
+  private setupSocketListeners(): void {
+    if (this.socket) {
+      this.socket.on('data', (data: Buffer) => this.handleData(data));
+      this.socket.on('error', (err: Error) => this.handleError(err));
+      this.socket.on('close', (hadError: boolean) =>
+        this.handleClose(hadError),
+      );
+    }
+  }
+
+  private handleData(data: Buffer): void {
+    this.receiveBuffer = Buffer.concat([this.receiveBuffer, data]);
+    this.logger.info(`Accumulated buffer length: ${this.receiveBuffer.length}`);
+    this.logger.debug(`Received data chunk: ${data.toString('hex')}`);
+
+    while (this.receiveBuffer.length >= 6) {
+      // Minimum header size
+      const length = this.receiveBuffer.readUInt16BE(0);
+      this.logger.info(`Parsed message length: ${length}`);
+
+      if (this.receiveBuffer.length < length) {
+        this.logger.info(`Incomplete message. Waiting for more data...`);
+        break;
+      }
+
+      const messageBuffer = this.receiveBuffer.slice(0, length);
+      this.logger.debug(
+        `Complete message received: ${messageBuffer.toString('hex')}`,
+      );
+      this.receiveBuffer = this.receiveBuffer.slice(length); // Remove processed message from buffer
+
+      try {
+        const header = this.parseDRDAHeader(messageBuffer);
+        const payload = this.parseDRDAPayload(header.payload);
+        this.logger.info('Received DRDA payload:', payload);
+        const response = this.decodeDRDAResponse(header);
+
+        if (this.responseResolvers.length > 0) {
+          const resolve = this.responseResolvers.shift()!;
+          resolve(response);
+          this.responseRejectors.shift();
+        } else {
+          this.logger.warn(
+            'No pending response resolver to handle the response.',
+          );
+        }
+      } catch (err) {
+        this.logger.error('Error decoding DRDA response:', err);
+        if (this.responseRejectors.length > 0) {
+          const reject = this.responseRejectors.shift()!;
+          reject(err);
+          this.responseResolvers.shift();
+        }
+      }
+    }
+  }
+
+  private handleError(err: Error): void {
+    this.logger.error('Socket error:', err);
+    // Handle socket errors
+
+    // Close the socket to prevent further issues
+    if (this.socket) {
+      this.socket.destroy();
+      this.isConnected = false;
+    } else {
+      this.logger.error('Socket is not available to close.');
+
+      // Handle the error appropriately
+      throw new Error('Socket error occurred.');
+    }
+  }
+
+  private handleClose(hadError: boolean): void {
+    if (hadError) {
+      this.logger.error('Socket closed due to an error.');
+    } else {
+      this.logger.info('Socket closed gracefully.');
+    }
+    this.isConnected = false;
+    // Handle socket closure
   }
 
   // Parse the DB2 connection string into components
@@ -61,10 +158,380 @@ export class Connection {
     });
   }
 
+  // Asynchronous prepare method
+  public async prepare(sql: string): Promise<PreparedStatement> {
+    await this.sendPrepareRequest(sql);
+    const stmtHandle = await this.sendPrepareRequest(sql);
+    const stmt = new PreparedStatement(this, sql, stmtHandle);
+    return stmt;
+  }
+
+  public async sendExecuteRequest(
+    statementHandle: string,
+    params: any[],
+  ): Promise<void> {
+    const message = this.createExecuteSQLMessage(statementHandle, params);
+    await this.send(message);
+  }
+
+  private createExecuteSQLMessage(
+    statementHandle: string,
+    params: any[],
+  ): Buffer {
+    // Construct parameters
+    const buffers: Buffer[] = [];
+
+    // Statement Handle
+    const stmtHandleParam = this.constructParameter(
+      DRDAConstants.STMTHDL,
+      Buffer.from(statementHandle, 'utf8'),
+    );
+    buffers.push(stmtHandleParam);
+
+    // Parameters (similar to how you handle SQL parameters)
+    params.forEach((param) => {
+      const paramValue = Buffer.from(this.escapeSQLParam(param), 'utf8');
+      const paramBuffer = this.constructParameter(
+        DRDAConstants.PARAM, // Define PARAM in DRDAConstants
+        paramValue,
+      );
+      buffers.push(paramBuffer);
+    });
+
+    const parametersBuffer = Buffer.concat(buffers);
+
+    // EXCSQLEXPRQ Object
+    const excsqlexprqLength = 4 + parametersBuffer.length;
+    const excsqlexprqBuffer = Buffer.alloc(4);
+    excsqlexprqBuffer.writeUInt16BE(excsqlexprqLength, 0);
+    excsqlexprqBuffer.writeUInt16BE(DRDAConstants.EXCSQLEXPRQ, 2); // Define EXCSQLEXPRQ in DRDAConstants
+
+    const excsqlexprqObject = Buffer.concat([
+      excsqlexprqBuffer,
+      parametersBuffer,
+    ]);
+
+    // DSS Header
+    const totalLength = 6 + excsqlexprqObject.length;
+    const dssHeader = Buffer.alloc(6);
+    dssHeader.writeUInt16BE(totalLength, 0);
+    dssHeader.writeUInt8(0xd0, 2);
+    dssHeader.writeUInt8(0x01, 3);
+    dssHeader.writeUInt16BE(this.nextCorrelationId(), 4);
+
+    // Final EXCSQLEXPRQ message with DSS header
+    const message = Buffer.concat([dssHeader, excsqlexprqObject]);
+    this.logger.info(
+      'Constructed EXCSQLEXPRQ message:',
+      message.toString('hex'),
+    );
+
+    return message;
+  }
+
+  private async sendPrepareRequest(sql: string): Promise<string> {
+    // Construct the EXCSQLPREP message
+    const message = this.createEXCSQLPREPMessage(sql);
+    await this.send(message);
+
+    // Receive and parse the response
+    const response = await this.receiveResponse();
+
+    if (response.type !== 'EXCSQLPREPRM') {
+      throw new Error(`Unexpected response type: ${response.type}`);
+    }
+
+    // Extract the statement handle from the response
+    const stmtHandle = this.extractStatementHandle(response.payload);
+    if (!stmtHandle) {
+      throw new Error(
+        'Failed to retrieve statement handle from EXCSQLPREPRM response',
+      );
+    }
+
+    return stmtHandle;
+  }
+
+  private extractStatementHandle(payload: Buffer): string | null {
+    let offset = 0;
+
+    // Iterate through parameters to find the statement handle
+    while (offset + 4 <= payload.length) {
+      const paramLength = payload.readUInt16BE(offset);
+      const paramCodePoint = payload.readUInt16BE(offset + 2);
+      const data = payload.slice(offset + 4, offset + paramLength);
+
+      if (paramCodePoint === DRDAConstants.STMTHDL) {
+        // Assume STMTHDL is defined
+        const stmtHandle = data.toString('utf8').trim();
+        return stmtHandle;
+      }
+
+      offset += paramLength;
+    }
+
+    return null;
+  }
+
+  public processExecuteResponse(payload: Buffer): EXCSQLSETResponse {
+    this.logger.info('Processing EXCSQLSETResponse...');
+    let offset = 0;
+    const response: EXCSQLSETResponse = {
+      length: payload.length,
+      type: 'EXCSQLSET',
+      payload: payload,
+      success: true,
+      parameters: {},
+      result: [],
+    };
+
+    while (offset + 4 <= payload.length) {
+      const paramLength = payload.readUInt16BE(offset);
+      const paramCodePoint = payload.readUInt16BE(offset + 2);
+      const paramData = payload.slice(offset + 4, offset + paramLength);
+
+      this.logger.info(
+        `Parameter Code Point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}`,
+      );
+
+      switch (paramCodePoint) {
+        case DRDAConstants.SVRCOD:
+          const svrcod = paramData.readUInt16BE(0);
+          response.parameters['SVRCOD'] = svrcod;
+          if (svrcod !== 0) {
+            response.success = false;
+            this.logger.error(`Server returned error code: ${svrcod}`);
+          }
+          break;
+
+        case DRDAConstants.RSMD:
+          const rsmd = this.parseResultSetMetadata(paramData);
+          response.parameters['RSMD'] = rsmd;
+          break;
+
+        case DRDAConstants.QRYDTA:
+          const rows = this.parseQueryData(paramData);
+          response.result.push(...rows);
+          break;
+
+        // Handle other code points as needed
+        default:
+          this.logger.warn(
+            `Unknown parameter code point: 0x${paramCodePoint.toString(16)}, Data: ${paramData.toString('hex')}`,
+          );
+          break;
+      }
+
+      offset += paramLength;
+    }
+
+    this.logger.info('EXCSQLSETResponse processed:', response);
+    return response;
+  }
+
+  private parseResultSetMetadata(data: Buffer): ColumnMetadata[] {
+    const columns: ColumnMetadata[] = [];
+    let offset = 0;
+
+    while (offset + 4 <= data.length) {
+      const paramLength = data.readUInt16BE(offset);
+      const paramCodePoint = data.readUInt16BE(offset + 2);
+      const paramData = data.slice(offset + 4, offset + paramLength);
+
+      switch (paramCodePoint) {
+        case DRDAConstants.CMDCOLNAM: // Column Name
+          const columnName = paramData.toString('utf8').trim();
+          columns.push({
+            name: columnName,
+            dataType: 'UNKNOWN', // Placeholder, to be updated
+            length: 0, // Placeholder, to be updated
+            nullable: true, // Placeholder, to be updated
+          });
+          break;
+
+        case DRDAConstants.CMDCOLDAT: // Column Data Type
+          if (columns.length === 0) {
+            this.logger.warn('CMDCOLDAT received before any CMDCOLNAM');
+            break;
+          }
+          const dataType = paramData.toString('utf8').trim();
+          columns[columns.length - 1].dataType = dataType;
+          break;
+
+        case DRDAConstants.CMDCOLLEN: // Column Length
+          if (columns.length === 0) {
+            this.logger.warn('CMDCOLLEN received before any CMDCOLNAM');
+            break;
+          }
+          const length = paramData.readUInt16BE(0);
+          columns[columns.length - 1].length = length;
+          break;
+
+        case DRDAConstants.CMDCOLNUL: // Column Nullable
+          if (columns.length === 0) {
+            this.logger.warn('CMDCOLNUL received before any CMDCOLNAM');
+            break;
+          }
+          const nullable = paramData.readUInt8(0) === 1;
+          columns[columns.length - 1].nullable = nullable;
+          break;
+
+        // Handle other RSMD parameters as needed
+
+        default:
+          this.logger.warn(
+            `Unknown RSMD parameter code point: 0x${paramCodePoint.toString(16)}`,
+          );
+          break;
+      }
+
+      offset += paramLength;
+    }
+
+    this.logger.info('Parsed RSMD:', columns);
+    return columns;
+  }
+
+  private parseQueryData(data: Buffer): Row[] {
+    const rows: Row[] = [];
+    let offset = 0;
+
+    while (offset + 4 <= data.length) {
+      const paramLength = data.readUInt16BE(offset);
+      const paramCodePoint = data.readUInt16BE(offset + 2);
+      const paramData = data.slice(offset + 4, offset + paramLength);
+
+      if (paramCodePoint === DRDAConstants.QRYDTA) {
+        // Query Data
+        const row = this.parseRowData(paramData);
+        rows.push(row);
+      }
+
+      // Handle other code points if necessary
+
+      offset += paramLength;
+    }
+
+    this.logger.info('Parsed Query Data:', rows);
+    return rows;
+  }
+
+  private parseRowData(data: Buffer): Row {
+    const row: Row = {};
+    let offset = 0;
+    let columnIndex = 0;
+
+    while (offset + 4 <= data.length) {
+      const paramLength = data.readUInt16BE(offset);
+      const paramCodePoint = data.readUInt16BE(offset + 2);
+      const paramData = data.slice(offset + 4, offset + paramLength);
+
+      if (paramCodePoint === DRDAConstants.CMDCOLDAT) {
+        // Column Data
+        const columnMetadata = this.rsmd[columnIndex];
+        if (!columnMetadata) {
+          this.logger.warn(`No metadata found for column index ${columnIndex}`);
+        }
+
+        let columnValue: any = null;
+
+        // Parse based on data type
+        switch (columnMetadata?.dataType.toUpperCase()) {
+          case 'INTEGER':
+            columnValue = paramData.readInt32BE(0); // Adjust based on actual encoding
+            break;
+          case 'VARCHAR':
+          case 'CHAR':
+            columnValue = paramData.toString('utf8').trim();
+            break;
+          case 'DATE':
+            columnValue = this.parseDRDADate(paramData);
+            break;
+          // Handle other data types as needed
+          default:
+            columnValue = paramData.toString('utf8').trim();
+            break;
+        }
+
+        if (columnMetadata) {
+          row[columnMetadata.name] = columnValue;
+        } else {
+          row[`Column${columnIndex + 1}`] = columnValue;
+        }
+
+        columnIndex++;
+      }
+
+      // Handle other code points as needed
+
+      offset += paramLength;
+    }
+
+    this.logger.info('Parsed Row Data:', row);
+    return row;
+  }
+
+  private parseDRDADate(data: Buffer): Date {
+    // Implement date parsing based on DRDA date format
+    // Placeholder: assume YYYYMMDD as ASCII
+    const dateStr = data.toString('utf8').trim();
+    const year = parseInt(dateStr.substr(0, 4), 10);
+    const month = parseInt(dateStr.substr(4, 2), 10) - 1; // Months are 0-based in JS
+    const day = parseInt(dateStr.substr(6, 2), 10);
+    return new Date(year, month, day);
+  }
+
+  private createEXCSQLPREPMessage(sql: string): Buffer {
+    const sqlBuffer = Buffer.from(sql, 'utf8');
+
+    // Construct the EXCSQLPREP parameters
+    const buffers: Buffer[] = [];
+
+    // SQL Statement
+    const sqlStmtParam = this.constructParameter(
+      DRDAConstants.EXCSQLPREP, // Code point for EXCSQLPREP
+      sqlBuffer,
+    );
+    buffers.push(sqlStmtParam);
+
+    // Combine parameters
+    const parametersBuffer = Buffer.concat(buffers);
+
+    // EXCSQLPREP Object
+    const excsqlprepLength = 4 + parametersBuffer.length;
+    const excsqlprepBuffer = Buffer.alloc(4);
+    excsqlprepBuffer.writeUInt16BE(excsqlprepLength, 0);
+    excsqlprepBuffer.writeUInt16BE(DRDAConstants.EXCSQLPREP, 2);
+
+    const excsqlprepObject = Buffer.concat([
+      excsqlprepBuffer,
+      parametersBuffer,
+    ]);
+
+    // DSS Header
+    const totalLength = 6 + excsqlprepObject.length;
+    const dssHeader = Buffer.alloc(6);
+    dssHeader.writeUInt16BE(totalLength, 0); // Length including header
+    dssHeader.writeUInt8(0xd0, 2); // DSS Flags (0xD0 indicates request)
+    dssHeader.writeUInt8(0x01, 3); // DSS Type (0x01 for RQSDSS)
+    dssHeader.writeUInt16BE(this.nextCorrelationId(), 4); // Correlation ID
+
+    // Final EXCSQLPREP message with DSS header
+    const message = Buffer.concat([dssHeader, excsqlprepObject]);
+    this.logger.info(
+      'Constructed EXCSQLPREP message:',
+      message.toString('hex'),
+    );
+
+    return message;
+  }
+
   // Open the TCP connection (supports SSL)
   public async open(): Promise<void> {
     if (this.isConnected) {
-      console.log(`Already connected to DB2 at ${this.hostName}:${this.port}.`);
+      this.logger.info(
+        `Already connected to DB2 at ${this.hostName}:${this.port}.`,
+      );
       return; // Skip re-opening if already connected
     }
 
@@ -72,10 +539,13 @@ export class Connection {
       // Use the existing retryConnection method
       await this.retryConnection(3); // You can adjust the number of retries if needed
     } catch (error) {
-      console.error(`Failed to connect to DB2 after retries: ${error.message}`);
+      this.logger.error(
+        `Failed to connect to DB2 after retries: ${error.message}`,
+      );
       throw error;
     }
   }
+
   parseDRDAEXTNAM(payload: Buffer): any {
     let offset = 0;
     const result: any = {};
@@ -108,70 +578,85 @@ export class Connection {
 
   // Authentication logic using DRDA
   private async authenticate(): Promise<void> {
-    console.log(`Authenticating as user ${this.userId}...`);
+    this.logger.info(`Authenticating as user ${this.userId}...`);
 
     try {
       // Step 1: Send EXCSAT message
       const excsatMessage = this.createEXCSATMessage();
-      console.log('Sending EXCSAT message...');
+      this.logger.info('Sending EXCSAT message...');
       await this.send(excsatMessage);
 
-      // Wait for response from the server
-      let response = await this.receiveResponse();
-      console.log('Received response:', response);
+      // Wait for EXCSATRD response
+      const response = await this.receiveResponse();
 
-      // Handle EXTNAM explicitly
-      if (response.type === 'EXTNAM') {
-        console.log('Received EXTNAM response, proceeding...');
-        const payload = this.parseDRDAEXTNAM(response.payload);
-        console.log('Received DRDA payload:', payload);
-      } else if (response.type !== 'EXCSATRD') {
-        throw new Error('Unexpected response to EXCSAT message');
+      if (response.type === 'EXCSATRD') {
+        const serverPublicKey = this.extractServerPublicKey(response.payload);
+        this.serverPublicKey = serverPublicKey;
+        this.logger.info('Server public key acquired.');
+      } else {
+        throw new Error(`Unexpected response type: ${response.type}`);
       }
 
-      // Proceed with ACCSEC after handling EXTNAM
+      // Step 2: Send ACCSEC message
       const accsecMessage = this.createACCSECMessage();
-      console.log('Sending ACCSEC message...');
+      this.logger.info('Sending ACCSEC message...');
       await this.send(accsecMessage);
 
-      // Wait for ACCSECRM response from the server
-      response = await this.receiveResponse();
-      console.log('Received ACCSECRM response:', response);
+      // Wait for ACCSECRM response
+      const accsecResponse = await this.receiveResponse();
 
-      // Handle the SVRCOD (Server Code) response
-      if (response.type === 'SVRCOD') {
-        const svrcod = this.extractSVRCOD(response.payload);
-        console.log(`SVRCOD received: ${svrcod}`);
+      if (accsecResponse.type === 'ACCSECRM') {
+        const svrcod = this.extractSVRCOD(accsecResponse.payload);
+        this.logger.info(`SVRCOD received: ${svrcod}`);
 
-        // Check if the SVRCOD indicates success (usually 0 means success)
         if (svrcod !== 0) {
           throw new Error(`Server returned error code: ${svrcod}`);
         }
-      } else if (response.type !== 'ACCSECRM') {
+      } else {
         throw new Error('Unexpected response to ACCSEC message');
       }
 
-      // Step 3: Send SECCHK message with username and password
+      // Step 3: Send SECCHK message with encrypted credentials
       const secchkMessage = this.createSECCHKMessage();
-      console.log('Sending SECCHK message...');
+      this.logger.info('Sending SECCHK message...');
       await this.send(secchkMessage);
 
-      // Wait for SECCHKRM response from the server
-      response = await this.receiveResponse();
-      console.log('Received SECCHKRM response:', response);
+      // Wait for SECCHKRM response
+      const secchkResponse = await this.receiveResponse();
+
+      if (secchkResponse.type === 'SECCHKRM') {
+        const svrcod = this.extractSVRCOD(secchkResponse.payload);
+        this.logger.info(`SECCHKRM SVRCOD received: ${svrcod}`);
+
+        if (svrcod !== 0) {
+          throw new Error(`Security check failed with code: ${svrcod}`);
+        }
+      } else {
+        throw new Error('Unexpected response to SECCHK message');
+      }
 
       // Step 4: Send ACCRDB message
       const accrdbMessage = this.createACCRDBMessage();
-      console.log('Sending ACCRDB message...');
+      this.logger.info('Sending ACCRDB message...');
       await this.send(accrdbMessage);
 
-      // Wait for ACCRDBRM response from the server
-      response = await this.receiveResponse();
-      console.log('Received ACCRDBRM response:', response);
+      // Wait for ACCRDBRM response
+      const accrdbResponse = await this.receiveResponse();
 
-      console.log('Authentication successful for user', this.userId);
+      if (accrdbResponse.type === 'ACCRDBRM') {
+        const svrcod = this.extractSVRCOD(accrdbResponse.payload);
+        this.logger.info(`ACCRDBRM SVRCOD received: ${svrcod}`);
+
+        if (svrcod !== 0) {
+          throw new Error(`Access RDB failed with code: ${svrcod}`);
+        }
+      } else {
+        throw new Error('Unexpected response to ACCRDB message');
+      }
+
+      this.logger.info('Authentication successful for user', this.userId);
     } catch (error) {
-      console.error('Error during authentication:', error);
+      this.logger.error('Error during authentication:', error);
       throw error;
     }
   }
@@ -270,17 +755,15 @@ export class Connection {
   private createEXCSATMessage(): Buffer {
     const buffers: Buffer[] = [];
 
-    // EXTNAM (External Name) - Optional but included for client identification
-    // Make sure this is short, valid, and identifiable. Typically, it's a short name for the application.
-    const extnamData = Buffer.from('MyApp', 'utf8'); // Adjust to a valid name
-    const extnamParameter = this.constructParameter(
-      DRDAConstants.EXTNAM,
-      extnamData,
-    );
-    buffers.push(extnamParameter);
+    // // EXTNAM (External Name)
+    // const extnamData = Buffer.from('MyApp', 'utf8');
+    // const extnamParameter = this.constructParameter(
+    //   DRDAConstants.EXTNAM,
+    //   extnamData,
+    // );
+    // buffers.push(extnamParameter);
 
-    // SRVNAM (Server Name) - Should match the database name
-    // Ensure that the database name is correctly specified.
+    // SRVNAM (Server Name)
     const srvnamData = Buffer.from(this.dbName, 'utf8');
     const srvnamParameter = this.constructParameter(
       DRDAConstants.SRVNAM,
@@ -288,79 +771,89 @@ export class Connection {
     );
     buffers.push(srvnamParameter);
 
-    // MGRLVLLS (Manager Level List) - Critical for DRDA compliance
-    // We've already improved this in the previous steps. Ensure all managers are correctly included.
+    // MGRLVLLS (Manager Level List)
     const mgrlvllsData = this.constructMgrlvlls();
     buffers.push(mgrlvllsData);
 
-    // PRDID (Product ID) - Identifies the client product
-    // This should be a valid identifier for your client software. DRDA expects something like 'JDB42' or other DB2 clients.
-    const prdidData = Buffer.from('JDB42', 'utf8'); // Replace with the correct product ID
+    // PRDID (Product ID)
+    const prdidData = Buffer.from('JDB42', 'utf8');
     const prdidParameter = this.constructParameter(
       DRDAConstants.PRDID,
       prdidData,
     );
     buffers.push(prdidParameter);
 
-    // SRVCLSNM (Server Class Name) - Should identify the class of the server
-    // This can be 'QDB2/NT', for example, to identify the platform of the server.
-    // const srvclsnmData = Buffer.from('QDB2/NT', 'utf8'); // Adjust if necessary
-    // const srvclsnmParameter = this.constructParameter(
-    //   DRDAConstants.SRVCLSNM,
-    //   srvclsnmData,
-    // );
-    // buffers.push(srvclsnmParameter);
-
-    // SRVRLSLV (Server Release Level) - Identifies the DRDA version or release level
-    // Make sure this version aligns with the server's expected protocol version.
-    const srvrlslvData = Buffer.from('11.5', 'utf8'); // Adjust to the correct release level (example: '11.5' for DB2 v11.5)
+    // SRVRLSLV (Server Release Level)
+    const srvrlslvData = Buffer.from('11.5', 'utf8');
     const srvrlslvParameter = this.constructParameter(
       DRDAConstants.SRVRLSLV,
       srvrlslvData,
     );
     buffers.push(srvrlslvParameter);
 
-    // Combine all parameters into one buffer
+    // Combine all parameters
     const parametersBuffer = Buffer.concat(buffers);
 
-    // EXCSAT Object - Combine EXCSAT header with parameters
+    // EXCSAT Object
     const excsatLength = 4 + parametersBuffer.length;
     const excsatBuffer = Buffer.alloc(4);
-    excsatBuffer.writeUInt16BE(excsatLength, 0);
-    excsatBuffer.writeUInt16BE(DRDAConstants.EXCSAT, 2);
+    excsatBuffer.writeUInt16BE(excsatLength, 0); // Length
+    excsatBuffer.writeUInt16BE(DRDAConstants.EXCSAT, 2); // Code Point (0x1041)
 
     const excsatObject = Buffer.concat([excsatBuffer, parametersBuffer]);
 
-    // DSS Header - Prepares the DRDA message header
+    // DSS Header
     const totalLength = 6 + excsatObject.length;
     const dssHeader = Buffer.alloc(6);
-    dssHeader.writeUInt16BE(totalLength, 0); // Total length including DSS header
+    dssHeader.writeUInt16BE(totalLength, 0); // Total Length including DSS Header
     dssHeader.writeUInt8(0xd0, 2); // DSS Flags (0xD0 indicates request)
     dssHeader.writeUInt8(0x01, 3); // DSS Type (0x01 for RQSDSS)
     dssHeader.writeUInt16BE(this.nextCorrelationId(), 4); // Correlation ID
 
     // Final EXCSAT message with DSS header
     const message = Buffer.concat([dssHeader, excsatObject]);
-    console.log('Constructed EXCSAT message:', message.toString('hex'));
+    this.logger.info(`Constructed EXCSAT message: ${message.toString('hex')}`);
+
+    // **Corrected Debugging Check**
+    if (message.slice(8, 10).toString('hex') !== '1041') {
+      this.logger.error(
+        `EXCSAT code point mismatch: Expected 1041, Found ${message
+          .slice(8, 10)
+          .toString('hex')}`,
+      );
+    } else {
+      this.logger.info('EXCSAT message constructed correctly.');
+    }
+
+    this.logger.info(`EXCSAT Message Breakdown:
+      Total Length: ${totalLength} (0x${totalLength.toString(16)})
+      DSS Flags: 0x${dssHeader[2].toString(16)}
+      DSS Type: 0x${dssHeader[3].toString(16)}
+      Correlation ID: ${this.nextCorrelationId()}
+      EXCSAT Length: ${excsatLength} (0x${excsatLength.toString(16)})
+      EXCSAT Code Point: 0x${excsatBuffer.readUInt16BE(2).toString(16)}
+      Parameters: ${parametersBuffer.toString('hex')}
+    `);
+
     return message;
   }
 
   private async retryConnection(retries = 3): Promise<void> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        console.log(`Attempting to connect (Attempt ${attempt})...`);
+        this.logger.info(`Attempting to connect (Attempt ${attempt})...`);
 
         await new Promise<void>((resolve, reject) => {
           const connectionTimeout = setTimeout(() => {
             const errorMessage = `Connection to DB2 at ${this.hostName}:${this.port} timed out`;
-            console.error(errorMessage);
+            this.logger.error(errorMessage);
             reject(new Error(errorMessage));
           }, this.connectionTimeout);
 
           const onConnectionError = (err: Error) => {
             this.isConnected = false;
             clearTimeout(connectionTimeout);
-            console.error(
+            this.logger.error(
               `Connection error to DB2 at ${this.hostName}:${this.port}:`,
               err,
             );
@@ -368,19 +861,13 @@ export class Connection {
           };
 
           if (this.useSSL) {
-            console.log('Using SSL for connection');
-            const completeCertChain = readFileSync(
-              './certs/db2-complete-chain.crt',
-            );
-
+            this.logger.info('Using SSL for connection');
             this.socket = tlsConnect(
               {
                 port: this.port,
                 host: this.hostName,
-                rejectUnauthorized: true, // Ensure unauthorized certificates are rejected
-                ca: completeCertChain, // Use the complete certificate chain
+                rejectUnauthorized: false,
                 timeout: this.connectionTimeout,
-                // enableTrace: true,
               },
               async () => {
                 clearTimeout(connectionTimeout);
@@ -389,14 +876,14 @@ export class Connection {
                   this.socket.authorized
                 ) {
                   this.isConnected = true;
-                  console.log(
+                  this.logger.info(
                     `Socket connected securely at ${this.hostName}:${this.port}`,
                   );
                   try {
                     await this.authenticate();
                     resolve(); // Connection successful
                   } catch (authErr) {
-                    console.error('Authentication failed:', authErr);
+                    this.logger.error('Authentication failed:', authErr);
                     reject(authErr);
                   }
                 } else {
@@ -413,7 +900,7 @@ export class Connection {
               },
             );
           } else {
-            console.log('Using plain TCP for connection');
+            this.logger.info('Using plain TCP for connection');
             this.socket = new Socket();
             this.socket.connect(this.port, this.hostName, async () => {
               clearTimeout(connectionTimeout);
@@ -438,11 +925,11 @@ export class Connection {
 
           this.socket!.on('close', (hadError: boolean) => {
             if (hadError) {
-              console.error(
+              this.logger.error(
                 `Connection to DB2 at ${this.hostName}:${this.port} closed due to an error.`,
               );
             } else {
-              console.log(
+              this.logger.info(
                 `Connection to DB2 at ${this.hostName}:${this.port} closed gracefully.`,
               );
             }
@@ -451,7 +938,7 @@ export class Connection {
         });
         break; // Break out of the loop if connection is successful
       } catch (error) {
-        console.error(`Attempt ${attempt} failed: ${error.message}`);
+        this.logger.error(`Attempt ${attempt} failed: ${error.message}`);
         if (attempt === retries) {
           throw new Error(
             'Maximum retry attempts reached. Unable to connect to DB2.',
@@ -472,7 +959,7 @@ export class Connection {
 
     // SECMEC (Security Mechanism) - We will use EUSRIDPWD, but this can be adjusted
     const secmecData = Buffer.alloc(2);
-    secmecData.writeUInt16BE(DRDAConstants.SECMEC_EUSRIDPWD, 0); // Encrypted User ID and Password
+    secmecData.writeUInt16BE(DRDAConstants.SECMEC_USRIDPWD, 0);
     const secmecParameter = this.constructParameter(
       DRDAConstants.SECMEC,
       secmecData,
@@ -522,7 +1009,7 @@ export class Connection {
 
     // Final ACCSEC message with DSS header
     const message = Buffer.concat([dssHeader, accsecObject]);
-    console.log('Constructed ACCSEC message:', message.toString('hex'));
+    this.logger.info('Constructed ACCSEC message:', message.toString('hex'));
     return message;
   }
 
@@ -600,7 +1087,7 @@ export class Connection {
 
     // Final SECCHK message
     const message = Buffer.concat([secchkBuffer, parametersBuffer]);
-    console.log(
+    this.logger.info(
       'Constructed SECCHK message (encrypted):',
       message.toString('hex'),
     );
@@ -612,20 +1099,20 @@ export class Connection {
     return new Promise((resolve, reject) => {
       if (!this.isConnected || !this.socket) {
         const message = 'Connection is already closed or not open.';
-        console.warn(message);
+        this.logger.warn(message);
 
         if (callback) callback(new Error(message)); // Use the callback to report the error if provided
         resolve(); // No need to close if already closed
         return;
       }
 
-      console.log(
+      this.logger.info(
         `Closing connection to DB2 at ${this.hostName}:${this.port}...`,
       );
 
       // Listen for errors during socket closure
       this.socket!.once('error', (err) => {
-        console.error('Error closing connection:', err);
+        this.logger.error('Error closing connection:', err);
 
         if (callback) callback(err); // Report the error using the callback
         reject(err); // Also reject the promise to allow promise-based error handling
@@ -634,7 +1121,7 @@ export class Connection {
       // Listen for the close event and update the state accordingly
       this.socket!.once('close', () => {
         this.isConnected = false; // Set the state to disconnected
-        console.log('DB2 connection closed.');
+        this.logger.info('DB2 connection closed.');
 
         if (callback) callback(null); // No error, so pass null to the callback
         resolve(); // Resolve the promise to indicate the operation was successful
@@ -655,26 +1142,69 @@ export class Connection {
       // Attempt to write the data to the socket
       const success = this.socket!.write(data, (err: Error | null) => {
         if (err) {
-          console.error(
+          this.logger.error(
             'Error occurred while sending data to the socket:',
             err.message,
           );
           reject(new Error(`Failed to send data: ${err.message}`));
         } else {
-          console.log(`Data sent to DB2 at ${this.hostName}:${this.port}`);
+          this.logger.info(`Data sent to DB2 at ${this.hostName}:${this.port}`);
           resolve(); // Message successfully sent
         }
       });
 
       // Handle the case where the socket's buffer becomes full
       if (!success) {
-        console.log('Socket buffer full, waiting for drain event...');
+        this.logger.info('Socket buffer full, waiting for drain event...');
         this.socket!.once('drain', () => {
-          console.log('Socket buffer drained, continuing to send...');
+          this.logger.info('Socket buffer drained, continuing to send...');
           resolve(); // Resolve once the drain event is emitted
         });
       }
     });
+  }
+
+  public async sendCloseStatementRequest(
+    statementHandle: string,
+  ): Promise<void> {
+    const message = this.createCloseStatementMessage(statementHandle);
+    await this.send(message);
+  }
+
+  private createCloseStatementMessage(statementHandle: string): Buffer {
+    // Construct the CLOSE Statement message
+    const buffers: Buffer[] = [];
+
+    // Statement Handle
+    const stmtHandleParam = this.constructParameter(
+      DRDAConstants.STMTHDL,
+      Buffer.from(statementHandle, 'utf8'),
+    );
+    buffers.push(stmtHandleParam);
+
+    const parametersBuffer = Buffer.concat(buffers);
+
+    // CLOSE Statement Object
+    const closeStmtLength = 4 + parametersBuffer.length;
+    const closeStmtBuffer = Buffer.alloc(4);
+    closeStmtBuffer.writeUInt16BE(closeStmtLength, 0);
+    closeStmtBuffer.writeUInt16BE(DRDAConstants.CLOSESTM, 2); // Define CLOSESTM in DRDAConstants
+
+    const closeStmtObject = Buffer.concat([closeStmtBuffer, parametersBuffer]);
+
+    // DSS Header
+    const totalLength = 6 + closeStmtObject.length;
+    const dssHeader = Buffer.alloc(6);
+    dssHeader.writeUInt16BE(totalLength, 0);
+    dssHeader.writeUInt8(0xd0, 2);
+    dssHeader.writeUInt8(0x01, 3);
+    dssHeader.writeUInt16BE(this.nextCorrelationId(), 4);
+
+    // Final CLOSESTM message with DSS header
+    const message = Buffer.concat([dssHeader, closeStmtObject]);
+    this.logger.info('Constructed CLOSESTM message:', message.toString('hex'));
+
+    return message;
   }
 
   // Add this query method to your Connection class
@@ -696,7 +1226,7 @@ export class Connection {
     try {
       // Check if the connection is alive before executing the query
       if (!this.isConnected) {
-        console.log('Connection lost. Attempting to reconnect...');
+        this.logger.info('Connection lost. Attempting to reconnect...');
         await this.retryConnection();
       }
 
@@ -742,7 +1272,7 @@ export class Connection {
   // Send DRDA-encoded SQL request
   async sendSQL(query: string, params: any[]): Promise<void> {
     if (!this.isConnected) {
-      console.log('Connection lost. Reconnecting...');
+      this.logger.info('Connection lost. Reconnecting...');
       await this.retryConnection();
     }
 
@@ -767,32 +1297,36 @@ export class Connection {
 
   async receiveResponse(retries = 3): Promise<DRDAResponseType> {
     if (!this.isConnected || !this.socket) {
-      console.log('Connection lost. Reconnecting...');
+      this.logger.info('Connection lost. Reconnecting...');
       await this.retryConnection(retries);
     }
 
     return new Promise((resolve, reject) => {
-      console.log('Waiting for data from DB2 server...');
+      this.responseResolvers.push(resolve);
+      this.responseRejectors.push(reject);
+      this.logger.info('Waiting for data from DB2 server...');
 
       const responseTimeout = setTimeout(() => {
         const errorMessage =
           'No response received from DB2 server in a timely manner.';
-        console.error(errorMessage);
+        this.logger.error(errorMessage);
         reject(new Error(errorMessage));
       }, 40000);
 
       const onData = (data: Buffer) => {
         clearTimeout(responseTimeout);
-        console.log(`Received ${data.length} bytes of data from DB2 server.`);
+        this.logger.info(
+          `Received ${data.length} bytes of data from DB2 server.`,
+        );
 
         try {
           const header = this.parseDRDAHeader(data);
           const payload = this.parseDRDAPayload(data);
-          console.log('Received DRDA payload:', payload);
+          this.logger.info('Received DRDA payload:', payload);
           const response = this.decodeDRDAResponse(header);
           resolve(response);
         } catch (err) {
-          console.error('Error decoding DRDA response: ', err);
+          this.logger.error('Error decoding DRDA response: ', err);
           reject(err);
         } finally {
           this.socket?.removeListener('data', onData);
@@ -803,7 +1337,7 @@ export class Connection {
 
       const onError = (err: Error) => {
         clearTimeout(responseTimeout);
-        console.error('Error on socket during data reception:', err);
+        this.logger.error('Error on socket during data reception:', err);
         reject(err);
         this.socket?.removeListener('data', onData);
         this.socket?.removeListener('error', onError);
@@ -814,11 +1348,11 @@ export class Connection {
         clearTimeout(responseTimeout);
         this.isConnected = false;
         if (hadError) {
-          console.error(
+          this.logger.error(
             `Connection to DB2 at ${this.hostName}:${this.port} closed due to an error.`,
           );
         } else {
-          console.log(
+          this.logger.info(
             `Connection to DB2 at ${this.hostName}:${this.port} closed gracefully.`,
           );
         }
@@ -835,75 +1369,85 @@ export class Connection {
 
   // Decode DRDA response
   private decodeDRDAResponse(header: DRDAHeader): DRDAResponseType {
-    console.log('Decoding DRDA response...');
+    this.logger.info('Decoding DRDA response...');
 
     const { payload } = header;
     let offset = 0;
     const parameters: any = {};
     let success = true;
 
-    // Ensure payload has at least 4 bytes for message length and code point
-    if (offset + 4 > payload.length) {
+    if (payload.length < 4) {
+      this.logger.error('Payload too short:', payload.length);
       throw new Error('Invalid DRDA response payload.');
     }
 
-    // Read the main message code point
     const messageLength = payload.readUInt16BE(offset);
     const messageCodePoint = payload.readUInt16BE(offset + 2);
-    offset += 4; // Move past the code point header
+    offset += 4;
 
     const responseType = this.mapCodePointToResponseType(messageCodePoint);
 
-    console.log(
+    this.logger.info(
       `Main code point: 0x${messageCodePoint.toString(16)} (${responseType}), Length: ${messageLength}`,
     );
 
-    const endOfMessage = offset + messageLength - 4; // Subtract the code point header length
+    // Handle CHNRQSDSS by processing each chained message
+    if (responseType === 'CHNRQSDSS') {
+      this.logger.info('Handling CHNRQSDSS message...');
+      // Process the chained messages within the payload
+      while (offset < payload.length) {
+        if (offset + 4 > payload.length) {
+          throw new Error('Incomplete parameter in payload.');
+        }
 
-    while (offset + 4 <= endOfMessage) {
-      if (offset + 4 > payload.length) {
-        throw new Error(
-          'Reached the end of the payload unexpectedly while parsing parameters.',
+        const paramLength = payload.readUInt16BE(offset);
+        const paramCodePoint = payload.readUInt16BE(offset + 2);
+        const data = payload.slice(offset + 4, offset + paramLength);
+
+        this.logger.info(
+          `Chained Parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}`,
         );
-      }
-      const paramLength = payload.readUInt16BE(offset);
-      const paramCodePoint = payload.readUInt16BE(offset + 2);
-      const data = Buffer.from(
-        payload.subarray(offset + 4, offset + paramLength),
-      );
 
-      console.log(
-        `Parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}`,
-      );
+        switch (paramCodePoint) {
+          case DRDAConstants.EXCSATRD:
+            const serverPublicKey = this.extractServerPublicKey(data);
+            this.serverPublicKey = serverPublicKey;
+            this.logger.info('Extracted server public key.');
+            break;
 
-      console.log(
-        `Parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}`,
-      );
-
-      switch (paramCodePoint) {
-        case DRDAConstants.SVRCOD:
-          const svrcod = data.readInt16BE(0);
-          parameters['SVRCOD'] = svrcod;
-          if (svrcod > 0) {
+          case DRDAConstants.ODBC_ERROR:
+            const svrcod = data.readInt16BE(0);
+            parameters['SVRCOD'] = svrcod;
             success = false;
-            console.error(`Server returned error with SVRCOD: ${svrcod}`);
-          }
-          break;
+            this.logger.error(
+              `Server returned ODBC error with SVRCOD: ${svrcod}`,
+            );
+            break;
 
-        case 0xf289: // Handle the ODBC error
-          console.warn('ODBC Error: Recordset is read-only (0xF289).');
-          parameters['ODBC_ERROR'] = 'READ_ONLY_RECORDSET';
-          success = false;
-          break;
+          case DRDAConstants.EXTNAM:
+            this.logger.info('Received EXTNAM message during authentication.');
+            // Handle EXTNAM if necessary
+            break;
 
-        default:
-          console.warn(
-            `Unknown parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}, Raw Data: ${data.toString('hex')}`,
-          );
-          break;
+          // Handle other code points as needed
+
+          default:
+            this.logger.warn(
+              `Unknown chained parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}, Raw Data: ${data.toString('hex')}`,
+            );
+            break;
+        }
+
+        offset += paramLength;
       }
 
-      offset += 4 + paramLength; // Move offset past the parameter header and data
+      return {
+        length: header.length,
+        type: responseType,
+        payload: header.payload,
+        success,
+        parameters,
+      };
     }
 
     return {
@@ -913,6 +1457,40 @@ export class Connection {
       success,
       parameters,
     };
+  }
+
+  private extractServerPublicKey(data: Buffer): Buffer {
+    // Implement the extraction of the server's public key from the EXCSATRD response
+    // This will depend on how the server sends the public key
+    // For example, if the server sends it as a parameter with a specific code point
+    // You need to parse and extract it accordingly
+
+    // Placeholder implementation:
+    // Assume the public key is sent as a separate parameter within EXCSATRD
+    // You need to iterate over the data and find the parameter containing the public key
+
+    // Example:
+    let offset = 0;
+    let publicKey: Buffer | null = null;
+
+    while (offset + 4 <= data.length) {
+      const paramLength = data.readUInt16BE(offset);
+      const paramCodePoint = data.readUInt16BE(offset + 2);
+      const paramData = data.slice(offset + 4, offset + paramLength);
+
+      if (paramCodePoint === DRDAConstants.SRVCLSNM_PK) {
+        publicKey = paramData;
+        break;
+      }
+
+      offset += 4 + paramLength;
+    }
+
+    if (!publicKey) {
+      throw new Error('Server public key not found in EXCSATRD response.');
+    }
+
+    return publicKey;
   }
 
   // Parse the DRDA header
@@ -962,7 +1540,7 @@ export class Connection {
     const codePointMap = {
       0x115e: 'EXTNAM', // External Name
       0xf289: 'ODBC_ERROR', // ODBC Error
-      // Add other known code points here
+      0xf2a1: 'SQLERRRM', // SQL Error
     };
 
     result.messageType = codePointMap[codePoint] || 'UNKNOWN';
@@ -987,7 +1565,13 @@ export class Connection {
       result.errorMessage = 'Recordset is read-only'; // Based on the code point
     }
 
-    // Handle other known message types similarly
+    if (result.messageType === 'SQLERRRM') {
+      // Parse SQL error details
+      const sqlErrorCode = payload.readUInt16BE(offset);
+      offset += 2;
+      result.sqlErrorCode = sqlErrorCode;
+      result.sqlErrorMessage = 'Syntax error in SQL statement'; // Example message
+    }
 
     return result;
   }
@@ -995,9 +1579,12 @@ export class Connection {
   private mapCodePointToResponseType(codePoint: number): string {
     const responseType = DRDAConstants[codePoint];
     if (responseType !== undefined) {
+      this.logger.info(
+        `Mapped code point 0x${codePoint.toString(16)} to ${responseType}`,
+      );
       return responseType;
     } else {
-      console.warn(`Unknown code point: 0x${codePoint.toString(16)}`);
+      this.logger.warn(`Unknown code point: 0x${codePoint.toString(16)}`);
       return 'UNKNOWN';
     }
   }

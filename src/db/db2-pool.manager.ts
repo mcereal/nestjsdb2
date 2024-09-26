@@ -1,24 +1,20 @@
 import { Inject, OnModuleInit } from '@nestjs/common';
-import { Connection } from 'ibm_db';
+import { Connection } from './Connection';
 import { IDb2ConfigOptions, IPoolManager } from '../interfaces';
-import * as ibm_db from 'ibm_db';
-import { Pool, Factory, createPool } from 'generic-pool';
+import { Pool } from './Pool';
 import { I_DB2_CONFIG } from '../constants/injection-token.constant';
 import { Db2AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 
 export class Db2PoolManager implements IPoolManager, OnModuleInit {
   private readonly logger = new Logger(Db2PoolManager.name);
-  private pool: Pool<Connection>;
+  private pool: Pool;
   private poolInitialized = false;
-  private ibm_db: ibm_db;
 
   constructor(
     @Inject(I_DB2_CONFIG) private config: IDb2ConfigOptions,
     @Inject('DB2_AUTH_STRATEGY') private authStrategy: Db2AuthStrategy,
-  ) {
-    this.ibm_db = ibm_db;
-  }
+  ) {}
 
   async onModuleInit() {
     await this.init();
@@ -36,36 +32,17 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
     // Authenticate before creating the pool
     await this.authStrategy.authenticate();
 
-    const factory: Factory<Connection> = {
-      create: async () => {
-        const connectionString = this.authStrategy.getConnectionString();
-        this.logger.debug(
-          `Attempting to connect with connection string: ${connectionString}`,
-        );
-        return new Promise<Connection>((resolve, reject) => {
-          this.ibm_db.open(connectionString, (err, connection) => {
-            if (err) {
-              this.logger.error('Error opening connection', err.message);
-              reject(err);
-            } else {
-              this.logger.info('Connection successfully established');
-              resolve(connection);
-            }
-          });
-        });
-      },
-      destroy: async (connection: Connection) => {
-        await connection.close();
-        this.logger.info('Connection closed.');
-      },
-    };
-
     try {
-      this.pool = createPool(factory, {
-        max: this.config.maxPoolSize || 10,
-        min: this.config.minPoolSize || 2,
-        acquireTimeoutMillis: this.config.acquireTimeoutMillis || 30000,
-      });
+      // Initialize your custom Pool with configuration options
+      this.pool = new Pool();
+      await this.pool.init(
+        {
+          max: this.config.maxPoolSize || 10,
+          min: this.config.minPoolSize || 2,
+          acquireTimeoutMillis: this.config.acquireTimeoutMillis || 30000,
+        },
+        this.authStrategy.getConnectionString(),
+      );
       this.poolInitialized = true;
       this.logger.info('Connection pool initialized successfully.');
     } catch (error) {
@@ -107,8 +84,7 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
     }
     // Add more validations as needed
   }
-
-  public get getPool(): Pool<Connection> {
+  public get getPool(): Pool {
     if (!this.poolInitialized || !this.pool) {
       this.logger.error('DB2 connection pool is not initialized.');
       throw new Error('DB2 connection pool is not initialized.');
@@ -129,16 +105,7 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
 
     try {
       this.logger.info('Acquiring connection from pool...');
-      const connection = await Promise.race([
-        this.pool.acquire(),
-        new Promise(
-          (_, reject) =>
-            setTimeout(
-              () => reject(new Error('Connection acquisition timeout')),
-              10000,
-            ), // 10 seconds
-        ),
-      ]);
+      const connection = await this.pool.getConnection();
       this.logger.info('Connection acquired from pool.');
       return connection;
     } catch (error) {
@@ -152,15 +119,14 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
 
   public async closeConnection(connection: Connection): Promise<void> {
     if (this.poolInitialized) {
-      await this.pool.release(connection);
-      this.logger.info('Connection released back to pool.');
+      await this.pool.closeConnection(connection);
+      this.logger.info('Connection closed.');
     }
   }
 
   public async drainPool(): Promise<void> {
     try {
-      await this.pool.drain();
-      await this.pool.clear();
+      await this.pool.closeAll();
       this.poolInitialized = false;
       this.logger.info('Connection pool drained and cleared.');
     } catch (error) {
@@ -171,8 +137,8 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
 
   public async releaseConnection(connection: Connection): Promise<void> {
     if (this.poolInitialized) {
-      await this.pool.release(connection);
-      this.logger.info('Connection released back to custom pool.');
+      await this.pool.releaseConnection(connection);
+      this.logger.info('Connection released back to pool.');
     }
   }
 }

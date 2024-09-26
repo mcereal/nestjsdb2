@@ -1,4 +1,3 @@
-import { Pool, Connection } from 'ibm_db';
 import { Inject, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   Db2AuthOptions,
@@ -26,13 +25,13 @@ import {
   I_POOL_MANAGER,
 } from '../constants/injection-token.constant';
 import { Logger } from '../utils';
+import { Connection } from './Connection';
 
 export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   protected readonly config: IDb2ConfigOptions;
   protected readonly authConfig: Db2AuthOptions;
   protected readonly authStrategy: Db2AuthStrategy;
   readonly logger = new Logger(Db2Client.name);
-  private pool: Pool;
   protected connection?: Connection;
   private idleTimeoutInterval: NodeJS.Timeout;
   private activeConnectionsList: Connection[] = [];
@@ -132,31 +131,6 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       this.logger.error('Failed to get connection:', error.message);
       throw new Db2ConnectionError('Failed to get connection');
     }
-  }
-
-  public async closePool(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.logger.info('Closing DB2 connection pool...');
-      this.connectionManager.setState({
-        connectionState: Db2ConnectionState.DISCONNECTING,
-      });
-
-      this.pool.close((err) => {
-        if (err) {
-          this.connectionManager.setState({
-            connectionState: Db2ConnectionState.ERROR,
-          });
-          this.logger.error('Error closing DB2 connection pool', err);
-          reject(new Db2ConnectionError('Failed to close DB2 connection pool'));
-        } else {
-          this.connectionManager.setState({
-            connectionState: Db2ConnectionState.POOL_DRAINED,
-          });
-          this.logger.info('DB2 connection pool closed successfully');
-          resolve();
-        }
-      });
-    });
   }
 
   private async handleConnectionError(error: Error): Promise<void> {
@@ -344,6 +318,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
       await this.closeConnection(connection);
     }
   }
+
   /**
    * Executes a batch insert operation on the Db2 database.
    * @param tableName The name of the table to insert into.
@@ -358,16 +333,26 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     this.logger.info(`Starting batch insert into table: ${tableName}`);
 
-    const columnsString = columns.join(', ');
-    const placeholders = columns.map(() => '?').join(', ');
-    const sql = `INSERT INTO ${tableName} (${columnsString}) VALUES (${placeholders})`;
+    const connection = await this.getConnection();
 
-    const stmt = this.connection.prepareSync(sql);
-    for (const values of valuesArray) {
-      stmt.executeSync(values);
+    try {
+      const columnsString = columns.join(', ');
+      const placeholders = columns.map(() => '?').join(', ');
+      const sql = `INSERT INTO ${tableName} (${columnsString}) VALUES (${placeholders})`;
+
+      // Use Connection's prepared statement method
+      const stmt = await connection.prepare(sql);
+      for (const values of valuesArray) {
+        await stmt.execute(values);
+      }
+      await stmt.close();
+      this.logger.info(`Batch insert completed for table: ${tableName}`);
+    } catch (error: any) {
+      this.logError('Batch insert error', error);
+      throw new Db2TransactionError('Batch insert failed');
+    } finally {
+      await this.closeConnection(connection);
     }
-    stmt.closeSync();
-    this.logger.info(`Batch insert completed for table: ${tableName}`);
   }
 
   /**
@@ -381,35 +366,21 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     params: any[] = [],
   ): Promise<T> {
     this.logger.info(`Executing prepared statement: ${sql}`);
-    if (!this.connection) {
-      this.logger.warn(
-        'No active connection to execute the prepared statement. Attempting to reconnect...',
-      );
-      await this.reconnect();
+
+    const connection = await this.getConnection();
+
+    try {
+      // Use Connection's prepare and execute methods
+      const stmt = await connection.prepare(sql);
+      const result = await stmt.execute(params);
+      await stmt.close();
+      return result;
+    } catch (error: any) {
+      this.logger.error('Error executing prepared statement:', error.message);
+      throw new Db2Error('Prepared statement execution failed');
+    } finally {
+      await this.closeConnection(connection);
     }
-
-    return new Promise<T>((resolve, reject) => {
-      this.connection.prepare(sql, (err, stmt) => {
-        if (err) {
-          this.logger.error('Error preparing statement:', err.message);
-          reject(new Db2Error('Failed to prepare statement'));
-          return;
-        }
-
-        stmt.execute(params, (error, result) => {
-          if (error) {
-            this.logger.error(
-              'Error executing prepared statement:',
-              error.message,
-            );
-            reject(new Db2Error('Prepared statement execution failed'));
-          } else {
-            resolve(result);
-            stmt.closeSync();
-          }
-        });
-      });
-    });
   }
 
   /**
@@ -471,6 +442,14 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     this.logger.info('Transaction rolled back successfully.');
   }
 
+  /**
+   * Executes a batch update operation on the Db2 database.
+   * @param tableName The name of the table to update.
+   * @param columns The columns to update.
+   * @param valuesArray An array of value arrays, each containing values for a single row.
+   * @param whereClause The WHERE clause for the update statement.
+   * @returns A promise that resolves when the batch update is complete.
+   */
   public async batchUpdate(
     tableName: string,
     columns: string[],
@@ -479,28 +458,24 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     this.logger.info(`Starting batch update on table: ${tableName}`);
 
-    if (!this.connection) {
-      this.logger.warn(
-        'No active connection to perform batch update. Attempting to reconnect...',
-      );
-      await this.reconnect(); // Attempt to reconnect before batch update
-    }
-
-    const setString = columns.map((col) => `${col} = ?`).join(', ');
-    const sql = `UPDATE ${tableName} SET ${setString} WHERE ${whereClause}`;
+    const connection = await this.getConnection();
 
     try {
-      const stmt = this.connection.prepareSync(sql); // Prepare the statement
+      const setString = columns.map((col) => `${col} = ?`).join(', ');
+      const sql = `UPDATE ${tableName} SET ${setString} WHERE ${whereClause}`;
 
+      // Use Connection's prepared statement method
+      const stmt = await connection.prepare(sql);
       for (const values of valuesArray) {
-        stmt.executeSync(values); // Execute each row update
+        await stmt.execute(values);
       }
-
-      stmt.closeSync(); // Close the statement after execution
+      await stmt.close();
       this.logger.info(`Batch update completed for table: ${tableName}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logError('Batch update error', error);
       throw new Db2TransactionError('Batch update failed');
+    } finally {
+      await this.closeConnection(connection);
     }
   }
 
