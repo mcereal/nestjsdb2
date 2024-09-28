@@ -1,19 +1,27 @@
 import { Socket } from 'net';
 import { connect as tlsConnect, TLSSocket } from 'tls';
 import {
+  CHNRQSDSSResponse,
   ColumnMetadata,
   DRDAHeader,
   DRDAResponseType,
   EXCSQLSETResponse,
   Row,
 } from '../interfaces/drda.interface';
-
-import { readFileSync } from 'fs';
 import { DRDAConstants } from '../constants/drda.constants';
 import { constants, publicEncrypt } from 'crypto';
 import { PreparedStatement } from './PreparedStatement';
 import { Logger } from '../utils';
-import path from 'path';
+
+const DRDA_CODEPOINT_MAP: { [key: number]: string } = {
+  [DRDAConstants.EXCSAT]: 'EXCSAT',
+  [DRDAConstants.EXTNAM]: 'EXTNAM',
+  [DRDAConstants.CHRNRQSDSS]: 'CHNRQSDSS',
+  [DRDAConstants.EXCSATRD]: 'EXCSATRD',
+  [DRDAConstants.ACCSECRM]: 'ACCSECRM',
+  [DRDAConstants.SECCHKRM]: 'SECCHKRM',
+  [DRDAConstants.ACCRDBRM]: 'ACCRDBRM',
+};
 
 export class Connection {
   private socket: Socket | TLSSocket | null = null;
@@ -586,75 +594,93 @@ export class Connection {
       this.logger.info('Sending EXCSAT message...');
       await this.send(excsatMessage);
 
-      // Wait for EXCSATRD response
+      // Wait for response
       const response = await this.receiveResponse();
 
-      if (response.type === 'EXCSATRD') {
-        const serverPublicKey = this.extractServerPublicKey(response.payload);
-        this.serverPublicKey = serverPublicKey;
-        this.logger.info('Server public key acquired.');
+      if (response.type === DRDAConstants.CHRNRQSDSS) {
+        this.logger.info('Received CHNRQSDSS response.');
+
+        // Extract parameters from CHNRQSDSS
+        const { EXCSATRD, EXTNAM, SVRCOD } = response.parameters;
+
+        if (SVRCOD && SVRCOD !== 0) {
+          throw new Error(`Server returned error code: ${SVRCOD}`);
+        }
+
+        if (EXCSATRD && EXCSATRD.serverPublicKey) {
+          this.serverPublicKey = EXCSATRD.serverPublicKey;
+          this.logger.info('Server public key acquired.');
+        } else {
+          this.logger.warn('EXCSATRD not found in CHNRQSDSS response.');
+        }
+
+        if (EXTNAM && EXTNAM.extnam) {
+          this.logger.info(`Received EXTNAM: ${EXTNAM.extnam}`);
+          // Handle EXTNAM as needed. It might require additional steps or configurations.
+          // For now, we'll proceed assuming no additional action is needed.
+        }
+
+        // Step 2: Send ACCSEC message
+        const accsecMessage = this.createACCSECMessage();
+        this.logger.info('Sending ACCSEC message...');
+        await this.send(accsecMessage);
+
+        // Wait for ACCSECRM response
+        const accsecResponse = await this.receiveResponse();
+
+        if (accsecResponse.type === DRDAConstants.ACCSECRM) {
+          const svrcod = this.extractSVRCOD(accsecResponse.payload);
+          this.logger.info(`ACCSECRM SVRCOD received: ${svrcod}`);
+
+          if (svrcod !== 0) {
+            throw new Error(`Server returned error code: ${svrcod}`);
+          }
+        } else {
+          throw new Error('Unexpected response to ACCSEC message');
+        }
+
+        // Step 3: Send SECCHK message with encrypted credentials
+        const secchkMessage = this.createSECCHKMessage();
+        this.logger.info('Sending SECCHK message...');
+        await this.send(secchkMessage);
+
+        // Wait for SECCHKRM response
+        const secchkResponse = await this.receiveResponse();
+
+        if (secchkResponse.type === DRDAConstants.SECCHKRM) {
+          const svrcod = this.extractSVRCOD(secchkResponse.payload);
+          this.logger.info(`SECCHKRM SVRCOD received: ${svrcod}`);
+
+          if (svrcod !== 0) {
+            throw new Error(`Security check failed with code: ${svrcod}`);
+          }
+        } else {
+          throw new Error('Unexpected response to SECCHK message');
+        }
+
+        // Step 4: Send ACCRDB message
+        const accrdbMessage = this.createACCRDBMessage();
+        this.logger.info('Sending ACCRDB message...');
+        await this.send(accrdbMessage);
+
+        // Wait for ACCRDBRM response
+        const accrdbResponse = await this.receiveResponse();
+
+        if (accrdbResponse.type === DRDAConstants.ACCRDBRM) {
+          const svrcod = this.extractSVRCOD(accrdbResponse.payload);
+          this.logger.info(`ACCRDBRM SVRCOD received: ${svrcod}`);
+
+          if (svrcod !== 0) {
+            throw new Error(`Access RDB failed with code: ${svrcod}`);
+          }
+        } else {
+          throw new Error('Unexpected response to ACCRDB message');
+        }
+
+        this.logger.info('Authentication successful for user', this.userId);
       } else {
         throw new Error(`Unexpected response type: ${response.type}`);
       }
-
-      // Step 2: Send ACCSEC message
-      const accsecMessage = this.createACCSECMessage();
-      this.logger.info('Sending ACCSEC message...');
-      await this.send(accsecMessage);
-
-      // Wait for ACCSECRM response
-      const accsecResponse = await this.receiveResponse();
-
-      if (accsecResponse.type === 'ACCSECRM') {
-        const svrcod = this.extractSVRCOD(accsecResponse.payload);
-        this.logger.info(`SVRCOD received: ${svrcod}`);
-
-        if (svrcod !== 0) {
-          throw new Error(`Server returned error code: ${svrcod}`);
-        }
-      } else {
-        throw new Error('Unexpected response to ACCSEC message');
-      }
-
-      // Step 3: Send SECCHK message with encrypted credentials
-      const secchkMessage = this.createSECCHKMessage();
-      this.logger.info('Sending SECCHK message...');
-      await this.send(secchkMessage);
-
-      // Wait for SECCHKRM response
-      const secchkResponse = await this.receiveResponse();
-
-      if (secchkResponse.type === 'SECCHKRM') {
-        const svrcod = this.extractSVRCOD(secchkResponse.payload);
-        this.logger.info(`SECCHKRM SVRCOD received: ${svrcod}`);
-
-        if (svrcod !== 0) {
-          throw new Error(`Security check failed with code: ${svrcod}`);
-        }
-      } else {
-        throw new Error('Unexpected response to SECCHK message');
-      }
-
-      // Step 4: Send ACCRDB message
-      const accrdbMessage = this.createACCRDBMessage();
-      this.logger.info('Sending ACCRDB message...');
-      await this.send(accrdbMessage);
-
-      // Wait for ACCRDBRM response
-      const accrdbResponse = await this.receiveResponse();
-
-      if (accrdbResponse.type === 'ACCRDBRM') {
-        const svrcod = this.extractSVRCOD(accrdbResponse.payload);
-        this.logger.info(`ACCRDBRM SVRCOD received: ${svrcod}`);
-
-        if (svrcod !== 0) {
-          throw new Error(`Access RDB failed with code: ${svrcod}`);
-        }
-      } else {
-        throw new Error('Unexpected response to ACCRDB message');
-      }
-
-      this.logger.info('Authentication successful for user', this.userId);
     } catch (error) {
       this.logger.error('Error during authentication:', error);
       throw error;
@@ -1411,8 +1437,15 @@ export class Connection {
         switch (paramCodePoint) {
           case DRDAConstants.EXCSATRD:
             const serverPublicKey = this.extractServerPublicKey(data);
+            parameters['EXCSATRD'] = { serverPublicKey };
             this.serverPublicKey = serverPublicKey;
             this.logger.info('Extracted server public key.');
+            break;
+
+          case DRDAConstants.EXTNAM:
+            const extnam = this.parseEXTNAM(data);
+            parameters['EXTNAM'] = { extnam };
+            this.logger.info(`Received EXTNAM: ${extnam}`);
             break;
 
           case DRDAConstants.ODBC_ERROR:
@@ -1424,16 +1457,13 @@ export class Connection {
             );
             break;
 
-          case DRDAConstants.EXTNAM:
-            this.logger.info('Received EXTNAM message during authentication.');
-            // Handle EXTNAM if necessary
-            break;
-
           // Handle other code points as needed
 
           default:
             this.logger.warn(
-              `Unknown chained parameter code point: 0x${paramCodePoint.toString(16)}, Length: ${paramLength}, Raw Data: ${data.toString('hex')}`,
+              `Unknown chained parameter code point: 0x${paramCodePoint.toString(
+                16,
+              )}, Length: ${paramLength}, Raw Data: ${data.toString('hex')}`,
             );
             break;
         }
@@ -1450,6 +1480,7 @@ export class Connection {
       };
     }
 
+    // Handle other response types as before
     return {
       length: header.length,
       type: responseType,
@@ -1459,17 +1490,13 @@ export class Connection {
     };
   }
 
+  // Helper method to parse EXTNAM
+  private parseEXTNAM(data: Buffer): string {
+    // Assuming EXTNAM contains a null-terminated string
+    return data.toString('utf8').replace(/\x00/g, '');
+  }
+
   private extractServerPublicKey(data: Buffer): Buffer {
-    // Implement the extraction of the server's public key from the EXCSATRD response
-    // This will depend on how the server sends the public key
-    // For example, if the server sends it as a parameter with a specific code point
-    // You need to parse and extract it accordingly
-
-    // Placeholder implementation:
-    // Assume the public key is sent as a separate parameter within EXCSATRD
-    // You need to iterate over the data and find the parameter containing the public key
-
-    // Example:
     let offset = 0;
     let publicKey: Buffer | null = null;
 
@@ -1541,6 +1568,7 @@ export class Connection {
       0x115e: 'EXTNAM', // External Name
       0xf289: 'ODBC_ERROR', // ODBC Error
       0xf2a1: 'SQLERRRM', // SQL Error
+      0xd043: 'CHRNRQSDSS', // Chained Request
     };
 
     result.messageType = codePointMap[codePoint] || 'UNKNOWN';
@@ -1573,10 +1601,59 @@ export class Connection {
       result.sqlErrorMessage = 'Syntax error in SQL statement'; // Example message
     }
 
+    if (result.messageType === 'CHRNRQSDSS') {
+      // Parse chained request data
+      const chainedData = this.parseChainedRequest(payload, offset);
+      result.chainedData = chainedData;
+    }
     return result;
   }
 
+  private parseChainedRequest(
+    payload: Buffer,
+    offset: number,
+  ): CHNRQSDSSResponse {
+    const chainedData: any = {};
+    let chainedOffset = offset;
+
+    while (chainedOffset < payload.length) {
+      const paramLength = payload.readUInt16BE(chainedOffset);
+      chainedOffset += 2;
+      const paramCodePoint = payload.readUInt16BE(chainedOffset);
+      chainedOffset += 2;
+      const paramData = payload.slice(
+        chainedOffset,
+        chainedOffset + paramLength - 4,
+      );
+      chainedOffset += paramLength - 4;
+
+      switch (paramCodePoint) {
+        case 0x115e:
+          chainedData.extnam = paramData.toString('utf8');
+          break;
+        case 0xf289:
+          chainedData.odbcError = {
+            errorCode: paramData.readUInt16BE(0),
+            errorMessage: paramData.toString('utf8', 2),
+          };
+          break;
+        case 0xf2a1:
+          chainedData.sqlError = {
+            sqlErrorCode: paramData.readUInt16BE(0),
+            sqlErrorMessage: paramData.toString('utf8', 2),
+          };
+          break;
+        default:
+          chainedData[paramCodePoint.toString(16)] = paramData.toString('hex');
+          break;
+      }
+    }
+
+    return chainedData;
+  }
+
   private mapCodePointToResponseType(codePoint: number): string {
+    this.logger.info(`Mapping code point 0x${codePoint.toString(16)}...`);
     const responseType = DRDAConstants[codePoint];
     if (responseType !== undefined) {
       this.logger.info(

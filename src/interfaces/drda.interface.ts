@@ -3,6 +3,7 @@ export interface DRDAResponse {
   length: number; // Message length
   type: string | number; // Message type (e.g., EXCSQLSET, SECCHK, etc.)
   payload: Buffer; // The actual data or response content
+  parameters?: any; // Additional parameters (optional)
 }
 
 export interface EXCSATRDResponse extends DRDAResponse {
@@ -36,8 +37,14 @@ export interface DRDAHeader {
   payload?: Buffer; // The actual data or response content
 }
 
+export interface CHNRQSDSSResponse extends DRDAResponse {
+  isChained: boolean;
+  chainedPayload: Buffer;
+}
+
 // DRDA response types
 export type DRDAResponseType =
+  | CHNRQSDSSResponse
   | EXCSQLSETResponse
   | SECCHKResponse
   | ACCRDBResponse

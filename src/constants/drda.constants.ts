@@ -48,7 +48,7 @@ export enum DRDAConstants {
   PKGID = 0x2112, // Package Identifier
 
   // 0xd043 to mark Chained Request Data Stream (CHNRQSDSS).
-  CHNRQSDSS = 0xd043,
+  CHRNRQSDSS = 0xd043, // Chained Request Data Stream
 
   EXCSQLPREP = 0x2416, // Execute SQL Prepare
   EXCSQLPREPRM = 0x2417, // Execute SQL Prepare Reply Message
