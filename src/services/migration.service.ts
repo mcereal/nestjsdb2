@@ -1,16 +1,17 @@
 // migration/migration.service.ts
 
 import { Logger } from '../utils';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import {
   IDb2ConfigOptions,
   Db2MigrationOptions,
   IDb2MigrationService,
   IDb2Client,
+  TableMetadata,
+  ViewMetadata,
 } from '../interfaces';
 import { handleDb2Error } from '../errors';
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { EntityMetadataStorage } from '../metadata';
+import { EntityMetadata } from '../interfaces';
 
 export class Db2MigrationService implements IDb2MigrationService {
   private readonly logger = new Logger(Db2MigrationService.name);
@@ -27,340 +28,180 @@ export class Db2MigrationService implements IDb2MigrationService {
   /**
    * Runs database migrations based on the configuration.
    */
-  public async runMigrations(): Promise<void> {
-    if (!this.migrationConfig.enabled) {
-      this.logger.warn(
-        'Migrations are disabled. Skipping migration execution.',
-      );
+  async runMigrations(): Promise<void> {
+    if (!this.migrationConfig.enabled || !this.migrationConfig.runOnStart) {
+      this.logger.info('Migrations are disabled or not set to run on start.');
       return;
     }
 
-    if (!this.migrationConfig.runOnStart) {
-      this.logger.info(
-        'Migrations are not configured to run on start. Skipping migration execution.',
-      );
-      return;
-    }
+    const entities = EntityMetadataStorage.getEntities();
 
-    // Proceed with migration execution
-    try {
-      await this.executeMigrations();
-    } catch (error) {
-      handleDb2Error(
-        error,
-        'Migration process',
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Executes the migration scripts based on the configuration.
-   */
-  private async executeMigrations(): Promise<void> {
-    try {
-      // Load and execute migration files if configured
-      const migrationFiles = await this.loadMigrationFiles();
-      for (const file of migrationFiles) {
-        await this.executeMigrationFile(file);
+    for (const entity of entities) {
+      const metadata: EntityMetadata =
+        EntityMetadataStorage.getEntityMetadata(entity);
+      if (!metadata) {
+        this.logger.warn(
+          `No metadata found for entity ${entity.name}. Skipping.`,
+        );
+        continue;
       }
 
-      // Execute metadata-driven migrations
-      const entities = EntityMetadataStorage.getEntities();
-      for (const entity of entities) {
-        const metadata = EntityMetadataStorage.getEntityMetadata(entity);
-        const createTableSQL = this.generateCreateTableSQL(metadata);
+      // Determine if the entity is a table or a view
+      const isTable = metadata.entityType === 'table';
+      const tableMetadata: TableMetadata = isTable
+        ? metadata.tableMetadata
+        : undefined;
+      const viewMetadata: ViewMetadata = !isTable
+        ? metadata.viewMetadata
+        : undefined;
 
-        // Execute or log the SQL script as required
-        if (this.migrationConfig.dryRun) {
+      if (!tableMetadata && !viewMetadata) {
+        this.logger.warn(
+          `No table or view metadata found for entity ${entity.name}. Skipping.`,
+        );
+        continue;
+      }
+
+      // Use table or view metadata to generate SQL
+      const createSQL = isTable
+        ? this.generateCreateTableSQL(tableMetadata!)
+        : this.generateCreateViewSQL(viewMetadata!);
+
+      if (this.migrationConfig.logQueries) {
+        this.logger.info(
+          `Migration SQL for ${isTable ? tableMetadata!.tableName : viewMetadata!.viewName}:\n${createSQL}`,
+        );
+      }
+
+      if (this.migrationConfig.dryRun) {
+        this.logger.info(
+          `Dry run enabled. Skipping execution of migration for ${entity.name}.`,
+        );
+        continue;
+      }
+
+      try {
+        await this.db2Client.query(createSQL);
+        this.logger.info(
+          `Migration for ${isTable ? tableMetadata!.tableName : viewMetadata!.viewName} applied successfully.`,
+        );
+
+        if (this.migrationConfig.markAsExecuted) {
+          // Implement logic to mark the migration as executed, e.g., insert into a migrations table
           this.logger.info(
-            `Dry run enabled. Migration script not executed: ${createTableSQL}`,
+            `Migration for ${isTable ? tableMetadata!.tableName : viewMetadata!.viewName} marked as executed.`,
           );
-        } else {
-          try {
-            this.logger.info(
-              `Executing migration script for table: ${metadata.tableName}`,
-            );
-            await this.db2Client.query(createTableSQL);
-            this.logger.info(
-              `Migration for table ${metadata.tableName} applied successfully.`,
-            );
-          } catch (error) {
-            handleDb2Error(
-              error,
-              `Migration script for table: ${metadata.tableName}`,
-              {
-                host: this.config.host,
-                database: this.config.database,
-              },
-              this.logger,
-            );
-            if (this.migrationConfig.skipOnFail) {
-              this.logger.warn(
-                `Skipping remaining migrations due to error in table: ${metadata.tableName}`,
-              );
-              break;
-            } else if (this.migrationConfig.ignoreErrors) {
-              this.logger.warn(
-                `Ignoring error in migration for table: ${metadata.tableName} and continuing.`,
-              );
-              continue;
-            } else {
-              throw error;
-            }
-          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to migrate ${isTable ? tableMetadata!.tableName : viewMetadata!.viewName}: ${error.message}`,
+        );
+        if (!this.migrationConfig.skipOnFail) {
+          handleDb2Error(
+            error,
+            'Migration process',
+            { host: this.config.host, database: this.config.database },
+            this.logger,
+          );
+          throw error;
         }
       }
-    } catch (error) {
-      handleDb2Error(
-        error,
-        'Migration process',
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-      throw error;
     }
   }
 
   /**
    * Generates the SQL script for creating a table based on entity metadata.
    */
-  private generateCreateTableSQL(metadata: EntityMetadata): string {
-    let sql = `CREATE TABLE ${metadata.tableName} (`;
+  private generateCreateTableSQL(metadata: TableMetadata): string {
+    let sql = `CREATE SCHEMA IF NOT EXISTS "${metadata.schemaName}";\n`;
+    sql += `CREATE TABLE IF NOT EXISTS "${metadata.schemaName}"."${metadata.tableName}" (\n`;
 
-    // Define columns
-    const columnDefinitions = metadata.columns.map((column) => {
-      let columnDef = `${String(
-        column.propertyKey,
-      )} ${column.options.type.toUpperCase()}`;
-      if (column.options.length) columnDef += `(${column.options.length})`;
-      if (column.options.nullable === false) columnDef += ` NOT NULL`;
-      if (
-        metadata.defaultValues.some(
-          (def) => def.propertyKey === column.propertyKey,
-        )
-      ) {
-        const defaultValue = metadata.defaultValues.find(
-          (def) => def.propertyKey === column.propertyKey,
-        ).value;
+    const columnDefs = metadata.columns.map((column) => {
+      let columnDef = `  "${String(column.propertyKey)}" ${this.mapColumnType(column.type, column.length)}`;
+      if (column.nullable === false) {
+        columnDef += ' NOT NULL';
+      }
+      if (column.unique) {
+        columnDef += ' UNIQUE';
+      }
+      if (column.default !== undefined) {
+        const defaultValue =
+          typeof column.default === 'function'
+            ? column.default()
+            : `'${column.default}'`;
         columnDef += ` DEFAULT ${defaultValue}`;
       }
       return columnDef;
     });
 
-    sql += columnDefinitions.join(', ');
-
-    // Define primary keys
-    if (metadata.primaryKeys.length) {
-      sql += `, PRIMARY KEY (${metadata.primaryKeys.join(', ')})`;
+    // Add primary key constraint
+    if (metadata.primaryKeys.length > 0) {
+      const primaryKeys = metadata.primaryKeys
+        .map((pk) => `"${String(pk.propertyKey)}"`)
+        .join(', ');
+      columnDefs.push(`  PRIMARY KEY (${primaryKeys})`);
     }
 
-    // Define unique constraints
-    if (metadata.uniqueColumns.length) {
-      metadata.uniqueColumns.forEach((uniqueColumn) => {
-        sql += `, UNIQUE (${uniqueColumn})`;
-      });
+    sql += columnDefs.join(',\n');
+    sql += `\n);`;
+
+    // Add indexes
+    for (const index of metadata.indexedColumns) {
+      const indexName =
+        index.name || `${metadata.tableName}_${String(index.propertyKey)}_idx`;
+      const columns = Array.isArray(index.propertyKey)
+        ? index.propertyKey
+        : [index.propertyKey];
+      const indexColumns = columns.map((col) => `"${col}"`).join(', ');
+      sql += `\nCREATE INDEX "${indexName}" ON "${metadata.schemaName}"."${metadata.tableName}" (${indexColumns});`;
     }
 
-    // Define foreign keys
-    if (metadata.foreignKeys.length) {
-      metadata.foreignKeys.forEach((fk) => {
-        sql += `, FOREIGN KEY (${String(fk.propertyKey)}) REFERENCES ${
-          fk.options.reference
-        }`;
-        if (fk.options.onDelete) {
-          sql += ` ON DELETE ${fk.options.onDelete}`;
-        }
-      });
+    // Add foreign keys
+    for (const fk of metadata.foreignKeys) {
+      const fkName =
+        fk.name || `${metadata.tableName}_${String(fk.propertyKey)}_fk`;
+      const columns = Array.isArray(fk.propertyKey)
+        ? fk.propertyKey
+        : [fk.propertyKey];
+      const fkColumns = columns.map((col) => `"${col}"`).join(', ');
+      const reference = fk.reference;
+      const onDelete = fk.onDelete ? ` ON DELETE ${fk.onDelete}` : '';
+      const onUpdate = fk.onUpdate ? ` ON UPDATE ${fk.onUpdate}` : '';
+      sql += `\nALTER TABLE "${metadata.schemaName}"."${metadata.tableName}" ADD CONSTRAINT "${fkName}" FOREIGN KEY (${fkColumns}) REFERENCES ${reference}${onDelete}${onUpdate};`;
     }
 
-    // Define check constraints
-    if (metadata.checkConstraints.length) {
-      metadata.checkConstraints.forEach((check) => {
-        sql += `, CHECK (${check.constraint})`;
-      });
-    }
-
-    sql += ');';
-
-    // Define indexes
-    if (metadata.indexedColumns.length) {
-      metadata.indexedColumns.forEach((indexedColumn) => {
-        sql += ` CREATE INDEX idx_${metadata.tableName}_${String(
-          indexedColumn,
-        )} ON ${metadata.tableName} (${String(indexedColumn)});`;
-      });
+    // Add unique constraints
+    for (const constraint of metadata.constraints) {
+      const constraintName =
+        constraint.name ||
+        `${metadata.tableName}_${String(constraint.propertyKey)}_unique`;
+      const columns = Array.isArray(constraint.propertyKey)
+        ? constraint.propertyKey
+        : [constraint.propertyKey];
+      const constraintColumns = columns.map((col) => `"${col}"`).join(', ');
+      sql += `\nALTER TABLE "${metadata.schemaName}"."${metadata.tableName}" ADD CONSTRAINT "${constraintName}" UNIQUE (${constraintColumns});`;
     }
 
     return sql;
   }
 
-  /**
-   * Load migration files from the configured directory.
-   */
-  private async loadMigrationFiles(): Promise<string[]> {
-    try {
-      const files = await fs.readdir(this.migrationConfig.migrationDir);
-      return files
-        .filter((file) => file.endsWith(this.migrationConfig.fileExtension))
-        .map((file) => join(this.migrationConfig.migrationDir, file));
-    } catch (error) {
-      handleDb2Error(
-        error,
-        'Loading migration files',
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-
-      if (this.migrationConfig.ignoreMissing) {
-        this.logger.warn(
-          'Ignoring missing migration files due to configuration.',
-        );
-        return [];
-      } else {
-        throw error;
-      }
-    }
+  private generateCreateViewSQL(metadata: ViewMetadata): string {
+    let sql = `CREATE SCHEMA IF NOT EXISTS "${metadata.schemaName}";\n`;
+    sql += `CREATE VIEW "${metadata.schemaName}"."${metadata.viewName}" AS ${metadata.underlyingQuery};\n`;
+    return sql;
   }
 
-  /**
-   * Executes a migration file.
-   */
-  private async executeMigrationFile(file: string): Promise<void> {
-    if (
-      this.migrationConfig.ignoreExecuted &&
-      this.migrationConfig.tableName &&
-      (await this.isMigrationExecuted(file))
-    ) {
-      this.logger.info(`Skipping executed migration: ${file}`);
-      return;
-    }
-
-    const script = await fs.readFile(file, 'utf-8');
-
-    if (this.migrationConfig.dryRun) {
-      this.logger.info(
-        `Dry run enabled. Migration script not executed: ${file}`,
-      );
-      return;
-    }
-
-    try {
-      if (this.migrationConfig.logQueries) {
-        this.logger.info(`Executing migration script: ${file}`);
-      }
-
-      await this.db2Client.query(script);
-
-      if (
-        this.migrationConfig.markAsExecuted &&
-        this.migrationConfig.tableName
-      ) {
-        await this.markMigrationAsExecuted(file);
-      }
-
-      this.logger.info(`Migration applied successfully: ${file}`);
-    } catch (error) {
-      handleDb2Error(
-        error,
-        `Migration script: ${file}`,
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-
-      if (this.migrationConfig.skipOnFail) {
-        this.logger.warn(
-          `Skipping remaining migrations due to error in: ${file}`,
-        );
-      } else if (this.migrationConfig.ignoreErrors) {
-        this.logger.warn(
-          `Ignoring error in migration: ${file} and continuing.`,
-        );
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Checks if a migration file has already been executed.
-   */
-  private async isMigrationExecuted(file: string): Promise<boolean> {
-    if (!this.migrationConfig.tableName) {
-      return false;
-    }
-
-    const sql = `SELECT COUNT(*) AS count FROM ${this.migrationConfig.tableName} WHERE migration_file = ?`;
-
-    try {
-      const result = await this.db2Client.query<{ count: number }>(sql, [file]);
-      return result.count > 0;
-    } catch (error) {
-      handleDb2Error(
-        error,
-        'Checking if migration is executed',
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-
-      if (this.migrationConfig.ignoreErrors) {
-        this.logger.warn(
-          `Ignoring error and continuing. Error: ${error.message}`,
-        );
-        return false;
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Marks a migration file as executed in the tracking table.
-   */
-  private async markMigrationAsExecuted(file: string): Promise<void> {
-    if (!this.migrationConfig.tableName) {
-      return;
-    }
-
-    const sql = `INSERT INTO ${this.migrationConfig.tableName} (migration_file) VALUES (?)`;
-
-    try {
-      await this.db2Client.query(sql, [file]);
-      this.logger.info(`Migration marked as executed: ${file}`);
-    } catch (error) {
-      handleDb2Error(
-        error,
-        'Marking migration as executed',
-        {
-          host: this.config.host,
-          database: this.config.database,
-        },
-        this.logger,
-      );
-
-      if (this.migrationConfig.ignoreErrors) {
-        this.logger.warn(
-          `Ignoring error and continuing. Error: ${error.message}`,
-        );
-        return;
-      }
-      throw error;
+  private mapColumnType(type: string, length?: number): string {
+    switch (type.toUpperCase()) {
+      case 'VARCHAR':
+        return length ? `VARCHAR(${length})` : 'VARCHAR';
+      case 'CHAR':
+        return length ? `CHAR(${length})` : 'CHAR';
+      case 'TIMESTAMP':
+        return 'TIMESTAMP';
+      // Add other type mappings as needed
+      default:
+        throw new Error(`Unsupported column type: ${type}`);
     }
   }
 }

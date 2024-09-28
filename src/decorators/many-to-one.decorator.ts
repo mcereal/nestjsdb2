@@ -1,59 +1,67 @@
 // src/decorators/manyToOne.decorator.ts
-
-import { createPropertyDecorator } from './base.decorator';
-import { ManyToOneMetadata, ManyToOneOptions } from '../interfaces';
+import { BaseDecorator } from './base.decorator';
+import { ManyToOneMetadata } from '../interfaces';
 import { getMetadata } from './utils';
 
 /**
- * Validates the options provided to the @ManyToOne decorator.
- * @param options - The many-to-one relationship options.
+ * ManyToOneDecorator class that extends BaseDecorator to handle many-to-one relationship metadata.
  */
-const validateManyToOneOptions = (options: ManyToOneOptions) => {
-  if (typeof options.target !== 'function') {
-    throw new Error(
-      "ManyToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
+class ManyToOneDecorator extends BaseDecorator<Partial<ManyToOneMetadata>> {
+  constructor() {
+    super(
+      'manyToOneRelations',
+      // Validation function for the ManyToOne options
+      (options: Partial<ManyToOneMetadata>) => {
+        if (typeof options.target !== 'function') {
+          throw new Error(
+            "ManyToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
+          );
+        }
+
+        // Additional validations can be added here if necessary
+      },
+      // Metadata creation function for ManyToOne
+      (propertyKey, options) => {
+        return {
+          propertyKey,
+          target: options.target,
+          joinColumn: options.joinColumn,
+          inverseJoinColumn: options.inverseJoinColumn,
+          cascade: options.cascade,
+          sourceJoinColumn: options.sourceJoinColumn,
+          sourceInverseJoinColumn: options.sourceInverseJoinColumn,
+          targetJoinColumn: options.targetJoinColumn,
+          targetInverseJoinColumn: options.targetInverseJoinColumn,
+          joinTable: options.joinTable,
+          sourceTable: options.sourceTable,
+        } as ManyToOneMetadata;
+      },
+      // Unique check function to ensure property key is unique within many-to-one relations
+      (existing: ManyToOneMetadata, newEntry: ManyToOneMetadata) =>
+        existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // Additional validations can be added here if necessary
-};
+  // No need to implement createClassMetadata for many-to-one as it's a property decorator
+  protected createClassMetadata(target: Function): void {
+    target;
+    return;
+  }
+}
 
-/**
- * Creates many-to-one metadata from the provided options.
- * @param propertyKey - The property key of the relationship.
- * @param options - The many-to-one relationship options.
- * @returns The many-to-one metadata.
- */
-const createManyToOneMetadata = (
-  propertyKey: string | symbol,
-  options: ManyToOneOptions,
-): ManyToOneMetadata => ({
-  propertyKey,
-  options,
-});
-
-/**
- * Ensures that the property key is unique within many-to-one relations.
- * @param existing - An existing metadata entry.
- * @param newEntry - A new metadata entry.
- * @returns Boolean indicating if the entry already exists.
- */
-const uniqueCheckManyToOne = (
-  existing: ManyToOneMetadata,
-  newEntry: ManyToOneMetadata,
-) => existing.propertyKey === newEntry.propertyKey;
+// Instance of ManyToOneDecorator
+const manyToOneDecoratorInstance = new ManyToOneDecorator();
 
 /**
  * @ManyToOne decorator to define a many-to-one relationship between entities.
  * @param options - Configuration options for the relationship.
  * @returns PropertyDecorator
  */
-export const ManyToOne = createPropertyDecorator<ManyToOneOptions>(
-  'manyToOneRelations',
-  validateManyToOneOptions,
-  createManyToOneMetadata,
-  uniqueCheckManyToOne,
-);
+export const ManyToOne = (
+  options: Partial<ManyToOneMetadata>,
+): PropertyDecorator => {
+  return manyToOneDecoratorInstance.decorate(options) as PropertyDecorator;
+};
 
 /**
  * Retrieves many-to-one relations metadata for a given class.

@@ -1,24 +1,34 @@
-import { CompositeKeyMetadata } from '../interfaces';
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+// src/decorators/compositeKey.decorator.ts
+import { BaseDecorator } from './base.decorator';
+import { CompositeKeyMetadata, EntityMetadata } from '../interfaces';
+import { EntityMetadataStorage } from '../metadata';
 
 /**
- * Class decorator to mark a composite key in an entity.
- * @param keys - An array of strings representing the properties that form the composite key.
- * @returns A class decorator.
+ * CompositeKeyDecorator class that extends BaseDecorator to handle composite key metadata.
  */
-export const CompositeKey = (keys: string[]): ClassDecorator => {
-  if (!Array.isArray(keys) || keys.length === 0) {
-    throw new Error(
-      'CompositeKey must be initialized with a non-empty array of strings.',
+class CompositeKeyDecorator extends BaseDecorator<string[]> {
+  constructor() {
+    super(
+      'compositeKeys',
+      // Validation function for composite keys
+      (keys: string[]) => {
+        if (!Array.isArray(keys) || keys.length === 0) {
+          throw new Error(
+            'CompositeKey must be initialized with a non-empty array of strings.',
+          );
+        }
+      },
+      // No need for a property-level metadata creation function
+      () => {},
     );
   }
 
-  return (target: Function) => {
-    // Using Function type as expected by ClassDecorator
-    if (typeof target !== 'function') {
-      throw new Error('CompositeKey decorator can only be applied to classes.');
-    }
-
+  /**
+   * Creates composite key metadata and adds it to the entity's table metadata.
+   * @param target - The class to which the decorator is applied.
+   * @param keys - The keys forming the composite key.
+   */
+  protected createClassMetadata(target: Function, keys: string[]): void {
     // Ensure that the constructor is treated as a class constructor
     const constructor = target as new (...args: any[]) => any;
 
@@ -40,46 +50,55 @@ export const CompositeKey = (keys: string[]): ClassDecorator => {
 
     // Retrieve existing entity metadata or create a new one
     let entityMetadata: EntityMetadata =
-      EntityMetadataStorage.getEntityMetadata(constructor);
-
-    // If no metadata exists, initialize a new one
-    if (!entityMetadata) {
-      entityMetadata = {
-        tableName: '',
-        columns: [],
-        primaryKeys: [],
-        uniqueColumns: [],
-        indexedColumns: [],
-        foreignKeys: [],
-        oneToOneRelations: [],
-        oneToManyRelations: [],
-        manyToOneRelations: [],
-        manyToManyRelations: [],
-        defaultValues: [],
-        checkConstraints: [],
-        compositeKeys: [],
-        uniqueColumnMetadada: [],
+      EntityMetadataStorage.getEntityMetadata(constructor) || {
+        entityType: 'table',
+        tableMetadata: {
+          tableName: '',
+          schemaName: '',
+          columns: [],
+          primaryKeys: [],
+          indexedColumns: [],
+          foreignKeys: [],
+          oneToOneRelations: [],
+          oneToManyRelations: [],
+          manyToOneRelations: [],
+          manyToManyRelations: [],
+          defaultValues: [],
+          constraints: [],
+          compositeKeys: [], // Include composite keys in table metadata
+        },
       };
-    }
 
-    // Add new composite key metadata
+    // Add new composite key metadata to tableMetadata
     const compositeKeyMetadata: CompositeKeyMetadata = { keys };
-    entityMetadata.compositeKeys.push(compositeKeyMetadata);
+    entityMetadata.tableMetadata!.compositeKeys.push(compositeKeyMetadata);
 
     // Store the updated metadata
     EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
-  };
+  }
+}
+
+// Instance of CompositeKeyDecorator
+const compositeKeyDecoratorInstance = new CompositeKeyDecorator();
+
+/**
+ * @CompositeKey decorator to define a composite key in an entity.
+ * @param keys - An array of strings representing the properties that form the composite key.
+ * @returns ClassDecorator
+ */
+export const CompositeKey = (keys: string[]): ClassDecorator => {
+  return compositeKeyDecoratorInstance.decorate(keys) as ClassDecorator;
 };
 
 /**
- * Function to retrieve composite key metadata for a given class
+ * Function to retrieve composite key metadata for a given class.
  * @param target - The constructor of the entity class.
  * @returns CompositeKeyMetadata[]
  */
 export const getCompositeKeyMetadata = (
-  target: Function, // Using Function type here as well
+  target: Function,
 ): CompositeKeyMetadata[] => {
   const constructor = target as new (...args: any[]) => any;
   const entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
-  return entityMetadata ? entityMetadata.compositeKeys : [];
+  return entityMetadata?.tableMetadata?.compositeKeys || [];
 };

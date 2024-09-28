@@ -1,57 +1,62 @@
 // src/decorators/oneToOne.decorator.ts
-
-import { createPropertyDecorator } from './base.decorator';
-import { OneToOneOptions, OneToOneMetadata } from '../interfaces';
+import { BaseDecorator } from './base.decorator';
+import { OneToOneMetadata } from '../interfaces';
 import { getMetadata } from './utils';
 
 /**
- * Validates the options provided to the @OneToOne decorator.
- * @param options - The one-to-one relationship options.
+ * OneToOneDecorator class that extends BaseDecorator to handle one-to-one relationship metadata.
  */
-const validateOneToOneOptions = (options: OneToOneOptions) => {
-  if (typeof options.target !== 'function') {
-    throw new Error(
-      "OneToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
+class OneToOneDecorator extends BaseDecorator<Partial<OneToOneMetadata>> {
+  constructor() {
+    super(
+      'oneToOneRelations',
+      // Validation function for the one-to-one options
+      (options: Partial<OneToOneMetadata>) => {
+        if (typeof options.target !== 'function') {
+          throw new Error(
+            "OneToOne decorator requires a 'target' option that is a function (constructor of the target entity).",
+          );
+        }
+      },
+      // Metadata creation function for the one-to-one relationship
+      (propertyKey, options) => {
+        return {
+          propertyKey,
+          target: options.target,
+          cascade: options.cascade,
+          sourceJoinColumn: options.sourceJoinColumn,
+          sourceInverseJoinColumn: options.sourceInverseJoinColumn,
+          targetJoinColumn: options.targetJoinColumn,
+          targetInverseJoinColumn: options.targetInverseJoinColumn,
+          joinTable: options.joinTable,
+        } as OneToOneMetadata;
+      },
+      // Unique check function to ensure the property key is unique within one-to-one relations
+      (existing: OneToOneMetadata, newEntry: OneToOneMetadata) =>
+        existing.propertyKey === newEntry.propertyKey,
     );
   }
-};
 
-/**
- * Creates one-to-one metadata from the provided options.
- * @param propertyKey - The property key of the relationship.
- * @param options - The one-to-one relationship options.
- * @returns The one-to-one metadata.
- */
-const createOneToOneMetadata = (
-  propertyKey: string | symbol,
-  options: OneToOneOptions,
-): OneToOneMetadata => ({
-  propertyKey,
-  options,
-});
+  // No need to implement createClassMetadata for one-to-one as it's a property decorator
+  protected createClassMetadata(target: Function): void {
+    target;
+    return;
+  }
+}
 
-/**
- * Ensures that the property key is unique within one-to-one relations.
- * @param existing - An existing metadata entry.
- * @param newEntry - A new metadata entry.
- * @returns Boolean indicating if the entry already exists.
- */
-const uniqueCheckOneToOne = (
-  existing: OneToOneMetadata,
-  newEntry: OneToOneMetadata,
-) => existing.propertyKey === newEntry.propertyKey;
+// Instance of OneToOneDecorator
+const oneToOneDecoratorInstance = new OneToOneDecorator();
 
 /**
  * @OneToOne decorator to define a one-to-one relationship between entities.
  * @param options - Configuration options for the relationship.
  * @returns PropertyDecorator
  */
-export const OneToOne = createPropertyDecorator<OneToOneOptions>(
-  'oneToOneRelations',
-  validateOneToOneOptions,
-  createOneToOneMetadata,
-  uniqueCheckOneToOne,
-);
+export const OneToOne = (
+  options: Partial<OneToOneMetadata>,
+): PropertyDecorator => {
+  return oneToOneDecoratorInstance.decorate(options) as PropertyDecorator;
+};
 
 /**
  * Retrieves one-to-one relations metadata for a given class.

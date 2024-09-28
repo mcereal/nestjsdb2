@@ -1,34 +1,39 @@
-// src/decorators/baseDecorator.ts
-
-import { addMetadata, MetadataType } from './utils';
+// src/decorators/base.decorator.ts
 import { ClassConstructor } from '../types';
+import { addMetadata, MetadataType } from './utils';
 
-/**
- * A factory function to create property decorators.
- * @param metadataType - The type of metadata to add.
- * @param validateOptions - A function to validate decorator options.
- * @param createMetadata - A function to create metadata from property and options.
- * @param uniqueCheckFn - An optional function to ensure metadata uniqueness.
- * @returns A PropertyDecorator.
- */
-export const createPropertyDecorator = <T>(
-  metadataType: MetadataType,
-  validateOptions: (options: T) => void,
-  createMetadata: (propertyKey: string | symbol, options: T) => any,
-  uniqueCheckFn?: (existing: any, newEntry: any) => boolean,
-): PropertyDecorator => {
-  return (options: T): PropertyDecorator => {
-    // Validate the provided options
-    validateOptions(options);
+export abstract class BaseDecorator<T> {
+  constructor(
+    protected metadataType: MetadataType,
+    protected optionsValidator: (options: T) => void,
+    protected metadataCreator: (
+      propertyKey: string | symbol,
+      options: T,
+    ) => any,
+    protected uniqueCheckFn?: (existing: any, newEntry: any) => boolean,
+  ) {}
 
-    return (target: Object, propertyKey: string | symbol) => {
-      const constructor = target.constructor as ClassConstructor;
+  decorate(options: T): PropertyDecorator | ClassDecorator {
+    return (target: Object | Function, propertyKey?: string | symbol) => {
+      // Validate options
+      this.optionsValidator(options);
 
-      // Create the specific metadata entry
-      const metadataEntry = createMetadata(propertyKey, options);
-
-      // Add the metadata using the utility function
-      addMetadata(constructor, metadataType, metadataEntry, uniqueCheckFn);
+      if (typeof target === 'function') {
+        // Class Decorator
+        (this as any).createClassMetadata(target as Function, options);
+      } else if (propertyKey) {
+        // Property Decorator
+        const constructor = target.constructor as ClassConstructor;
+        const metadataEntry = this.metadataCreator(propertyKey, options);
+        addMetadata(
+          constructor,
+          this.metadataType,
+          metadataEntry,
+          this.uniqueCheckFn,
+        );
+      }
     };
-  };
-};
+  }
+
+  protected abstract createClassMetadata(target: Function, options: T): void;
+}

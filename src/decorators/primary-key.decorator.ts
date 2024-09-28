@@ -1,51 +1,77 @@
-// src/decorators/primaryKey.decorator.ts
-
-import { createPropertyDecorator } from './base.decorator';
-import { PrimaryKeyMetadata, primeKeyOptions } from '../interfaces';
-import { getMetadata } from './utils';
+// src/decorators/primary-key.decorator.ts
+import { BaseDecorator } from './base.decorator';
+import { PrimaryKeyMetadata } from '../interfaces';
 
 /**
- * Creates primary key metadata for the property.
- * @param propertyKey - The property key of the primary key.
- * @param options - Optional configuration options for the primary key.
- * @returns The primary key metadata.
+ * PrimaryKeyDecorator class that extends BaseDecorator to handle primary key metadata.
  */
-const createPrimaryKeyMetadata = (
-  propertyKey: string | symbol,
-  options?: primeKeyOptions,
-): PrimaryKeyMetadata => ({
-  propertyKey,
-  options: options || {},
-});
+class PrimaryKeyDecorator extends BaseDecorator<Partial<PrimaryKeyMetadata>> {
+  constructor() {
+    super(
+      'primaryKeys',
+      // Validation function for the primary key options
+      (options: Partial<PrimaryKeyMetadata>) => {
+        if (!options.type) {
+          throw new Error('Primary key decorator requires a "type" option.');
+        }
+      },
+      // Metadata creation function for the primary key
+      (propertyKey, options) => {
+        return {
+          propertyKey: propertyKey.toString(),
+          name: options.name,
+          length: options.length,
+          type: options.type,
+          generated: options.generated,
+          unique: options.unique,
+          nullable: options.nullable,
+          default: options.default,
+          onUpdate: options.onUpdate,
+          autoIncrement: options.autoIncrement,
+          comment: options.comment,
+          collation: options.collation,
+          charset: options.charset,
+          precision: options.precision,
+          scale: options.scale,
+          zerofill: options.zerofill,
+          unsigned: options.unsigned,
+          spatial: options.spatial,
+          srid: options.srid,
+          geometryType: options.geometryType,
+          geometrySrid: options.geometrySrid,
+          geometryDimension: options.geometryDimension,
+          geometryTypeComment: options.geometryTypeComment,
+          enum: options.enum,
+          set: options.set,
+          asExpression: options.asExpression,
+          virtual: options.virtual,
+          stored: options.stored,
+          hidden: options.hidden,
+          defaultToNow: options.defaultToNow,
+          defaultToNowOnUpdate: options.defaultToNowOnUpdate,
+          defaultToUUID: options.defaultToUUID,
+        } as PrimaryKeyMetadata;
+      },
+    );
+  }
+
+  // No need to implement createClassMetadata for primary keys as it's a property decorator
+  protected createClassMetadata(target: Function): void {
+    target;
+    return;
+  }
+}
+
+// Instance of PrimaryKeyDecorator
+const primaryKeyDecoratorInstance = new PrimaryKeyDecorator();
 
 /**
- * Ensures that the property key is unique within primary keys.
- * @param existing - An existing metadata entry.
- * @param newEntry - A new metadata entry.
- * @returns Boolean indicating if the entry already exists.
- */
-const uniqueCheckPrimaryKey = (
-  existing: PrimaryKeyMetadata,
-  newEntry: PrimaryKeyMetadata,
-) => existing.propertyKey === newEntry.propertyKey;
-
-/**
- * @PrimaryKey decorator to mark a property as a primary key.
- * @param options - Optional configuration options for the primary key.
+ * @PrimaryKey decorator to define a primary key column.
+ * @param options - The primary key options.
  * @returns PropertyDecorator
  */
-export const PrimaryKey = createPropertyDecorator<primeKeyOptions | undefined>(
-  'primaryKeys',
-  () => {}, // No validation needed for now
-  createPrimaryKeyMetadata,
-  uniqueCheckPrimaryKey,
-);
-
-/**
- * Retrieves primary keys metadata for a given class.
- * @param target - The constructor of the entity class.
- * @returns PrimaryKeyMetadata[]
- */
-export const getPrimaryKeyMetadata = (target: any): PrimaryKeyMetadata[] => {
-  return getMetadata<PrimaryKeyMetadata>(target, 'primaryKeys');
+export const PrimaryKey = (
+  options: Partial<PrimaryKeyMetadata>,
+): PropertyDecorator => {
+  return primaryKeyDecoratorInstance.decorate(options) as PropertyDecorator;
 };

@@ -1,45 +1,49 @@
 // src/decorators/default.decorator.ts
-
-import { createPropertyDecorator } from './base.decorator';
+import { BaseDecorator } from './base.decorator';
 import { DefaultMetadata } from '../interfaces';
 import { getMetadata } from './utils';
 
 /**
- * Creates default value metadata from the provided value.
- * @param propertyKey - The property key of the column.
- * @param value - The default value.
- * @returns The default value metadata.
+ * DefaultDecorator class that extends BaseDecorator to handle default value metadata.
  */
-const createDefaultMetadata = (
-  propertyKey: string | symbol,
-  value: any,
-): DefaultMetadata => ({
-  propertyKey,
-  value,
-});
+class DefaultDecorator extends BaseDecorator<any> {
+  constructor() {
+    super(
+      'defaultValues',
+      // No validation function needed for the default decorator
+      () => {},
+      // Metadata creation function for the default value
+      (propertyKey, value) => {
+        return {
+          propertyKey,
+          value,
+        } as DefaultMetadata;
+      },
+      // Unique check function to ensure the property key is unique within default values
+      (existing: DefaultMetadata, newEntry: DefaultMetadata) =>
+        existing.propertyKey === newEntry.propertyKey,
+    );
+  }
 
-/**
- * Ensures that the property key is unique within default values.
- * @param existing - An existing metadata entry.
- * @param newEntry - A new metadata entry.
- * @returns Boolean indicating if the entry already exists.
- */
-const uniqueCheckDefault = (
-  existing: DefaultMetadata,
-  newEntry: DefaultMetadata,
-) => existing.propertyKey === newEntry.propertyKey;
+  // No need to implement createClassMetadata for defaults as it's a property decorator
+  protected createClassMetadata(target: Function, value: any): void {
+    target;
+    value;
+    return;
+  }
+}
+
+// Instance of DefaultDecorator
+const defaultDecoratorInstance = new DefaultDecorator();
 
 /**
  * @Default decorator to define a default value for a database column.
  * @param value - The default value to set.
  * @returns PropertyDecorator
  */
-export const Default = createPropertyDecorator<any>(
-  'defaultValues',
-  () => {}, // No validation needed
-  createDefaultMetadata,
-  uniqueCheckDefault,
-);
+export const Default = (value: any): PropertyDecorator => {
+  return defaultDecoratorInstance.decorate(value) as PropertyDecorator;
+};
 
 /**
  * Retrieves default values metadata for a given class.

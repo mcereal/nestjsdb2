@@ -98,18 +98,16 @@ export interface Db2RetryOptions {
  */
 export interface Db2MigrationOptions {
   enabled: boolean;
-  migrationDir: string;
   tableName?: string;
-  fileExtension: string;
-  runOnStart: boolean;
-  logQueries: boolean;
-  logErrors: boolean;
-  dryRun: boolean;
-  skipOnFail: boolean;
-  ignoreMissing: boolean;
-  ignoreExecuted: boolean;
-  ignoreErrors: boolean;
-  markAsExecuted: boolean;
+  runOnStart?: boolean;
+  logQueries?: boolean;
+  logErrors?: boolean;
+  dryRun?: boolean;
+  skipOnFail?: boolean;
+  ignoreMissing?: boolean;
+  ignoreExecuted?: boolean;
+  ignoreErrors?: boolean;
+  markAsExecuted?: boolean;
 }
 
 /**

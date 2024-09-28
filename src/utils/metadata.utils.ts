@@ -1,4 +1,5 @@
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { EntityMetadata } from '../interfaces';
+import { EntityMetadataStorage } from '../metadata';
 
 /**
  * Utility class for retrieving metadata.

@@ -1,8 +1,12 @@
 // src/decorators/utils.ts
 
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
+import { EntityMetadata } from '../interfaces';
 import { ClassConstructor } from '../types';
 
+/**
+ * Define the various metadata types.
+ */
 export type MetadataType =
   | 'columns'
   | 'manyToManyRelations'
@@ -10,14 +14,13 @@ export type MetadataType =
   | 'defaultValues'
   | 'oneToManyRelations'
   | 'manyToOneRelations'
-  | 'uniqueColumns'
   | 'indexedColumns'
   | 'foreignKeys'
-  | 'checkConstraints'
+  | 'constraints'
   | 'compositeKeys'
-  | 'uniqueColumnMetadada'
-  | 'primaryKeys';
-// Add other metadata types as needed
+  | 'primaryKeys'
+  | 'uniqueColumns'
+  | 'entity';
 
 /**
  * Retrieves existing entity metadata or creates a new one if it doesn't exist.
@@ -30,20 +33,22 @@ export const getOrCreateEntityMetadata = (
   let entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
   if (!entityMetadata) {
     entityMetadata = {
-      tableName: '',
-      columns: [],
-      primaryKeys: [],
-      uniqueColumns: [],
-      indexedColumns: [],
-      foreignKeys: [],
-      oneToOneRelations: [],
-      oneToManyRelations: [],
-      manyToOneRelations: [],
-      manyToManyRelations: [],
-      defaultValues: [],
-      checkConstraints: [],
-      compositeKeys: [],
-      uniqueColumnMetadada: [],
+      entityType: 'table', // Default to 'table'; can be overridden by decorators like @View
+      tableMetadata: {
+        tableName: '',
+        schemaName: '',
+        columns: [],
+        primaryKeys: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        constraints: [],
+        compositeKeys: [],
+      },
     };
     EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   }
@@ -72,7 +77,36 @@ export const addMetadata = <T>(
     if (exists) return;
   }
 
-  (entityMetadata as any)[metadataType].push(metadata);
+  // Handle based on entity type
+  if (entityMetadata.entityType === 'table') {
+    if (
+      metadataType === 'columns' ||
+      metadataType === 'primaryKeys' ||
+      metadataType === 'indexedColumns' ||
+      metadataType === 'foreignKeys' ||
+      metadataType === 'constraints' ||
+      metadataType === 'compositeKeys'
+    ) {
+      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
+    }
+    // Handle relations similarly
+    else if (
+      [
+        'oneToOneRelations',
+        'oneToManyRelations',
+        'manyToOneRelations',
+        'manyToManyRelations',
+      ].includes(metadataType)
+    ) {
+      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
+    }
+  } else if (entityMetadata.entityType === 'view') {
+    if (metadataType === 'columns') {
+      entityMetadata.viewMetadata!.columns.push(metadata as any);
+    }
+    // Views might not have other metadata types, but adjust as needed
+  }
+
   EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
 };
 
@@ -87,7 +121,16 @@ export const getMetadata = <T>(
   metadataType: MetadataType,
 ): T[] => {
   const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  return entityMetadata && entityMetadata[metadataType]
-    ? (entityMetadata[metadataType] as T[])
-    : [];
+  if (!entityMetadata) return [];
+
+  if (entityMetadata.entityType === 'table') {
+    return entityMetadata.tableMetadata![metadataType] as T[];
+  } else if (entityMetadata.entityType === 'view') {
+    if (metadataType === 'columns') {
+      return entityMetadata.viewMetadata!.columns as unknown as T[];
+    }
+    // Handle other metadata types for views if applicable
+  }
+
+  return [];
 };

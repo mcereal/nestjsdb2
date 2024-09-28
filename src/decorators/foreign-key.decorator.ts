@@ -1,60 +1,87 @@
 // src/decorators/foreignKey.decorator.ts
-
-import { createPropertyDecorator } from './base.decorator';
-import { ForeignKeyMetadata, ForeignKeyOptions } from '../interfaces';
+import { BaseDecorator } from './base.decorator';
+import { ForeignKeyMetadata } from '../interfaces';
 import { getMetadata } from './utils';
 
 /**
- * Validates the options provided to the @ForeignKey decorator.
- * @param options - The foreign key relationship options.
+ * ForeignKeyDecorator class that extends BaseDecorator to handle foreign key metadata.
  */
-const validateForeignKeyOptions = (options: ForeignKeyOptions) => {
-  // Validate that the reference is a properly formatted string
-  if (
-    typeof options.reference !== 'string' ||
-    !options.reference.includes('(') ||
-    !options.reference.includes(')')
-  ) {
-    throw new Error(
-      "ForeignKey decorator requires a 'reference' string in the format 'referenced_table(referenced_column)'.",
+class ForeignKeyDecorator extends BaseDecorator<Partial<ForeignKeyMetadata>> {
+  constructor() {
+    super(
+      'foreignKeys',
+      // Validation function for foreign key options
+      (options: Partial<ForeignKeyMetadata>) => {
+        // Validate that the reference is a properly formatted string
+        if (
+          typeof options.reference !== 'string' ||
+          !options.reference.includes('(') ||
+          !options.reference.includes(')')
+        ) {
+          throw new Error(
+            "ForeignKey decorator requires a 'reference' string in the format 'referenced_table(referenced_column)'.",
+          );
+        }
+
+        // Validate that the onDelete option, if provided, is one of the allowed values
+        if (
+          options.onDelete &&
+          !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
+        ) {
+          throw new Error(
+            "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
+          );
+        }
+
+        // Validate that the onUpdate option, if provided, is one of the allowed values
+        if (
+          options.onUpdate &&
+          !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onUpdate)
+        ) {
+          throw new Error(
+            "ForeignKey decorator 'onUpdate' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
+          );
+        }
+      },
+      // Metadata creation function for the foreign key
+      (propertyKey, options) => {
+        return {
+          propertyKey,
+          reference: options.reference,
+          onDelete: options.onDelete,
+          onUpdate: options.onUpdate,
+          name: options.name,
+          constraintName: options.constraintName,
+          comment: options.comment,
+          invisible: options.invisible,
+          functional: options.functional,
+          expression: options.expression,
+          include: options.include,
+        } as ForeignKeyMetadata;
+      },
     );
   }
 
-  // Validate that the onDelete option, if provided, is one of the allowed values
-  if (
-    options.onDelete &&
-    !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
-  ) {
-    throw new Error(
-      "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
-    );
+  // No need to implement createClassMetadata for foreign keys as it's a property decorator
+  protected createClassMetadata(target: Function): void {
+    target;
+    return;
   }
-};
+}
 
-/**
- * Creates foreign key metadata from the provided options.
- * @param propertyKey - The property key of the foreign key.
- * @param options - The foreign key relationship options.
- * @returns The foreign key metadata.
- */
-const createForeignKeyMetadata = (
-  propertyKey: string | symbol,
-  options: ForeignKeyOptions,
-): ForeignKeyMetadata => ({
-  propertyKey,
-  options,
-});
+// Instance of ForeignKeyDecorator
+const foreignKeyDecoratorInstance = new ForeignKeyDecorator();
 
 /**
  * @ForeignKey decorator to define a foreign key relationship.
  * @param options - Configuration options for the foreign key.
  * @returns PropertyDecorator
  */
-export const ForeignKey = createPropertyDecorator<ForeignKeyOptions>(
-  'foreignKeys',
-  validateForeignKeyOptions,
-  createForeignKeyMetadata,
-);
+export const ForeignKey = (
+  options: Partial<ForeignKeyMetadata>,
+): PropertyDecorator => {
+  return foreignKeyDecoratorInstance.decorate(options) as PropertyDecorator;
+};
 
 /**
  * Retrieves foreign key metadata for a given class.

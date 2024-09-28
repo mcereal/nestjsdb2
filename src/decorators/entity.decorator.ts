@@ -1,69 +1,87 @@
-import { EntityMetadataStorage, EntityMetadata } from '../metadata';
+// src/decorators/entity.decorator.ts
+import { BaseDecorator } from './base.decorator';
+import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
+import { EntityMetadata, EntityType } from '../interfaces';
 import { ClassConstructor } from '../types';
 
+interface EntityOptions {
+  schema: string;
+  tableName: string;
+}
+
 /**
- * Db2Entity decorator to mark a class as a database entity with a specified table name.
- * @param tableName - The name of the table in the database.
- * @returns ClassDecorator
+ * EntityDecorator class that extends BaseDecorator to handle DB2 entity metadata.
  */
-export const Db2Entity = (tableName: string): ClassDecorator => {
-  if (typeof tableName !== 'string' || tableName.trim().length === 0) {
-    throw new Error(
-      'Db2Entity decorator requires a non-empty string as a table name.',
+class EntityDecorator extends BaseDecorator<EntityOptions> {
+  constructor() {
+    super(
+      'entity',
+      // Validation function for the options
+      (options: EntityOptions) => {
+        if (!options.schema || typeof options.schema !== 'string') {
+          throw new Error('Entity decorator requires a valid "schema" name.');
+        }
+        if (!options.tableName || typeof options.tableName !== 'string') {
+          throw new Error('Entity decorator requires a valid "tableName".');
+        }
+      },
+      // Metadata creation function for the entity
+      (propertyKey, options) => ({
+        schema: options.schema,
+        tableName: options.tableName,
+      }),
     );
   }
 
-  return (target: Function) => {
-    // Ensure the target is a class constructor
-    if (typeof target !== 'function' || !target.prototype) {
-      throw new Error('Db2Entity decorator can only be applied to classes.');
-    }
+  /**
+   * Create and set metadata for the class.
+   * @param target - The class to which the decorator is applied.
+   * @param options - Options passed to the decorator.
+   */
+  protected createClassMetadata(
+    target: Function,
+    options: EntityOptions,
+  ): void {
+    const classConstructor = target as ClassConstructor<any>;
 
-    const classConstructor = target as ClassConstructor;
+    // Retrieve existing metadata or initialize new metadata
+    let entityMetadata: EntityMetadata =
+      EntityMetadataStorage.getEntityMetadata(classConstructor) || {
+        entityType: 'table',
+        tableMetadata: {
+          tableName: '',
+          schemaName: '',
+          columns: [],
+          primaryKeys: [],
+          indexedColumns: [],
+          foreignKeys: [],
+          oneToOneRelations: [],
+          oneToManyRelations: [],
+          manyToOneRelations: [],
+          manyToManyRelations: [],
+          defaultValues: [],
+          constraints: [],
+          compositeKeys: [],
+        },
+      };
 
-    // Check if the class constructor is already registered
-    if (!EntityMetadataStorage.getEntities().includes(classConstructor)) {
-      EntityMetadataStorage.getEntities().push(classConstructor);
-    }
+    entityMetadata.entityType = 'table'; // Default to 'table'; can be extended for views
+    entityMetadata.tableMetadata!.tableName = options.tableName;
+    entityMetadata.tableMetadata!.schemaName = options.schema;
 
-    // Define and store entity metadata for the class
-    const entityMetadata: EntityMetadata = {
-      tableName,
-      columns: [],
-      primaryKeys: [],
-      uniqueColumns: [],
-      indexedColumns: [],
-      foreignKeys: [],
-      oneToOneRelations: [],
-      oneToManyRelations: [],
-      manyToOneRelations: [],
-      manyToManyRelations: [],
-      defaultValues: [],
-      checkConstraints: [],
-      compositeKeys: [],
-      uniqueColumnMetadada: [],
-    };
-
-    // Store the metadata in the EntityMetadataStorage
+    // Update the metadata storage
     EntityMetadataStorage.setEntityMetadata(classConstructor, entityMetadata);
-  };
-};
+  }
+}
+
+// Instance of EntityDecorator
+const entityDecoratorInstance = new EntityDecorator();
 
 /**
- * Function to retrieve entity metadata for a given class
- * @param target - The constructor of the entity class.
- * @returns EntityMetadata | undefined
+ * Entity decorator function to be used in classes.
+ * @param options - The options for the entity.
+ * @returns ClassDecorator
  */
-export const getEntityMetadata = (
-  target: ClassConstructor,
-): EntityMetadata | undefined => {
-  return EntityMetadataStorage.getEntityMetadata(target);
-};
-
-/**
- * Function to retrieve all registered entities
- * @returns Array of ClassConstructors
- */
-export const getRegisteredEntities = (): ClassConstructor[] => {
-  return EntityMetadataStorage.getEntities();
-};
+export function Entity(options: EntityOptions): ClassDecorator {
+  return entityDecoratorInstance.decorate(options) as ClassDecorator;
+}
