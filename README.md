@@ -16,6 +16,7 @@ The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that
   - [Transaction Management](#transaction-management)
   - [Using Query Builder](#using-query-builder)
   - [Decorators](#decorators)
+- [ORM Support](#orm-support)
 - [Error Handling](#error-handling)
 - [Health Checks](#health-checks)
 - [Cache Management](#cache-management)
@@ -193,15 +194,66 @@ export class UserService {
 }
 ```
 
-## Error Handling
+## ORM Support
 
-The `@mcereal/nestjsdb2` package provides detailed error messages and stack traces for common database errors. You can catch and handle these errors in your application:
+The `@mcereal/nestjsdb2` package provides a lightweight ORM-like inrerface for working with DB2. You can define schemas using the `Schema` class and model classes using the `Model` class:
 
 ```typescript
+import { Schema, Model } from '@mcereal/nestjsdb2';
+
+const UserSchema = new Schema({
+  name: String,
+  email: String,
+});
+
+const UserModel = new Model('users', UserSchema);
+
+@Injectable()
+export class UserService {
+  async createUser(name: string, email: string) {
+    return UserModel.create({ name, email });
+  }
+
+  async getUserData(userId: string) {
+    return UserModel.findOne({ id: userId });
+  }
+
+  async updateUser(userId: string, data: Record<string, any>) {
+    return UserModel.update({ id: userId }, data);
+  }
+
+  async deleteUser(userId: string) {
+    return UserModel.delete({ id: userId });
+  }
+}
+```
+
+## Error Handling
+
+The `@mcereal/nestjsdb2` package provides detailed error messages and stack traces for common database errors. You can import multiple error types like `Db2Error`, `Db2ConnectionError`, `Db2QueryError`, and `Db2TransactionError` to handle specific error scenarios:
+
+```typescript
+import {
+  Db2Error,
+  Db2ConnectionError,
+  Db2QueryError,
+  Db2TransactionError,
+} from '@mcereal/nestjsdb2';
+
 try {
   await this.db2Service.query('SELECT * FROM non_existent_table');
 } catch (error) {
-  console.error('An error occurred:', error.message);
+  if (error instanceof Db2QueryError) {
+    console.error('Query error:', error.message);
+  } else if (error instanceof Db2ConnectionError) {
+    console.error('Connection error:', error.message);
+  } else if (error instanceof Db2TransactionError) {
+    console.error('Transaction error:', error.message);
+  } else if (error instanceof Db2Error) {
+    console.error('DB2 error:', error.message);
+  } else {
+    console.error('Unknown error:', error.message);
+  }
 }
 ```
 
