@@ -1,15 +1,18 @@
 // src/decorators/foreignKey.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { ForeignKeyMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * ForeignKeyDecorator class that extends BaseDecorator to handle foreign key metadata.
+ * ForeignKeyDecorator class that extends BasePropertyDecorator to handle foreign key metadata.
  */
-class ForeignKeyDecorator extends BaseDecorator<Partial<ForeignKeyMetadata>> {
+class ForeignKeyDecorator extends BasePropertyDecorator<
+  Partial<ForeignKeyMetadata>
+> {
   constructor() {
     super(
-      'foreignKeys',
+      'foreignKeys', // MetadataType
       // Validation function for foreign key options
       (options: Partial<ForeignKeyMetadata>) => {
         // Validate that the reference is a properly formatted string
@@ -43,30 +46,28 @@ class ForeignKeyDecorator extends BaseDecorator<Partial<ForeignKeyMetadata>> {
           );
         }
       },
-      // Metadata creation function for the foreign key
-      (propertyKey, options) => {
-        return {
-          propertyKey,
-          reference: options.reference,
-          onDelete: options.onDelete,
-          onUpdate: options.onUpdate,
-          name: options.name,
-          constraintName: options.constraintName,
-          comment: options.comment,
-          invisible: options.invisible,
-          functional: options.functional,
-          expression: options.expression,
-          include: options.include,
-        } as ForeignKeyMetadata;
-      },
+      // Metadata Creator
+      (propertyKey, options) => ({
+        propertyKey,
+        reference: options.reference,
+        onDelete: options.onDelete,
+        onUpdate: options.onUpdate,
+        name: options.name,
+        constraintName: options.constraintName,
+        comment: options.comment,
+        invisible: options.invisible,
+        functional: options.functional,
+        expression: options.expression,
+        include: options.include,
+      }),
+      // Unique Check Function (optional)
+      (existing: ForeignKeyMetadata, newEntry: ForeignKeyMetadata) =>
+        existing.propertyKey === newEntry.propertyKey &&
+        existing.reference === newEntry.reference,
     );
   }
 
-  // No need to implement createClassMetadata for foreign keys as it's a property decorator
-  protected createClassMetadata(target: Function): void {
-    target;
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of ForeignKeyDecorator
@@ -80,7 +81,9 @@ const foreignKeyDecoratorInstance = new ForeignKeyDecorator();
 export const ForeignKey = (
   options: Partial<ForeignKeyMetadata>,
 ): PropertyDecorator => {
-  return foreignKeyDecoratorInstance.decorate(options) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    foreignKeyDecoratorInstance.decorate(options)(target, propertyKey);
+  };
 };
 
 /**
@@ -89,5 +92,5 @@ export const ForeignKey = (
  * @returns ForeignKeyMetadata[]
  */
 export const getForeignKeyMetadata = (target: any): ForeignKeyMetadata[] => {
-  return getMetadata<ForeignKeyMetadata>(target, 'foreignKeys');
+  return getPropertyMetadata(target, 'foreignKeys') as ForeignKeyMetadata[];
 };

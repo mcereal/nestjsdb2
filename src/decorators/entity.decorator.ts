@@ -1,57 +1,106 @@
 // src/decorators/entity.decorator.ts
 
 import { BaseClassDecorator } from './base-class.decorator';
-import { EntityMetadata } from '../interfaces';
+import {
+  EntityMetadata,
+  EntityType,
+  TableMetadata,
+  ViewMetadata,
+} from '../interfaces';
 import { getClassMetadata } from './utils';
-import { MetadataUtil } from '../utils';
+
+interface EntityOptions {
+  entityType: EntityType;
+  tableMetadata?: TableMetadata;
+  viewMetadata?: ViewMetadata;
+}
 
 /**
  * EntityDecorator class that extends BaseClassDecorator to handle entity metadata.
  */
-class EntityDecorator extends BaseClassDecorator<EntityMetadata> {
-  private metadata: EntityMetadata;
+class EntityDecorator extends BaseClassDecorator<EntityOptions> {
   constructor() {
     super(
       'entity', // MetadataType
       // Options Validator
-      (options: EntityMetadata) => {
-        if (
-          !options.tableMetadata.tableName ||
-          typeof options.tableMetadata.tableName !== 'string'
-        ) {
+      (options: EntityOptions) => {
+        if (options.entityType === 'table') {
+          if (
+            !options.tableMetadata ||
+            typeof options.tableMetadata.tableName !== 'string'
+          ) {
+            throw new Error(
+              "Entity decorator requires a 'tableName' option of type string for tables.",
+            );
+          }
+        } else if (options.entityType === 'view') {
+          if (
+            !options.viewMetadata ||
+            typeof options.viewMetadata.viewName !== 'string'
+          ) {
+            throw new Error(
+              "Entity decorator requires a 'viewName' option of type string for views.",
+            );
+          }
+        } else {
           throw new Error(
-            "Entity decorator requires a 'tableName' option of type string.",
+            "Entity decorator requires a valid 'entityType' of 'table' or 'view'.",
           );
         }
-        // Add more validations as needed
       },
       // Metadata Creator
-      (options: EntityMetadata) => ({
-        entityType: 'table', // or 'view' based on options
-        tableMetadata: {
-          tableName: options.tableMetadata.tableName,
-          schemaName: options.tableMetadata.schemaName || 'public',
-          columns: options.tableMetadata.columns || [],
-          primaryKeys: options.tableMetadata.primaryKeys || [],
-          indexedColumns: options.tableMetadata.indexedColumns || [],
-          foreignKeys: options.tableMetadata.foreignKeys || [],
-          oneToOneRelations: options.tableMetadata.oneToOneRelations || [],
-          oneToManyRelations: options.tableMetadata.oneToManyRelations || [],
-          manyToOneRelations: options.tableMetadata.manyToOneRelations || [],
-          manyToManyRelations: options.tableMetadata.manyToManyRelations || [],
-          defaultValues: options.tableMetadata.defaultValues || [],
-          constraints: options.tableMetadata.constraints || [],
-          compositeKeys: options.tableMetadata.compositeKeys || [],
-        },
-        viewMetadata: options.viewMetadata, // Set if @View decorator is used
-      }),
+      (options: EntityOptions) => {
+        if (options.entityType === 'table') {
+          return {
+            entityType: 'table',
+            tableMetadata: {
+              tableName: options.tableMetadata?.tableName || '',
+              schemaName: options.tableMetadata?.schemaName || 'public',
+              columns: options.tableMetadata?.columns || [],
+              primaryKeys: options.tableMetadata?.primaryKeys || [],
+              indexedColumns: options.tableMetadata?.indexedColumns || [],
+              foreignKeys: options.tableMetadata?.foreignKeys || [],
+              oneToOneRelations: options.tableMetadata?.oneToOneRelations || [],
+              oneToManyRelations:
+                options.tableMetadata?.oneToManyRelations || [],
+              manyToOneRelations:
+                options.tableMetadata?.manyToOneRelations || [],
+              manyToManyRelations:
+                options.tableMetadata?.manyToManyRelations || [],
+              defaultValues: options.tableMetadata?.defaultValues || [],
+              constraints: options.tableMetadata?.constraints || [],
+              compositeKeys: options.tableMetadata?.compositeKeys || [],
+            },
+          };
+        } else if (options.entityType === 'view') {
+          return {
+            entityType: 'view',
+            viewMetadata: {
+              viewName: options.viewMetadata?.viewName || '',
+              schemaName: options.viewMetadata?.schemaName || 'public',
+              columns: options.viewMetadata?.columns || [],
+              underlyingQuery: options.viewMetadata?.underlyingQuery || '',
+            },
+          };
+        }
+        return {};
+      },
       // Unique Check Function (optional)
-      (existing: EntityMetadata, newEntry: EntityMetadata) =>
-        existing.tableMetadata?.tableName === newEntry.tableMetadata?.tableName,
+      (existing: EntityMetadata, newEntry: EntityMetadata) => {
+        if (newEntry.entityType === 'table') {
+          return (
+            existing.tableMetadata?.tableName ===
+            newEntry.tableMetadata?.tableName
+          );
+        } else if (newEntry.entityType === 'view') {
+          return (
+            existing.viewMetadata?.viewName === newEntry.viewMetadata?.viewName
+          );
+        }
+        return false;
+      },
     );
   }
-
-  // No need to implement property-specific methods
 }
 
 // Instance of EntityDecorator
@@ -62,13 +111,8 @@ const entityDecoratorInstance = new EntityDecorator();
  * @param options - Configuration options for the entity.
  * @returns ClassDecorator
  */
-export const Entity = (
-  options: Omit<EntityMetadata, 'entityType' | 'viewMetadata'>,
-): ClassDecorator => {
-  return entityDecoratorInstance.decorate({
-    ...options,
-    entityType: 'table' || 'view',
-  });
+export const Entity = (options: EntityOptions): ClassDecorator => {
+  return entityDecoratorInstance.decorate(options);
 };
 
 /**

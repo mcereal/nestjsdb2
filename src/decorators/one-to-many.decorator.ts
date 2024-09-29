@@ -1,15 +1,18 @@
 // src/decorators/oneToMany.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { OneToManyMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * OneToManyDecorator class that extends BaseDecorator to handle one-to-many relationship metadata.
+ * OneToManyDecorator class that extends BasePropertyDecorator to handle one-to-many relationship metadata.
  */
-class OneToManyDecorator extends BaseDecorator<Partial<OneToManyMetadata>> {
+class OneToManyDecorator extends BasePropertyDecorator<
+  Partial<OneToManyMetadata>
+> {
   constructor() {
     super(
-      'oneToManyRelations',
+      'oneToManyRelations', // MetadataType
       // Validation function for the OneToMany options
       (options: Partial<OneToManyMetadata>) => {
         if (typeof options.target !== 'function') {
@@ -17,33 +20,26 @@ class OneToManyDecorator extends BaseDecorator<Partial<OneToManyMetadata>> {
             "OneToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
           );
         }
-
         // Additional validations can be added here if needed
       },
-      // Metadata creation function for OneToMany
-      (propertyKey, options) => {
-        return {
-          propertyKey,
-          target: options.target,
-          cascade: options.cascade,
-          sourceJoinColumn: options.sourceJoinColumn,
-          sourceInverseJoinColumn: options.sourceInverseJoinColumn,
-          targetJoinColumn: options.targetJoinColumn,
-          targetInverseJoinColumn: options.targetInverseJoinColumn,
-          joinTable: options.joinTable,
-        } as OneToManyMetadata;
-      },
-      // Unique check function to ensure the property key is unique within one-to-many relations
+      // Metadata Creator
+      (propertyKey, options) => ({
+        propertyKey,
+        target: options.target,
+        cascade: options.cascade,
+        sourceJoinColumn: options.sourceJoinColumn,
+        sourceInverseJoinColumn: options.sourceInverseJoinColumn,
+        targetJoinColumn: options.targetJoinColumn,
+        targetInverseJoinColumn: options.targetInverseJoinColumn,
+        joinTable: options.joinTable,
+      }),
+      // Unique Check Function (optional)
       (existing: OneToManyMetadata, newEntry: OneToManyMetadata) =>
         existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // No need to implement createClassMetadata for one-to-many as it's a property decorator
-  protected createClassMetadata(target: Function): void {
-    target;
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of OneToManyDecorator
@@ -57,7 +53,9 @@ const oneToManyDecoratorInstance = new OneToManyDecorator();
 export const OneToMany = (
   options: Partial<OneToManyMetadata>,
 ): PropertyDecorator => {
-  return oneToManyDecoratorInstance.decorate(options) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    oneToManyDecoratorInstance.decorate(options)(target, propertyKey);
+  };
 };
 
 /**
@@ -66,5 +64,8 @@ export const OneToMany = (
  * @returns OneToManyMetadata[]
  */
 export const getOneToManyMetadata = (target: any): OneToManyMetadata[] => {
-  return getMetadata<OneToManyMetadata>(target, 'oneToManyRelations');
+  return getPropertyMetadata(
+    target,
+    'oneToManyRelations',
+  ) as OneToManyMetadata[];
 };

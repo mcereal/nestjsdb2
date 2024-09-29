@@ -1,36 +1,30 @@
 // src/decorators/default.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { DefaultMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * DefaultDecorator class that extends BaseDecorator to handle default value metadata.
+ * DefaultDecorator class that extends BasePropertyDecorator to handle default value metadata.
  */
-class DefaultDecorator extends BaseDecorator<any> {
+class DefaultDecorator extends BasePropertyDecorator<any> {
   constructor() {
     super(
-      'defaultValues',
+      'defaultValues', // MetadataType
       // No validation function needed for the default decorator
       () => {},
-      // Metadata creation function for the default value
-      (propertyKey, value) => {
-        return {
-          propertyKey,
-          value,
-        } as DefaultMetadata;
-      },
-      // Unique check function to ensure the property key is unique within default values
+      // Metadata Creator
+      (propertyKey, value) => ({
+        propertyKey,
+        value,
+      }),
+      // Unique Check Function (optional)
       (existing: DefaultMetadata, newEntry: DefaultMetadata) =>
         existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // No need to implement createClassMetadata for defaults as it's a property decorator
-  protected createClassMetadata(target: Function, value: any): void {
-    target;
-    value;
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of DefaultDecorator
@@ -42,7 +36,9 @@ const defaultDecoratorInstance = new DefaultDecorator();
  * @returns PropertyDecorator
  */
 export const Default = (value: any): PropertyDecorator => {
-  return defaultDecoratorInstance.decorate(value) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    defaultDecoratorInstance.decorate(value)(target, propertyKey);
+  };
 };
 
 /**
@@ -51,5 +47,5 @@ export const Default = (value: any): PropertyDecorator => {
  * @returns DefaultMetadata[]
  */
 export const getDefaultValuesMetadata = (target: any): DefaultMetadata[] => {
-  return getMetadata<DefaultMetadata>(target, 'defaultValues');
+  return getPropertyMetadata(target, 'defaultValues') as DefaultMetadata[];
 };

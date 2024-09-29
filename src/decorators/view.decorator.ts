@@ -1,4 +1,6 @@
 // src/decorators/view.decorator.ts
+
+import { BaseClassDecorator } from './base-class.decorator';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
 import { ClassConstructor } from '../types';
 import { ViewMetadata, EntityMetadata } from '../interfaces';
@@ -9,41 +11,58 @@ interface ViewOptions {
   query: string; // The SQL query defining the view
 }
 
-export function View(options: ViewOptions): ClassDecorator {
-  return (target: Function) => {
-    // Validate options
-    if (!options.schema || typeof options.schema !== 'string') {
-      throw new Error('View decorator requires a valid "schema" name.');
-    }
-    if (!options.viewName || typeof options.viewName !== 'string') {
-      throw new Error('View decorator requires a valid "viewName".');
-    }
-    if (!options.query || typeof options.query !== 'string') {
-      throw new Error(
-        'View decorator requires a valid "query" defining the view.',
-      );
-    }
-
-    const classConstructor = target as ClassConstructor<any>;
-
-    // Retrieve existing metadata or initialize
-    let entityMetadata: EntityMetadata =
-      EntityMetadataStorage.getEntityMetadata(classConstructor) || {
+/**
+ * ViewDecorator class that extends BaseClassDecorator to handle view metadata.
+ */
+class ViewDecorator extends BaseClassDecorator<ViewOptions> {
+  constructor() {
+    super(
+      'entity', // MetadataType
+      // Validation function for the view options
+      (options: ViewOptions) => {
+        if (!options.schema || typeof options.schema !== 'string') {
+          throw new Error('View decorator requires a valid "schema" name.');
+        }
+        if (!options.viewName || typeof options.viewName !== 'string') {
+          throw new Error('View decorator requires a valid "viewName".');
+        }
+        if (!options.query || typeof options.query !== 'string') {
+          throw new Error(
+            'View decorator requires a valid "query" defining the view.',
+          );
+        }
+      },
+      // Metadata Creator
+      (options: ViewOptions) => ({
         entityType: 'view',
         viewMetadata: {
-          viewName: '',
-          schemaName: '',
-          columns: [],
-          underlyingQuery: '',
+          viewName: options.viewName,
+          schemaName: options.schema,
+          columns: [], // Initialize an empty array for columns
+          underlyingQuery: options.query,
         },
-      };
+      }),
+      // Unique Check Function (optional)
+      (existing: EntityMetadata, newEntry: EntityMetadata) =>
+        existing.viewMetadata?.viewName === newEntry.viewMetadata?.viewName &&
+        existing.viewMetadata?.schemaName === newEntry.viewMetadata?.schemaName,
+    );
+  }
+}
 
-    entityMetadata.entityType = 'view';
-    entityMetadata.viewMetadata.viewName = options.viewName;
-    entityMetadata.viewMetadata.schemaName = options.schema;
-    entityMetadata.viewMetadata.underlyingQuery = options.query;
+// Instance of ViewDecorator
+const viewDecoratorInstance = new ViewDecorator();
 
-    // Update the metadata storage
-    EntityMetadataStorage.setEntityMetadata(classConstructor, entityMetadata);
+/**
+ * @View decorator to define a view's metadata.
+ * @param options - The view options, including schema, view name, and query.
+ * @returns ClassDecorator
+ */
+export function View(options: ViewOptions): ClassDecorator {
+  return (target: Function) => {
+    const classConstructor = target as ClassConstructor<any>;
+
+    // Use the decorator instance to handle metadata creation and storage
+    viewDecoratorInstance.decorate(options)(classConstructor);
   };
 }

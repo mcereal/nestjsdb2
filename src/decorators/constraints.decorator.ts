@@ -1,15 +1,16 @@
 // src/decorators/constraints.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { ConstraintMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * ConstraintDecorator class that extends BaseDecorator to handle check constraint metadata.
+ * ConstraintDecorator class that extends BasePropertyDecorator to handle check constraint metadata.
  */
-class ConstraintDecorator extends BaseDecorator<string> {
+class ConstraintDecorator extends BasePropertyDecorator<string> {
   constructor() {
     super(
-      'constraints',
+      'constraints', // MetadataType
       // Validation function for the constraint
       (constraint: string) => {
         if (typeof constraint !== 'string' || constraint.trim().length === 0) {
@@ -17,20 +18,15 @@ class ConstraintDecorator extends BaseDecorator<string> {
         }
       },
       // Metadata creation function for the constraint
-      (propertyKey, constraint) => {
-        return {
-          propertyKey,
-          constraint,
-        } as ConstraintMetadata;
-      },
+      (propertyKey, constraint) => ({
+        propertyKey,
+        constraint,
+      }),
+      // Unique Check Function (optional)
+      (existing: ConstraintMetadata, newEntry: ConstraintMetadata) =>
+        existing.propertyKey === newEntry.propertyKey &&
+        existing.constraint === newEntry.constraint,
     );
-  }
-
-  // No need to implement createClassMetadata for constraints as it's a property decorator
-  protected createClassMetadata(target: Function, constraint: string): void {
-    target;
-    constraint;
-    return;
   }
 }
 
@@ -43,7 +39,9 @@ const constraintDecoratorInstance = new ConstraintDecorator();
  * @returns PropertyDecorator
  */
 export const Check = (constraint: string): PropertyDecorator => {
-  return constraintDecoratorInstance.decorate(constraint) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    constraintDecoratorInstance.decorate(constraint)(target, propertyKey);
+  };
 };
 
 /**
@@ -51,6 +49,6 @@ export const Check = (constraint: string): PropertyDecorator => {
  * @param target - The constructor of the entity class.
  * @returns ConstraintMetadata[]
  */
-export const Constraint = (target: any): ConstraintMetadata[] => {
-  return getMetadata<ConstraintMetadata>(target, 'constraints');
+export const getConstraintMetadata = (target: any): ConstraintMetadata[] => {
+  return getPropertyMetadata(target, 'constraints') as ConstraintMetadata[];
 };

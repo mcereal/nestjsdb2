@@ -3,7 +3,7 @@
 import 'reflect-metadata';
 import { ClassConstructor } from '../types';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
-import { EntityMetadata, ManyToManyMetadata } from '../interfaces';
+import { EntityMetadata } from '../interfaces';
 
 /**
  * Define the various metadata types.

@@ -1,15 +1,18 @@
 // src/decorators/index.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { IndexedColumnMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * IndexDecorator class that extends BaseDecorator to handle index metadata.
+ * IndexDecorator class that extends BasePropertyDecorator to handle index metadata.
  */
-class IndexDecorator extends BaseDecorator<Partial<IndexedColumnMetadata>> {
+class IndexDecorator extends BasePropertyDecorator<
+  Partial<IndexedColumnMetadata>
+> {
   constructor() {
     super(
-      'indexedColumns',
+      'indexedColumns', // MetadataType
       // Validation function for the index options
       (options: Partial<IndexedColumnMetadata>) => {
         if (
@@ -32,38 +35,32 @@ class IndexDecorator extends BaseDecorator<Partial<IndexedColumnMetadata>> {
           );
         }
       },
-      // Metadata creation function for the index
-      (propertyKey, options) => {
-        return {
-          propertyKey,
-          name: options.name || propertyKey.toString(),
-          unique: options.unique || false,
-          nullable: options.nullable,
-          default: options.default,
-          onUpdate: options.onUpdate,
-          type: options.type,
-          method: options.method,
-          algorithm: options.algorithm,
-          parser: options.parser,
-          comment: options.comment,
-          invisible: options.invisible,
-          functional: options.functional,
-          expression: options.expression,
-          include: options.include,
-          prefixLength: options.prefixLength,
-        } as IndexedColumnMetadata;
-      },
-      // Unique check function to ensure the property key is unique within indexed columns
+      // Metadata Creator
+      (propertyKey, options) => ({
+        propertyKey,
+        name: options.name || propertyKey.toString(),
+        unique: options.unique || false,
+        nullable: options.nullable,
+        default: options.default,
+        onUpdate: options.onUpdate,
+        type: options.type,
+        method: options.method,
+        algorithm: options.algorithm,
+        parser: options.parser,
+        comment: options.comment,
+        invisible: options.invisible,
+        functional: options.functional,
+        expression: options.expression,
+        include: options.include,
+        prefixLength: options.prefixLength,
+      }),
+      // Unique Check Function (optional)
       (existing: IndexedColumnMetadata, newEntry: IndexedColumnMetadata) =>
         existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // No need to implement createClassMetadata for indexes as it's a property decorator
-  protected createClassMetadata(target: Function): void {
-    target;
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of IndexDecorator
@@ -77,7 +74,9 @@ const indexDecoratorInstance = new IndexDecorator();
 export const Index = (
   options: Partial<IndexedColumnMetadata> = {},
 ): PropertyDecorator => {
-  return indexDecoratorInstance.decorate(options) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    indexDecoratorInstance.decorate(options)(target, propertyKey);
+  };
 };
 
 /**
@@ -86,5 +85,8 @@ export const Index = (
  * @returns IndexedColumnMetadata[]
  */
 export const getIndexMetadata = (target: any): IndexedColumnMetadata[] => {
-  return getMetadata<IndexedColumnMetadata>(target, 'indexedColumns');
+  return getPropertyMetadata(
+    target,
+    'indexedColumns',
+  ) as IndexedColumnMetadata[];
 };

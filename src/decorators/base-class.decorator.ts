@@ -35,6 +35,4 @@ export abstract class BaseClassDecorator<T> {
       );
     };
   }
-
-  // No need to implement property-specific methods
 }

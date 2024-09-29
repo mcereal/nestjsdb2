@@ -1,15 +1,18 @@
 // src/decorators/oneToOne.decorator.ts
-import { BaseDecorator } from './base.decorator';
+
+import { BasePropertyDecorator } from './base-property.decorator';
 import { OneToOneMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+import { getPropertyMetadata } from './utils';
 
 /**
- * OneToOneDecorator class that extends BaseDecorator to handle one-to-one relationship metadata.
+ * OneToOneDecorator class that extends BasePropertyDecorator to handle one-to-one relationship metadata.
  */
-class OneToOneDecorator extends BaseDecorator<Partial<OneToOneMetadata>> {
+class OneToOneDecorator extends BasePropertyDecorator<
+  Partial<OneToOneMetadata>
+> {
   constructor() {
     super(
-      'oneToOneRelations',
+      'oneToOneRelations', // MetadataType
       // Validation function for the one-to-one options
       (options: Partial<OneToOneMetadata>) => {
         if (typeof options.target !== 'function') {
@@ -18,30 +21,24 @@ class OneToOneDecorator extends BaseDecorator<Partial<OneToOneMetadata>> {
           );
         }
       },
-      // Metadata creation function for the one-to-one relationship
-      (propertyKey, options) => {
-        return {
-          propertyKey,
-          target: options.target,
-          cascade: options.cascade,
-          sourceJoinColumn: options.sourceJoinColumn,
-          sourceInverseJoinColumn: options.sourceInverseJoinColumn,
-          targetJoinColumn: options.targetJoinColumn,
-          targetInverseJoinColumn: options.targetInverseJoinColumn,
-          joinTable: options.joinTable,
-        } as OneToOneMetadata;
-      },
-      // Unique check function to ensure the property key is unique within one-to-one relations
+      // Metadata Creator
+      (propertyKey, options) => ({
+        propertyKey,
+        target: options.target,
+        cascade: options.cascade,
+        sourceJoinColumn: options.sourceJoinColumn,
+        sourceInverseJoinColumn: options.sourceInverseJoinColumn,
+        targetJoinColumn: options.targetJoinColumn,
+        targetInverseJoinColumn: options.targetInverseJoinColumn,
+        joinTable: options.joinTable,
+      }),
+      // Unique Check Function (optional)
       (existing: OneToOneMetadata, newEntry: OneToOneMetadata) =>
         existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // No need to implement createClassMetadata for one-to-one as it's a property decorator
-  protected createClassMetadata(target: Function): void {
-    target;
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of OneToOneDecorator
@@ -55,7 +52,9 @@ const oneToOneDecoratorInstance = new OneToOneDecorator();
 export const OneToOne = (
   options: Partial<OneToOneMetadata>,
 ): PropertyDecorator => {
-  return oneToOneDecoratorInstance.decorate(options) as PropertyDecorator;
+  return (target: Object, propertyKey: string | symbol) => {
+    oneToOneDecoratorInstance.decorate(options)(target, propertyKey);
+  };
 };
 
 /**
@@ -64,5 +63,5 @@ export const OneToOne = (
  * @returns OneToOneMetadata[]
  */
 export const getOneToOneMetadata = (target: any): OneToOneMetadata[] => {
-  return getMetadata<OneToOneMetadata>(target, 'oneToOneRelations');
+  return getPropertyMetadata(target, 'oneToOneRelations') as OneToOneMetadata[];
 };
