@@ -1,6 +1,5 @@
 // src/decorators/utils.ts
 
-import 'reflect-metadata';
 import { ClassConstructor } from '../types';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
 import { EntityMetadata } from '../interfaces';

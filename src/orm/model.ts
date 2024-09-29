@@ -18,8 +18,6 @@ import { ClassConstructor } from '../types';
 export class Model<T> {
   private readonly logger = new Logger(Model.name);
   private schema: Schema<T>;
-  private tableName: string;
-  private columns: string[];
   private entityConstructor: ClassConstructor<T>;
 
   constructor(
@@ -32,14 +30,15 @@ export class Model<T> {
     if (!metadata.tableMetadata) {
       throw new Error('Schema must have table metadata.');
     }
-    this.tableName = metadata.tableMetadata.tableName;
-    this.columns = metadata.tableMetadata.columns.map((col) => col.propertyKey);
     this.entityConstructor = this.schema.getConstructor();
   }
 
   // Integrate QueryBuilder for advanced queries
   createQueryBuilder(): IQueryBuilder {
-    return new QueryBuilder(this.tableName, this.db2Service);
+    return new QueryBuilder(
+      this.schema.getMetadata().tableMetadata!.tableName,
+      this.db2Service,
+    );
   }
 
   // Create a new instance of the model with validation and default values
@@ -50,7 +49,7 @@ export class Model<T> {
 
     const instance = {} as T;
 
-    // Initialize columns with data, defaults, and validation
+    // Initialize columns with data, defaults, and validation using schema columns
     for (const column of metadata.tableMetadata.columns) {
       const { propertyKey, default: defaultValue, nullable } = column;
       const value = data[propertyKey as keyof T];
@@ -64,55 +63,12 @@ export class Model<T> {
           typeof defaultValue === 'function' ? defaultValue() : defaultValue;
       } else if (!nullable) {
         // Handle required columns or constraints
-        throw new Error(`Property '${propertyKey}' is required.`);
+        throw new Error(
+          `Property '${propertyKey}' is required in table '${metadata.tableMetadata.tableName}'.`,
+        );
       }
     }
     return instance;
-  }
-
-  async findWithConditions(
-    query: Partial<T>,
-    options: {
-      sort?: Record<string, 'ASC' | 'DESC'>;
-      limit?: number;
-      offset?: number;
-    } = {},
-  ): Promise<T[]> {
-    const qb = this.createQueryBuilder().where(this.buildConditions(query));
-
-    if (options.sort) {
-      for (const [column, direction] of Object.entries(options.sort)) {
-        qb.orderBy(column, direction as 'ASC' | 'DESC');
-      }
-    }
-
-    if (options.limit !== undefined) {
-      qb.limit(options.limit);
-    }
-
-    if (options.offset !== undefined) {
-      qb.offset(options.offset);
-    }
-
-    const { query: sql, params } = qb.build();
-    this.logger.debug(
-      `Executing SQL: ${sql} with params: ${JSON.stringify(params)}`,
-    );
-    try {
-      const results = await this.db2Service.query<T[]>(sql, params);
-      this.logger.log(
-        `Query executed successfully on ${this.tableName}: ${sql}`,
-      );
-      return results;
-    } catch (error) {
-      this.logger.error(
-        `Error executing query on ${this.tableName}: ${error.message}`,
-        error.stack,
-      );
-      throw new Error(
-        `Failed to execute findWithConditions operation: ${error.message}`,
-      );
-    }
   }
 
   async createAndValidate(data: Partial<T>): Promise<T> {
@@ -171,6 +127,52 @@ export class Model<T> {
         error.stack,
       );
       throw error;
+    }
+  }
+
+  async findWithConditions(
+    query: Partial<T>,
+    options: {
+      sort?: Record<string, 'ASC' | 'DESC'>;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<T[]> {
+    const qb = this.createQueryBuilder().where(this.buildConditions(query));
+
+    if (options.sort) {
+      for (const [column, direction] of Object.entries(options.sort)) {
+        qb.orderBy(column, direction as 'ASC' | 'DESC');
+      }
+    }
+
+    if (options.limit !== undefined) {
+      qb.limit(options.limit);
+    }
+
+    if (options.offset !== undefined) {
+      qb.offset(options.offset);
+    }
+
+    const { query: sql, params } = qb.build();
+    this.logger.debug(
+      `Executing SQL: ${sql} with params: ${JSON.stringify(params)}`,
+    );
+
+    try {
+      const results = await this.db2Service.query<T[]>(sql, params);
+      this.logger.log(
+        `Query executed successfully on ${this.schema.getMetadata().tableMetadata!.tableName}: ${sql}`,
+      );
+      return results;
+    } catch (error) {
+      this.logger.error(
+        `Error executing query on ${this.schema.getMetadata().tableMetadata!.tableName}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error(
+        `Failed to execute findWithConditions operation: ${error.message}`,
+      );
     }
   }
 
@@ -349,7 +351,9 @@ export class Model<T> {
       ) as ManyToManyMetadata);
 
     if (!relationMetadata) {
-      throw new Error(`Relation '${path}' not found on '${this.tableName}'.`);
+      throw new Error(
+        `Relation '${path}' not found on '${this.schema.getMetadata().tableMetadata?.tableName}'.`,
+      );
     }
 
     // Determine related model token
@@ -431,7 +435,7 @@ export class Model<T> {
     const total = countResult.length > 0 ? countResult[0].count : 0;
 
     this.logger.log(
-      `Paginated query executed successfully on ${this.tableName}: ${sql}`,
+      `Paginated query executed successfully on ${this.schema.getMetadata().tableMetadata!.tableName}: ${sql}`,
     );
 
     return { data, total, page, pageSize };
