@@ -10,7 +10,7 @@
  * @requires Db2Client from "./db2-client.interface"
  * @requires Db2Service from "./db2-service.interface"
  * @requires TransactionManager from "./transaction-manager.interface"
- * @requires Db2QueryBuilder from "./db2-query-builder.interface"
+ * @requires QueryBuilder from "./db2-query-builder.interface"
  * @requires Db2MigrationService from "./db2-migration-service.interface"
  *
  * @exports Db2ConfigOptions
@@ -18,7 +18,7 @@
  * @exports Db2Client
  * @exports Db2Service
  * @exports TransactionManager
- * @exports Db2QueryBuilder
+ * @exports QueryBuilder
  * @exports Db2MigrationService
  * @exports ConnectionManager
  * @exports IPoolManager

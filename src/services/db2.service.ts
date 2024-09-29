@@ -15,7 +15,6 @@ import {
   IDb2MigrationService,
   IPoolManager,
 } from '../interfaces';
-import { Db2QueryBuilder } from '../db';
 import { handleDb2Error } from '../errors/db2.error';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -306,7 +305,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
   /**
    * Generate a unique cache key based on the SQL query and parameters.
    */
-  private generateCacheKey(sql: string, params: any[]): string {
+  private generateCacheKey(sql: string, params: Record<string, any>): string {
     const paramsKey = params.map((p) => JSON.stringify(p)).join(':');
     return `${sql}:${paramsKey}`;
   }
@@ -355,7 +354,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
    */
   private logQueryDetails(
     sql: string,
-    params: any[],
+    params: Record<string, any>,
     duration: number,
     error?: any,
   ): void {
@@ -374,7 +373,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
    */
   public async query<T>(
     sql: string,
-    params: any[] = [],
+    params: Record<string, any>,
     timeout?: number,
   ): Promise<T> {
     const start = Date.now();
@@ -604,7 +603,7 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
    */
   public async runMigration(script: string): Promise<void> {
     try {
-      await this.query(script); // Use the existing query method
+      await this.query(script, {}); // Use the existing query method with empty params
       this.logger.info('Migration script executed successfully.');
     } catch (error) {
       const options = {
@@ -614,13 +613,6 @@ export class Db2Service implements IDb2Service, OnModuleInit, OnModuleDestroy {
       handleDb2Error(error, 'Migration Execution', options, this.logger);
       throw error; // Ensure the error is propagated
     }
-  }
-
-  /**
-   * Create a new query builder instance.
-   */
-  public createQueryBuilder(): Db2QueryBuilder {
-    return new Db2QueryBuilder();
   }
 
   /**

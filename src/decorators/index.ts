@@ -76,6 +76,5 @@ export * from './many-to-one.decorator';
 export * from './one-to-many.decorator';
 export * from './one-to-one.decorator';
 export * from './primary-key.decorator';
-export * from './base.decorator';
 export * from './utils';
 export * from './table.decorator';

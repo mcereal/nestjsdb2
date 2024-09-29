@@ -4,6 +4,8 @@
 
 The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that integrates IBM DB2 database capabilities into NestJS applications. This package provides decorators, services, and utility functions to handle common database operations, connection management, caching, error handling, and transaction management, specifically tailored for IBM DB2 environments.
 
+**This package it under active development and is not yet ready for production use. Please use with caution and report any issues or bugs you encounter.**
+
 ## Table of Contents
 
 - [Features](#features)

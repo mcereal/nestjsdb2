@@ -173,7 +173,8 @@ export class Db2MigrationService implements IDb2MigrationService {
     // Add unique constraints
     for (const constraint of metadata.constraints) {
       const constraintName =
-        constraint.name ||
+        (constraint.constraint.name ??
+          `${metadata.tableName}_${String(constraint.propertyKey)}_unique`) ||
         `${metadata.tableName}_${String(constraint.propertyKey)}_unique`;
       const columns = Array.isArray(constraint.propertyKey)
         ? constraint.propertyKey

@@ -1,20 +1,21 @@
 // src/decorators/manyToMany.decorator.ts
-import { BaseDecorator } from './base.decorator';
-import { ManyToManyMetadata } from '../interfaces';
-import { getMetadata } from './utils';
+
+import { BasePropertyDecorator } from './base-property.decorator';
+import { ManyToManyMetadata } from '../interfaces/';
+import { getPropertyMetadata, MetadataType } from './utils';
 
 /**
- * ManyToManyDecorator class that extends BaseDecorator to handle many-to-many relationship metadata.
+ * ManyToManyDecorator class that extends BasePropertyDecorator to handle many-to-many relationship metadata.
  */
-class ManyToManyDecorator extends BaseDecorator<ManyToManyMetadata> {
+class ManyToManyDecorator extends BasePropertyDecorator<ManyToManyMetadata> {
   constructor() {
     super(
-      'manyToManyRelations',
-      // Validation function for the many-to-many relationship
+      'manyToManyRelations', // MetadataType
+      // Options Validator
       (options: ManyToManyMetadata) => {
         if (typeof options.target !== 'function') {
           throw new Error(
-            "ManyToMany decorator requires a 'target' option that is a function (constructor of the target entity).",
+            "ManyToMany decorator requires a 'target' option that is a constructor function of the target entity.",
           );
         }
         if (options.joinTable && typeof options.joinTable !== 'string') {
@@ -22,7 +23,6 @@ class ManyToManyDecorator extends BaseDecorator<ManyToManyMetadata> {
             "ManyToMany decorator 'joinTable' option must be a string if provided.",
           );
         }
-        // Validate other join column options if necessary
         if (options.joinColumn && typeof options.joinColumn !== 'string') {
           throw new Error(
             "ManyToMany decorator 'joinColumn' option must be a string if provided.",
@@ -36,36 +36,28 @@ class ManyToManyDecorator extends BaseDecorator<ManyToManyMetadata> {
             "ManyToMany decorator 'inverseJoinColumn' option must be a string if provided.",
           );
         }
+        // Add more validations as needed
       },
-      // Metadata creation function for the many-to-many relationship
-      (propertyKey, options) => {
-        return {
-          propertyKey,
-          target: options.target,
-          joinTable: options.joinTable,
-          cascade: options.cascade,
-          joinColumn: options.joinColumn,
-          inverseJoinColumn: options.inverseJoinColumn,
-          sourceJoinColumn: options.sourceJoinColumn,
-          sourceInverseJoinColumn: options.sourceInverseJoinColumn,
-          targetJoinColumn: options.targetJoinColumn,
-          targetInverseJoinColumn: options.targetInverseJoinColumn,
-        } as ManyToManyMetadata;
-      },
-      // Unique check function to ensure the property key is unique within many-to-many relations
+      // Metadata Creator
+      (propertyKey, options: ManyToManyMetadata) => ({
+        propertyKey,
+        target: options.target,
+        joinTable: options.joinTable,
+        cascade: options.cascade,
+        joinColumn: options.joinColumn,
+        inverseJoinColumn: options.inverseJoinColumn,
+        sourceJoinColumn: options.sourceJoinColumn,
+        sourceInverseJoinColumn: options.sourceInverseJoinColumn,
+        targetJoinColumn: options.targetJoinColumn,
+        targetInverseJoinColumn: options.targetInverseJoinColumn,
+      }),
+      // Unique Check Function (optional)
       (existing: ManyToManyMetadata, newEntry: ManyToManyMetadata) =>
         existing.propertyKey === newEntry.propertyKey,
     );
   }
 
-  // No need to implement createClassMetadata for many-to-many as it's a property decorator
-  protected createClassMetadata(
-    target: Function,
-    options: ManyToManyMetadata,
-  ): void {
-    // This method is not used for property decorators, so no implementation is needed
-    return;
-  }
+  // No need to implement createClassMetadata as it's a property decorator
 }
 
 // Instance of ManyToManyDecorator
@@ -73,41 +65,18 @@ const manyToManyDecoratorInstance = new ManyToManyDecorator();
 
 /**
  * @ManyToMany decorator to define a many-to-many relationship between entities.
- * @param target - Target entity class.
- * @param joinTable - Name of the join table.
- * @param cascade - Whether to cascade operations.
- * @param joinColumn - Join column in the join table.
- * @param inverseJoinColumn - Inverse join column in the join table.
- * @param sourceJoinColumn - Join column in the source table.
- * @param sourceInverseJoinColumn - Inverse join column in the source table.
- * @param targetJoinColumn - Join column in the target table.
- * @param targetInverseJoinColumn - Inverse join column in the target table.
+ * @param options - Configuration options for the many-to-many relationship.
  * @returns PropertyDecorator
  */
-export const ManyToMany = ({
-  target,
-  joinTable,
-  cascade,
-  joinColumn,
-  inverseJoinColumn,
-  sourceJoinColumn,
-  sourceInverseJoinColumn,
-  targetJoinColumn,
-  targetInverseJoinColumn,
-}: Omit<ManyToManyMetadata, 'propertyKey'>): PropertyDecorator => {
-  return manyToManyDecoratorInstance.decorate({
-    // Property key is set by the decorator
-    propertyKey: '',
-    target,
-    joinTable,
-    cascade,
-    joinColumn,
-    inverseJoinColumn,
-    sourceJoinColumn,
-    sourceInverseJoinColumn,
-    targetJoinColumn,
-    targetInverseJoinColumn,
-  }) as PropertyDecorator;
+export const ManyToMany = (
+  options: Omit<ManyToManyMetadata, 'propertyKey'>,
+): PropertyDecorator => {
+  return (target: Object, propertyKey: string | symbol) => {
+    manyToManyDecoratorInstance.decorate({
+      ...options,
+      propertyKey: propertyKey as string,
+    })(target, propertyKey);
+  };
 };
 
 /**
@@ -116,5 +85,8 @@ export const ManyToMany = ({
  * @returns ManyToManyMetadata[]
  */
 export const getManyToManyMetadata = (target: any): ManyToManyMetadata[] => {
-  return getMetadata<ManyToManyMetadata>(target, 'manyToManyRelations');
+  return getPropertyMetadata(
+    target,
+    'manyToManyRelations',
+  ) as ManyToManyMetadata[];
 };

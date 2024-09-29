@@ -1,4 +1,5 @@
-import { Module, DynamicModule, Global } from '@nestjs/common';
+// src/db2.module.ts
+import { Module, DynamicModule, Global, Provider } from '@nestjs/common';
 import { Db2Service } from '../services/db2.service';
 import { Db2Client } from '../db/db2-client';
 import { TransactionManager } from '../db/transaction-manager';
@@ -18,6 +19,11 @@ import {
 } from '../constants/injection-token.constant';
 import { Db2ConfigModule } from './db2-config.module';
 import { createAuthStrategy } from '../auth';
+import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
+import { ClassConstructor } from '../types';
+import { Schema } from '../orm/schema';
+import { Model } from '../orm/model';
+import { ModelRegistry } from '../orm/model-registry';
 
 @Global()
 @Module({})
@@ -28,6 +34,38 @@ export class Db2Module {
       imports: [],
       additionalProviders: [],
     });
+  }
+
+  static forFeature(entities: Function[]): DynamicModule {
+    const modelProviders: Provider[] = entities.map((entity) =>
+      this.createModelProvider(entity as ClassConstructor),
+    );
+
+    return {
+      module: Db2Module,
+      providers: modelProviders,
+      exports: modelProviders,
+    };
+  }
+
+  static forFeatureAsync(options: {
+    entities: Function[];
+    imports?: any[];
+    useFactory?: (
+      ...args: any[]
+    ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
+    inject?: any[];
+  }): DynamicModule {
+    const modelProviders: Provider[] = options.entities.map((entity) =>
+      this.createModelProvider(entity as ClassConstructor),
+    );
+
+    return {
+      module: Db2Module,
+      imports: [...(options.imports || [])],
+      providers: [...modelProviders],
+      exports: [...modelProviders],
+    };
   }
 
   static forRootAsync(options: {
@@ -51,6 +89,24 @@ export class Db2Module {
         },
       ],
     });
+  }
+
+  private static createModelProvider(entity: ClassConstructor): Provider {
+    const metadata = EntityMetadataStorage.getEntityMetadata(entity);
+    if (!metadata || metadata.entityType !== 'table') {
+      throw new Error(`Entity ${entity.name} is not a valid table entity.`);
+    }
+    const schema = new Schema(entity);
+
+    return {
+      provide: `${entity.name}Model`,
+      useFactory: (db2Service: Db2Service, modelRegistry: ModelRegistry) => {
+        const model = new Model(db2Service, schema, modelRegistry);
+        modelRegistry.registerModel(`${entity.name}Model`, model);
+        return model;
+      },
+      inject: [I_DB2_SERVICE, ModelRegistry],
+    };
   }
 
   private static createModule(options: {
@@ -88,12 +144,16 @@ export class Db2Module {
         }),
       ],
       providers: [
+        ModelRegistry, // Register ModelRegistry as a provider
         Db2PoolManager,
         Db2ConnectionManager,
         Db2Client,
         TransactionManager,
         Db2MigrationService,
-        Db2Service,
+        {
+          provide: I_DB2_SERVICE,
+          useClass: Db2Service,
+        },
         {
           provide: 'DB2_AUTH_STRATEGY',
           useFactory: (
@@ -118,6 +178,7 @@ export class Db2Module {
         I_TRANSACTION_MANAGER,
         I_DB2_MIGRATION_SERVICE,
         I_DB2_CONFIG,
+        ModelRegistry, // Export ModelRegistry if external access is needed
       ],
     };
   }

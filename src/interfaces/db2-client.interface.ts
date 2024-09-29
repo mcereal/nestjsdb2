@@ -19,7 +19,11 @@ export interface IDb2Client {
   rollbackTransaction(): Promise<void>;
 
   // Query execution methods
-  query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
+  query<T>(
+    sql: string,
+    params?: Record<string, any>,
+    timeout?: number,
+  ): Promise<T>;
   executePreparedStatement<T>(sql: string, params?: any[]): Promise<T>;
   batchInsert(
     tableName: string,

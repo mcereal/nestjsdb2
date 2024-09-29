@@ -1,222 +1,161 @@
 // src/orm/schema.ts
-import { EntityMetadata, ColumnMetadata } from '../interfaces';
-import { EntityMetadataStorage } from '../metadata';
+
+import { MetadataUtil } from '../utils/metadata.utils';
+import {
+  EntityMetadata,
+  ColumnMetadata,
+  RelationMetadata,
+} from '../interfaces';
 import { ClassConstructor } from '../types';
+import { ColumnsHandler } from './schema-handlers/columns.handler';
+import { RelationsHandler } from './schema-handlers/relations.handler';
+import { ConstraintsHandler } from './schema-handlers/constraints.handler';
 
-export class Schema {
+/**
+ * Represents the schema definition for an entity.
+ * Handles table/view metadata, columns, relations, constraints, etc.
+ */
+export class Schema<T> {
   private metadata: EntityMetadata;
+  private columnsHandler: ColumnsHandler<T>;
+  private relationsHandler: RelationsHandler<T>;
+  private constraintsHandler: ConstraintsHandler<T>;
+  // You can add more handlers as needed (e.g., IndexesHandler)
 
-  constructor(target: ClassConstructor) {
-    // Retrieve or create entity metadata
-    this.metadata = EntityMetadataStorage.getEntityMetadata(target) || {
-      entityType: 'table',
-      tableMetadata: {
-        tableName: '',
-        schemaName: '',
-        columns: [],
-        primaryKeys: [],
-        indexedColumns: [],
-        foreignKeys: [],
-        oneToOneRelations: [],
-        oneToManyRelations: [],
-        manyToOneRelations: [],
-        manyToManyRelations: [],
-        defaultValues: [],
-        constraints: [],
-        compositeKeys: [],
-      },
-    };
+  /**
+   * Initializes the Schema with the given entity.
+   * @param entity - The class constructor of the entity.
+   */
+  constructor(private entity: ClassConstructor<T>) {
+    const metadata = MetadataUtil.getEntityMetadata(this.entity);
+    if (!metadata) {
+      throw new Error(`No metadata found for entity: ${this.entity.name}`);
+    }
+    this.metadata = metadata;
+    this.columnsHandler = new ColumnsHandler(this);
+    this.relationsHandler = new RelationsHandler(this);
+    this.constraintsHandler = new ConstraintsHandler(this);
+    // Initialize other handlers here
   }
 
-  // Determine if the entity is a table
-  private isTable() {
-    return this.metadata.entityType === 'table' && this.metadata.tableMetadata;
+  /**
+   * Checks if the entity is a table.
+   */
+  isTable(): boolean {
+    return (
+      this.metadata.entityType === 'table' && !!this.metadata.tableMetadata
+    );
   }
 
-  // Determine if the entity is a view
-  private isView() {
-    return this.metadata.entityType === 'view' && this.metadata.viewMetadata;
+  /**
+   * Checks if the entity is a view.
+   */
+  isView(): boolean {
+    return this.metadata.entityType === 'view' && !!this.metadata.viewMetadata;
   }
 
-  // Define a column in the schema
-  addColumn(propertyKey: string, options: ColumnMetadata) {
+  /**
+   * Adds a column to the table schema.
+   * @param propertyKey - The property name in the entity.
+   * @param options - Column configuration options.
+   */
+  addColumn(propertyKey: string, options: ColumnMetadata): void {
+    this.columnsHandler.addColumn(propertyKey, options);
+  }
+
+  /**
+   * Defines a one-to-many relationship.
+   * @param propertyKey - The property name in the entity.
+   * @param target - The target entity constructor.
+   * @param options - Relation configuration options.
+   */
+  setOneToMany(
+    propertyKey: string,
+    target: ClassConstructor<any>,
+    options: Partial<RelationMetadata>,
+  ): void {
+    this.relationsHandler.setOneToMany(propertyKey, target, options);
+  }
+
+  /**
+   * Defines a constraint on a column.
+   * @param propertyKey - The property name in the entity.
+   * @param options - Constraint configuration options.
+   * @param constraint - The constraint definition.
+   */
+  setConstraint(
+    propertyKey: string,
+    options: Partial<ColumnMetadata>,
+    constraint: string,
+  ): void {
+    this.constraintsHandler.setConstraint(propertyKey, options, constraint);
+  }
+
+  // Similarly, you can add methods for other operations like setting foreign keys, indexes, etc.
+
+  /**
+   * Finalizes the schema by performing validations.
+   * Should be called after all schema definitions are done.
+   */
+  finalizeSchema(): void {
+    this.validateSchema();
+    // Optionally, register the schema or perform other finalization steps
+  }
+
+  /**
+   * Validates the schema for completeness and correctness.
+   */
+  private validateSchema(): void {
     if (this.isTable()) {
-      const columnMetadata: ColumnMetadata = { ...options, propertyKey };
-      this.metadata.tableMetadata!.columns.push(columnMetadata);
+      const tableMeta = this.metadata.tableMetadata!;
+      if (!tableMeta.tableName) {
+        throw new Error(
+          `Table name is not set for entity: ${this.entity.name}`,
+        );
+      }
+      if (tableMeta.columns.length === 0) {
+        throw new Error(`No columns defined for table: ${tableMeta.tableName}`);
+      }
+      if (tableMeta.primaryKeys.length === 0) {
+        throw new Error(
+          `Primary key not defined for table: ${tableMeta.tableName}`,
+        );
+      }
+      // Add more validations as needed
+    } else if (this.isView()) {
+      const viewMeta = this.metadata.viewMetadata!;
+      if (!viewMeta.viewName) {
+        throw new Error(`View name is not set for entity: ${this.entity.name}`);
+      }
+      if (!viewMeta.underlyingQuery) {
+        throw new Error(
+          `Underlying query is not set for view: ${viewMeta.viewName}`,
+        );
+      }
+      // Add more validations as needed
+    } else {
+      throw new Error(`Unknown entity type for entity: ${this.entity.name}`);
     }
   }
 
-  // Retrieve the metadata
+  /**
+   * Retrieves the entity name.
+   */
+  getEntityName(): string {
+    return this.entity.name;
+  }
+
+  /**
+   * Retrieves the entity metadata.
+   */
   getMetadata(): EntityMetadata {
     return this.metadata;
   }
 
-  // Set the table name
-  setTableName(tableName: string) {
-    if (this.isTable()) {
-      this.metadata.tableMetadata!.tableName = tableName;
-    }
-  }
-
-  // Set the schema name
-  setSchemaName(schemaName: string) {
-    if (this.isTable()) {
-      this.metadata.tableMetadata!.schemaName = schemaName;
-    } else if (this.isView()) {
-      this.metadata.viewMetadata!.schemaName = schemaName;
-    }
-  }
-
-  // Set the primary key
-  setPrimaryKey(propertyKey: string, options: ColumnMetadata) {
-    if (this.isTable()) {
-      const primaryKeyMetadata = { propertyKey, ...options };
-      this.metadata.tableMetadata!.primaryKeys.push(primaryKeyMetadata);
-    }
-  }
-
-  // Set the indexed column
-  setIndexedColumn(propertyKey: string, options: ColumnMetadata) {
-    if (this.isTable()) {
-      const indexedColumnMetadata = {
-        name: propertyKey,
-        propertyKey,
-        ...options,
-        type: options.type as 'BTREE' | 'FULLTEXT' | 'HASH' | 'SPATIAL',
-      };
-      this.metadata.tableMetadata!.indexedColumns.push(indexedColumnMetadata);
-    }
-  }
-
-  // Set the column
-  setColumn(propertyKey: string, options: ColumnMetadata) {
-    this.addColumn(propertyKey, options);
-  }
-
-  // Set the foreign key
-  setForeignKey(
-    propertyKey: string,
-    options: ColumnMetadata,
-    reference: string,
-  ) {
-    if (this.isTable()) {
-      const foreignKeyMetadata = { propertyKey, ...options, reference };
-      this.metadata.tableMetadata!.foreignKeys.push(foreignKeyMetadata);
-    }
-  }
-
-  // Set the one-to-one relation
-  setOneToOne(
-    propertyKey: string,
-    target: ClassConstructor,
-    options: ColumnMetadata,
-  ) {
-    if (this.isTable()) {
-      const oneToOneMetadata = { propertyKey, target, ...options };
-      this.metadata.tableMetadata!.oneToOneRelations.push(oneToOneMetadata);
-    }
-  }
-
-  // Set the one-to-many relation
-  setOneToMany(
-    propertyKey: string,
-    target: ClassConstructor,
-    options: ColumnMetadata,
-  ) {
-    if (this.isTable()) {
-      const oneToManyMetadata = { propertyKey, target, ...options };
-      this.metadata.tableMetadata!.oneToManyRelations.push(oneToManyMetadata);
-    }
-  }
-
-  // Set the many-to-one relation
-  setManyToOne(
-    propertyKey: string,
-    target: ClassConstructor,
-    options: ColumnMetadata,
-  ) {
-    if (this.isTable()) {
-      const manyToOneMetadata = { propertyKey, target, ...options };
-      this.metadata.tableMetadata!.manyToOneRelations.push(manyToOneMetadata);
-    }
-  }
-
-  // Set the many-to-many relation
-  setManyToMany(
-    propertyKey: string,
-    target: ClassConstructor,
-    options: ColumnMetadata,
-  ) {
-    if (this.isTable()) {
-      const manyToManyMetadata = { propertyKey, target, ...options };
-      this.metadata.tableMetadata!.manyToManyRelations.push(manyToManyMetadata);
-    }
-  }
-
-  // Set the default value
-  setDefaultValue(propertyKey: string, options: ColumnMetadata, value: any) {
-    if (this.isTable()) {
-      const defaultMetadata = { propertyKey, ...options, value };
-      this.metadata.tableMetadata!.defaultValues.push(defaultMetadata);
-    }
-  }
-
-  // Set the constraint
-  setConstraint(
-    propertyKey: string,
-    options: ColumnMetadata,
-    constraint: string,
-  ) {
-    if (this.isTable()) {
-      const constraintMetadata = { propertyKey, ...options, constraint };
-      this.metadata.tableMetadata!.constraints.push(constraintMetadata);
-    }
-  }
-
-  // Set the composite key
-  setCompositeKey(
-    propertyKey: string,
-    options: ColumnMetadata,
-    keys: string[],
-  ) {
-    if (this.isTable()) {
-      const compositeKeyMetadata = { propertyKey, ...options, keys };
-      this.metadata.tableMetadata!.compositeKeys.push(compositeKeyMetadata);
-    }
-  }
-
-  // Set the description
-  setDescription(description: string) {
-    if (this.isTable()) {
-      this.metadata.tableMetadata!.description = description;
-    }
-  }
-
-  // Set the owner
-  setOwner(owner: string) {
-    if (this.isTable()) {
-      this.metadata.tableMetadata!.owner = owner;
-    }
-  }
-
-  // Set the underlying query (only for views)
-  setUnderlyingQuery(underlyingQuery: string) {
-    if (this.isView()) {
-      this.metadata.viewMetadata!.underlyingQuery = underlyingQuery;
-    }
-  }
-
-  // Set the view name
-  setViewName(viewName: string) {
-    if (this.isView()) {
-      this.metadata.viewMetadata!.viewName = viewName;
-    }
-  }
-
-  // Set the view schema name
-  setViewSchemaName(viewSchemaName: string) {
-    if (this.isView()) {
-      this.metadata.viewMetadata!.schemaName = viewSchemaName;
-    }
+  /**
+   * Retrieves the entity constructor.
+   */
+  getConstructor(): ClassConstructor<T> {
+    return this.entity;
   }
 }

@@ -1,11 +1,17 @@
+export interface IConstraint {
+  name: string;
+  type: string;
+  properties: Record<string, any>;
+}
+
 export interface ConstraintMetadata {
   propertyKey: string | symbol;
-  constraint: string;
-  name?: string;
+  constraint: IConstraint;
 }
 
 export interface ColumnMetadata {
   propertyKey: string;
+  name?: string;
   type: string;
   length?: number;
   nullable?: boolean;
@@ -58,26 +64,12 @@ export interface ForeignKeyMetadata {
   reference: string; // Format: 'referenced_table(referenced_column)'
   onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
   onUpdate?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
-
-  // Foreign key name
   name?: string;
-
-  // Foreign key constraint name
   constraintName?: string;
-
-  // Foreign key comment
   comment?: string;
-
-  // Foreign key visibility
   invisible?: boolean;
-
-  // Foreign key functional key
   functional?: boolean;
-
-  // Foreign key expression
   expression?: string;
-
-  // Foreign key include columns
   include?: string[];
 }
 
@@ -88,111 +80,62 @@ export interface IndexedColumnMetadata {
   nullable?: boolean;
   default?: any;
   onUpdate?: 'CASCADE' | 'SET NULL' | 'RESTRICT';
-
-  // Index type
   type?: 'BTREE' | 'FULLTEXT' | 'HASH' | 'SPATIAL';
-
-  // Index method
   method?: 'BTREE' | 'HASH';
-
-  // Index algorithm
   algorithm?: 'DEFAULT' | 'INPLACE' | 'COPY' | 'NOCOPY';
-
-  // Index parser
   parser?: string;
-
-  // Index comment
   comment?: string;
-
-  // Index visibility
   invisible?: boolean;
-
-  // Index functional key
   functional?: boolean;
-
-  // Index expression
   expression?: string;
-
-  // Index include columns
   include?: string[];
-
-  // Index prefix length
   prefixLength?: number;
 }
 
-export interface ManyToManyMetadata {
+export interface RelationMetadata {
   propertyKey: string | symbol;
   target: new (...args: any[]) => any;
-  joinTable?: string;
   cascade?: boolean;
-
-  // Join column in the join table
-  joinColumn?: string;
-  inverseJoinColumn?: string;
-
-  // Join column in the source table
-  sourceJoinColumn?: string;
-  sourceInverseJoinColumn?: string;
-
-  // Join column in the target table
-  targetJoinColumn?: string;
-  targetInverseJoinColumn?: string;
+  joinTable?: string;
 }
 
-export interface ManyToOneMetadata {
-  propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  joinColumn?: string;
-  inverseJoinColumn?: string;
-  cascade?: boolean;
-
-  // Join column in the source table
+export interface OneToManyMetadata extends RelationMetadata {
   sourceJoinColumn?: string;
   sourceInverseJoinColumn?: string;
-
-  // Join column in the target table
   targetJoinColumn?: string;
   targetInverseJoinColumn?: string;
+  sourceTable?: string;
+  targetTable?: string;
+}
 
-  // Join column in the join table
-  joinTable?: string;
-
-  // Join column in the source table
+export interface ManyToOneMetadata extends RelationMetadata {
+  joinColumn?: string;
+  inverseJoinColumn?: string;
+  sourceJoinColumn?: string;
+  sourceInverseJoinColumn?: string;
+  targetJoinColumn?: string;
+  targetInverseJoinColumn?: string;
   sourceTable?: string;
 }
 
-export interface OneToManyMetadata {
-  propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
-
-  // Join column in the source table
+export interface ManyToManyMetadata extends RelationMetadata {
+  joinColumn?: string;
+  inverseJoinColumn?: string;
   sourceJoinColumn?: string;
   sourceInverseJoinColumn?: string;
-
-  // Join column in the target table
   targetJoinColumn?: string;
   targetInverseJoinColumn?: string;
-
-  // Join column in the join table
-  joinTable?: string;
+  sourceTable?: string;
+  targetTable?: string;
 }
 
-export interface OneToOneMetadata {
-  propertyKey: string | symbol;
-  target: new (...args: any[]) => any;
-  cascade?: boolean;
-
-  // Join column in the source table
+export interface OneToOneMetadata extends RelationMetadata {
   sourceJoinColumn?: string;
   sourceInverseJoinColumn?: string;
-
-  // Join column in the target table
   targetJoinColumn?: string;
   targetInverseJoinColumn?: string;
-
-  // Join column in the join table
-  joinTable?: string;
+  sourceTable?: string;
+  targetTable?: string;
 }
 
 export interface PrimaryKeyMetadata {
