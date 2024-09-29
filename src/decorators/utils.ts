@@ -1,5 +1,3 @@
-// src/decorators/utils.ts
-
 import { ClassConstructor } from '../types';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
 import { EntityMetadata } from '../interfaces';
@@ -23,17 +21,15 @@ export type MetadataType =
   | 'entity';
 
 /**
- * Retrieves existing entity metadata or creates a new one if it doesn't exist.
+ * Helper function to get or create entity metadata for a constructor.
  * @param constructor - The constructor of the entity class.
  * @returns The entity metadata.
  */
-export const getOrCreateEntityMetadata = (
-  constructor: ClassConstructor,
-): EntityMetadata => {
+const getOrCreateMetadata = (constructor: ClassConstructor): EntityMetadata => {
   let entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
   if (!entityMetadata) {
     entityMetadata = {
-      entityType: 'table', // Default to 'table'; can be overridden by decorators like @View
+      entityType: 'table',
       tableMetadata: {
         tableName: '',
         schemaName: '',
@@ -49,11 +45,75 @@ export const getOrCreateEntityMetadata = (
         constraints: [],
         compositeKeys: [],
       },
-      viewMetadata: undefined, // Initialize as undefined; set if @View decorator is used
+      viewMetadata: undefined,
     };
     EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
   }
   return entityMetadata;
+};
+
+/**
+ * Helper function to add metadata based on entity type.
+ * @param entityMetadata - The entity metadata.
+ * @param metadataType - The type of metadata being added.
+ * @param metadata - The metadata to add.
+ */
+const addMetadata = <T>(
+  entityMetadata: EntityMetadata,
+  metadataType: MetadataType,
+  metadata: T,
+): void => {
+  if (entityMetadata.entityType === 'table') {
+    if (
+      metadataType === 'columns' ||
+      metadataType === 'primaryKeys' ||
+      metadataType === 'indexedColumns' ||
+      metadataType === 'foreignKeys' ||
+      metadataType === 'constraints' ||
+      metadataType === 'compositeKeys' ||
+      [
+        'oneToOneRelations',
+        'oneToManyRelations',
+        'manyToOneRelations',
+        'manyToManyRelations',
+      ].includes(metadataType)
+    ) {
+      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
+    }
+  } else if (
+    entityMetadata.entityType === 'view' &&
+    metadataType === 'columns'
+  ) {
+    entityMetadata.viewMetadata!.columns.push(metadata as any);
+  }
+};
+
+/**
+ * Adds metadata to the entity metadata storage with optional uniqueness check.
+ * @param constructor - The constructor of the entity class.
+ * @param metadataType - The type of metadata being added.
+ * @param metadata - The metadata to add.
+ * @param uniqueCheck - An optional function to check for uniqueness before adding.
+ */
+const addMetadataWithCheck = <T>(
+  constructor: ClassConstructor,
+  metadataType: MetadataType,
+  metadata: T,
+  uniqueCheck?: (existing: T, newEntry: T) => boolean,
+): void => {
+  const entityMetadata = getOrCreateMetadata(constructor);
+
+  if (
+    uniqueCheck &&
+    (entityMetadata as any)[metadataType].some((item: T) =>
+      uniqueCheck(item, metadata),
+    )
+  ) {
+    return;
+  }
+
+  addMetadata(entityMetadata, metadataType, metadata);
+  EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
 };
 
 /**
@@ -69,46 +129,7 @@ export const addClassMetadata = <T>(
   metadata: T,
   uniqueCheck?: (existing: T, newEntry: T) => boolean,
 ): void => {
-  const entityMetadata = getOrCreateEntityMetadata(constructor);
-
-  if (uniqueCheck) {
-    const exists = (entityMetadata as any)[metadataType].some((item: T) =>
-      uniqueCheck(item, metadata),
-    );
-    if (exists) return;
-  }
-
-  // Handle based on entity type
-  if (entityMetadata.entityType === 'table') {
-    if (
-      metadataType === 'columns' ||
-      metadataType === 'primaryKeys' ||
-      metadataType === 'indexedColumns' ||
-      metadataType === 'foreignKeys' ||
-      metadataType === 'constraints' ||
-      metadataType === 'compositeKeys'
-    ) {
-      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
-    }
-    // Handle relations similarly
-    else if (
-      [
-        'oneToOneRelations',
-        'oneToManyRelations',
-        'manyToOneRelations',
-        'manyToManyRelations',
-      ].includes(metadataType)
-    ) {
-      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
-    }
-  } else if (entityMetadata.entityType === 'view') {
-    if (metadataType === 'columns') {
-      entityMetadata.viewMetadata!.columns.push(metadata as any);
-    }
-    // Handle other metadata types for views if applicable
-  }
-
-  EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
+  addMetadataWithCheck(constructor, metadataType, metadata, uniqueCheck);
 };
 
 /**
@@ -124,46 +145,33 @@ export const addPropertyMetadata = <T>(
   metadata: T,
   uniqueCheck?: (existing: T, newEntry: T) => boolean,
 ): void => {
-  const entityMetadata = getOrCreateEntityMetadata(constructor);
+  addMetadataWithCheck(constructor, metadataType, metadata, uniqueCheck);
+};
 
-  if (uniqueCheck) {
-    const exists = (entityMetadata as any)[metadataType].some((item: T) =>
-      uniqueCheck(item, metadata),
-    );
-    if (exists) return;
-  }
+/**
+ * Retrieves specific metadata from the entity metadata storage.
+ * @param target - The constructor of the entity class.
+ * @param metadataType - The type of metadata to retrieve.
+ * @param isClassLevel - Boolean to specify if it's class-level metadata.
+ * @returns An array of the requested metadata type.
+ */
+const getMetadata = <T>(
+  target: ClassConstructor,
+  metadataType: MetadataType,
+  isClassLevel: boolean,
+): T[] => {
+  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
+  if (!entityMetadata) return [];
 
-  // Handle based on entity type
   if (entityMetadata.entityType === 'table') {
-    if (
-      metadataType === 'columns' ||
-      metadataType === 'primaryKeys' ||
-      metadataType === 'indexedColumns' ||
-      metadataType === 'foreignKeys' ||
-      metadataType === 'constraints' ||
-      metadataType === 'compositeKeys'
-    ) {
-      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
-    }
-    // Handle relations similarly
-    else if (
-      [
-        'oneToOneRelations',
-        'oneToManyRelations',
-        'manyToOneRelations',
-        'manyToManyRelations',
-      ].includes(metadataType)
-    ) {
-      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
-    }
-  } else if (entityMetadata.entityType === 'view') {
-    if (metadataType === 'columns') {
-      entityMetadata.viewMetadata!.columns.push(metadata as any);
-    }
-    // Handle other metadata types for views if applicable
+    return entityMetadata.tableMetadata![metadataType] as T[];
+  } else if (
+    entityMetadata.entityType === 'view' &&
+    metadataType === 'columns'
+  ) {
+    return entityMetadata.viewMetadata!.columns as unknown as T[];
   }
-
-  EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
+  return [];
 };
 
 /**
@@ -176,19 +184,7 @@ export const getClassMetadata = <T>(
   target: ClassConstructor,
   metadataType: MetadataType,
 ): T[] => {
-  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  if (!entityMetadata) return [];
-
-  if (entityMetadata.entityType === 'table') {
-    return entityMetadata.tableMetadata![metadataType] as T[];
-  } else if (entityMetadata.entityType === 'view') {
-    if (metadataType === 'columns') {
-      return entityMetadata.viewMetadata!.columns as unknown as T[];
-    }
-    // Handle other metadata types for views if applicable
-  }
-
-  return [];
+  return getMetadata(target, metadataType, true);
 };
 
 /**
@@ -201,17 +197,5 @@ export const getPropertyMetadata = <T>(
   target: ClassConstructor,
   metadataType: MetadataType,
 ): T[] => {
-  const entityMetadata = EntityMetadataStorage.getEntityMetadata(target);
-  if (!entityMetadata) return [];
-
-  if (entityMetadata.entityType === 'table') {
-    return entityMetadata.tableMetadata![metadataType] as T[];
-  } else if (entityMetadata.entityType === 'view') {
-    if (metadataType === 'columns') {
-      return entityMetadata.viewMetadata!.columns as unknown as T[];
-    }
-    // Handle other metadata types for views if applicable
-  }
-
-  return [];
+  return getMetadata(target, metadataType, false);
 };
