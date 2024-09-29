@@ -7,6 +7,7 @@ import {
   RelationMetadata,
   ForeignKeyMetadata,
   IndexedColumnMetadata,
+  PrimaryKeyMetadata,
 } from '../interfaces';
 import { ClassConstructor } from '../types';
 import { ColumnsHandler } from './schema-handlers/columns.handler';
@@ -16,6 +17,7 @@ import { IndexesHandler } from './schema-handlers/indexes.handler';
 import { ForeignKeysHandler } from './schema-handlers/foreign-keys.handler';
 import { DefaultValuesHandler } from './schema-handlers/default-values.handler';
 import { CompositeKeysHandler } from './schema-handlers/composite-keys.handler';
+import { PrimaryKeysHandler } from './schema-handlers/primary-keys.handler';
 
 /**
  * Represents the schema definition for an entity.
@@ -30,6 +32,7 @@ export class Schema<T> {
   private foreignKeysHandler: ForeignKeysHandler<T>;
   private defaultValuesHandler: DefaultValuesHandler<T>;
   private compositeKeysHandler: CompositeKeysHandler<T>;
+  private primaryKeysHandler: PrimaryKeysHandler<T>;
 
   /**
    * Initializes the Schema with the given entity.
@@ -141,6 +144,19 @@ export class Schema<T> {
    */
   setCompositeKey(propertyKeys: string[]): void {
     this.compositeKeysHandler.setCompositeKey(propertyKeys);
+  }
+
+  /**
+   * Defines a primary key on columns.
+   * @param propertyKeys - The property names in the entity.
+   */
+  setPrimaryKey(
+    propertyKeys: string[],
+    options: Partial<PrimaryKeyMetadata>,
+  ): void {
+    propertyKeys.forEach((propertyKey) => {
+      this.primaryKeysHandler.setPrimaryKey(propertyKey, options);
+    });
   }
 
   /**
