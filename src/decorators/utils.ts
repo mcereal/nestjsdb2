@@ -30,6 +30,7 @@ const getOrCreateMetadata = (constructor: ClassConstructor): EntityMetadata => {
   if (!entityMetadata) {
     entityMetadata = {
       entityType: 'table',
+      name: constructor.name,
       tableMetadata: {
         tableName: '',
         schemaName: '',
@@ -64,27 +65,45 @@ const addMetadata = <T>(
   metadata: T,
 ): void => {
   if (entityMetadata.entityType === 'table') {
-    if (
-      metadataType === 'columns' ||
-      metadataType === 'primaryKeys' ||
-      metadataType === 'indexedColumns' ||
-      metadataType === 'foreignKeys' ||
-      metadataType === 'constraints' ||
-      metadataType === 'compositeKeys' ||
-      [
-        'oneToOneRelations',
-        'oneToManyRelations',
-        'manyToOneRelations',
-        'manyToManyRelations',
-      ].includes(metadataType)
-    ) {
-      (entityMetadata.tableMetadata![metadataType] as any[]).push(metadata);
+    // Ensure tableMetadata exists and initialize the specific metadata type array if not present
+    if (!entityMetadata.tableMetadata) {
+      entityMetadata.tableMetadata = {
+        tableName: '',
+        schemaName: '',
+        columns: [],
+        primaryKeys: [],
+        indexedColumns: [],
+        foreignKeys: [],
+        oneToOneRelations: [],
+        oneToManyRelations: [],
+        manyToOneRelations: [],
+        manyToManyRelations: [],
+        defaultValues: [],
+        constraints: [],
+        compositeKeys: [],
+      };
     }
+    if (!entityMetadata.tableMetadata[metadataType]) {
+      (entityMetadata.tableMetadata[metadataType] as any[]) = [];
+    }
+    (entityMetadata.tableMetadata[metadataType] as any[]).push(metadata);
   } else if (
     entityMetadata.entityType === 'view' &&
     metadataType === 'columns'
   ) {
-    entityMetadata.viewMetadata!.columns.push(metadata as any);
+    // Ensure viewMetadata and columns array exist
+    if (!entityMetadata.viewMetadata) {
+      entityMetadata.viewMetadata = {
+        viewName: '',
+        schemaName: '',
+        columns: [],
+        underlyingQuery: '',
+      };
+    }
+    if (!entityMetadata.viewMetadata.columns) {
+      entityMetadata.viewMetadata.columns = [];
+    }
+    entityMetadata.viewMetadata.columns.push(metadata as any);
   }
 };
 
@@ -103,9 +122,17 @@ const addMetadataWithCheck = <T>(
 ): void => {
   const entityMetadata = getOrCreateMetadata(constructor);
 
+  // Initialize the specific metadataType array if it doesn't exist
+  if (
+    entityMetadata.entityType === 'table' &&
+    !entityMetadata.tableMetadata![metadataType]
+  ) {
+    (entityMetadata.tableMetadata![metadataType] as any[]) = [];
+  }
+
   if (
     uniqueCheck &&
-    (entityMetadata as any)[metadataType].some((item: T) =>
+    (entityMetadata.tableMetadata![metadataType] as any[]).some((item: T) =>
       uniqueCheck(item, metadata),
     )
   ) {
@@ -115,7 +142,6 @@ const addMetadataWithCheck = <T>(
   addMetadata(entityMetadata, metadataType, metadata);
   EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
 };
-
 /**
  * Adds class-level metadata to the entity metadata storage.
  * @param constructor - The constructor of the entity class.

@@ -2,35 +2,54 @@
 
 import { Schema } from '../schema';
 import { ColumnMetadata } from '../../interfaces';
+import { ClassConstructor } from '../../types';
 
 /**
  * Handles column-related operations for a schema.
  */
-export class ColumnsHandler<T> {
-  constructor(private schema: Schema<T>) {}
+export class ColumnsHandler {
+  private currentEntity!: ClassConstructor<any>;
+
+  constructor(private schema: Schema<any>) {}
 
   /**
-   * Adds a new column to the table schema.
+   * Sets the entity on which the handler will operate.
+   * @param entity - The entity class constructor.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.currentEntity = entity;
+  }
+
+  /**
+   * Adds a new column to the specified entity's table schema.
    * @param propertyKey - The property name in the entity.
    * @param options - Column configuration options.
    * @throws Will throw an error if the entity is not a table.
    */
   addColumn(propertyKey: string, options: ColumnMetadata): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for ColumnsHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot add column. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot add column. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
+
+    const metadata = this.schema.getMetadata(this.currentEntity);
     const columnMeta: ColumnMetadata = {
       propertyKey,
       type: options.type || 'string', // Default type if not specified
       ...options,
     };
-    this.schema.getMetadata().tableMetadata!.columns.push(columnMeta);
+
+    // Add column metadata to the entity's table metadata
+    metadata.tableMetadata!.columns.push(columnMeta);
 
     // Handle primary key
     if (options.primary) {
-      this.schema.getMetadata().tableMetadata!.primaryKeys.push({
+      metadata.tableMetadata!.primaryKeys.push({
         propertyKey,
         ...options,
       });
@@ -38,7 +57,7 @@ export class ColumnsHandler<T> {
 
     // Handle unique index
     if (options.unique) {
-      this.schema.getMetadata().tableMetadata!.indexedColumns.push({
+      metadata.tableMetadata!.indexedColumns.push({
         propertyKey,
         name: `${propertyKey}_unique`,
         unique: true,
@@ -49,7 +68,7 @@ export class ColumnsHandler<T> {
 
     // Handle default values
     if (options.default !== undefined) {
-      this.schema.getMetadata().tableMetadata!.defaultValues.push({
+      metadata.tableMetadata!.defaultValues.push({
         propertyKey,
         value: options.default,
       });

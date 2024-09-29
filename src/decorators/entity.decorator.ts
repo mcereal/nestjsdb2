@@ -1,46 +1,34 @@
-// src/decorators/entity.decorator.ts
-
 import { BaseClassDecorator } from './base-class.decorator';
-import {
-  EntityMetadata,
-  EntityType,
-  TableMetadata,
-  ViewMetadata,
-} from '../interfaces';
+import { EntityMetadata } from '../interfaces';
 import { getClassMetadata } from './utils';
-
-interface EntityOptions {
-  entityType: EntityType;
-  tableMetadata?: TableMetadata;
-  viewMetadata?: ViewMetadata;
-}
 
 /**
  * EntityDecorator class that extends BaseClassDecorator to handle entity metadata.
  */
-class EntityDecorator extends BaseClassDecorator<EntityOptions> {
+class EntityDecorator extends BaseClassDecorator<EntityMetadata> {
   constructor() {
     super(
-      'entity', // MetadataType
-      // Options Validator
-      (options: EntityOptions) => {
+      'entity',
+      (options: EntityMetadata) => {
+        if (!options.name || typeof options.name !== 'string') {
+          throw new Error(
+            "Entity decorator requires a 'name' property of type string.",
+          );
+        }
+
         if (options.entityType === 'table') {
           if (
-            !options.tableMetadata ||
-            typeof options.tableMetadata.tableName !== 'string'
+            options.tableMetadata &&
+            typeof options.tableMetadata !== 'object'
           ) {
-            throw new Error(
-              "Entity decorator requires a 'tableName' option of type string for tables.",
-            );
+            throw new Error("'tableMetadata' must be an object if provided.");
           }
         } else if (options.entityType === 'view') {
           if (
-            !options.viewMetadata ||
-            typeof options.viewMetadata.viewName !== 'string'
+            options.viewMetadata &&
+            typeof options.viewMetadata !== 'object'
           ) {
-            throw new Error(
-              "Entity decorator requires a 'viewName' option of type string for views.",
-            );
+            throw new Error("'viewMetadata' must be an object if provided.");
           }
         } else {
           throw new Error(
@@ -48,13 +36,12 @@ class EntityDecorator extends BaseClassDecorator<EntityOptions> {
           );
         }
       },
-      // Metadata Creator
-      (options: EntityOptions) => {
+      (options: EntityMetadata) => {
         if (options.entityType === 'table') {
           return {
             entityType: 'table',
             tableMetadata: {
-              tableName: options.tableMetadata?.tableName || '',
+              tableName: options.name,
               schemaName: options.tableMetadata?.schemaName || 'public',
               columns: options.tableMetadata?.columns || [],
               primaryKeys: options.tableMetadata?.primaryKeys || [],
@@ -76,7 +63,7 @@ class EntityDecorator extends BaseClassDecorator<EntityOptions> {
           return {
             entityType: 'view',
             viewMetadata: {
-              viewName: options.viewMetadata?.viewName || '',
+              viewName: options.name,
               schemaName: options.viewMetadata?.schemaName || 'public',
               columns: options.viewMetadata?.columns || [],
               underlyingQuery: options.viewMetadata?.underlyingQuery || '',
@@ -85,7 +72,6 @@ class EntityDecorator extends BaseClassDecorator<EntityOptions> {
         }
         return {};
       },
-      // Unique Check Function (optional)
       (existing: EntityMetadata, newEntry: EntityMetadata) => {
         if (newEntry.entityType === 'table') {
           return (
@@ -111,7 +97,7 @@ const entityDecoratorInstance = new EntityDecorator();
  * @param options - Configuration options for the entity.
  * @returns ClassDecorator
  */
-export const Entity = (options: EntityOptions): ClassDecorator => {
+export const Entity = (options: EntityMetadata): ClassDecorator => {
   return entityDecoratorInstance.decorate(options);
 };
 

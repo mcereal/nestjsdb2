@@ -1,15 +1,26 @@
 // src/orm/schema-handlers/primary-keys.handler.ts
 import { Schema } from '../schema';
 import { PrimaryKeyMetadata } from '../../interfaces';
+import { ClassConstructor } from '../../types';
 
 /**
  * Handles primary key-related operations for a schema.
  */
-export class PrimaryKeysHandler<T> {
-  constructor(private schema: Schema<T>) {}
+export class PrimaryKeysHandler {
+  private currentEntity!: ClassConstructor<any>;
+
+  constructor(private schema: Schema<any>) {}
 
   /**
-   * Defines a primary key on a column.
+   * Sets the entity on which the handler will operate.
+   * @param entity - The entity class constructor.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.currentEntity = entity;
+  }
+
+  /**
+   * Defines a primary key on a column for the current entity.
    * @param propertyKey - The property name in the entity.
    * @param options - Optional configurations for the primary key.
    */
@@ -17,19 +28,24 @@ export class PrimaryKeysHandler<T> {
     propertyKey: string,
     options: Partial<PrimaryKeyMetadata> = {},
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for PrimaryKeysHandler.');
+    }
+
+    // Validate that the entity is a table
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set primary key. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set primary key. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
 
     // Validate that the propertyKey exists as a column in the table metadata
     const existingColumns = this.schema
-      .getMetadata()
+      .getMetadata(this.currentEntity)
       .tableMetadata!.columns.map((col) => col.propertyKey);
     if (!existingColumns.includes(propertyKey)) {
       throw new Error(
-        `Invalid primary key property: ${propertyKey}. Make sure the key is a valid table column.`,
+        `Invalid primary key property: ${propertyKey}. Make sure the key is a valid table column in entity '${this.schema.getEntityName(this.currentEntity)}'.`,
       );
     }
 
@@ -70,6 +86,8 @@ export class PrimaryKeysHandler<T> {
     };
 
     // Add the primary key metadata to the table metadata in the schema
-    this.schema.getMetadata().tableMetadata!.primaryKeys.push(primaryKeyMeta);
+    this.schema
+      .getMetadata(this.currentEntity)
+      .tableMetadata!.primaryKeys.push(primaryKeyMeta);
   }
 }

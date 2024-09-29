@@ -2,15 +2,26 @@
 
 import { Schema } from '../schema';
 import { CompositeKeyMetadata } from '../../interfaces';
+import { ClassConstructor } from '../../types';
 
 /**
  * Handles composite key-related operations for a schema.
  */
-export class CompositeKeysHandler<T> {
-  constructor(private schema: Schema<T>) {}
+export class CompositeKeysHandler {
+  private currentEntity!: ClassConstructor<any>;
+
+  constructor(private schema: Schema<any>) {}
 
   /**
-   * Defines a composite key on columns.
+   * Sets the entity on which the handler will operate.
+   * @param entity - The entity class constructor.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.currentEntity = entity;
+  }
+
+  /**
+   * Defines a composite key on columns for the current entity.
    * @param propertyKeys - The property names in the entity.
    * @param options - Optional configurations for the composite key.
    */
@@ -18,9 +29,13 @@ export class CompositeKeysHandler<T> {
     propertyKeys: string[],
     options: Partial<CompositeKeyMetadata> = {},
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for CompositeKeysHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set composite key. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set composite key. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
 
@@ -32,12 +47,14 @@ export class CompositeKeysHandler<T> {
     }
 
     // Ensure all property keys exist in the table columns
-    const existingColumns = this.schema
-      .getMetadata()
-      .tableMetadata!.columns.map((col) => col.propertyKey);
+    const metadata = this.schema.getMetadata(this.currentEntity);
+    const existingColumns = metadata.tableMetadata!.columns.map(
+      (col) => col.propertyKey,
+    );
     const invalidKeys = propertyKeys.filter(
       (key) => !existingColumns.includes(key),
     );
+
     if (invalidKeys.length > 0) {
       throw new Error(
         `Invalid composite key properties: ${invalidKeys.join(', ')}. Make sure all keys are valid table columns.`,
@@ -55,8 +72,6 @@ export class CompositeKeysHandler<T> {
     };
 
     // Push the composite key metadata to the table metadata in the schema
-    this.schema
-      .getMetadata()
-      .tableMetadata!.compositeKeys.push(compositeKeyMeta);
+    metadata.tableMetadata!.compositeKeys.push(compositeKeyMeta);
   }
 }

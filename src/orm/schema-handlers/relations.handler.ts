@@ -13,8 +13,18 @@ import { ClassConstructor } from '../../types';
 /**
  * Handles relation-related operations for a schema.
  */
-export class RelationsHandler<T> {
-  constructor(private schema: Schema<T>) {}
+export class RelationsHandler {
+  private currentEntity!: ClassConstructor<any>;
+
+  constructor(private schema: Schema<any>) {}
+
+  /**
+   * Sets the entity on which the handler will operate.
+   * @param entity - The entity class constructor.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.currentEntity = entity;
+  }
 
   /**
    * Defines a one-to-many relationship.
@@ -27,19 +37,25 @@ export class RelationsHandler<T> {
     target: ClassConstructor<any>,
     options: Partial<RelationMetadata>,
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for RelationsHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set relation. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set relation. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
+
     const relationMeta: OneToManyMetadata = {
       propertyKey,
       target,
       cascade: options.cascade || false,
-      // You can map additional options here
+      // Map additional options here
     };
+
     this.schema
-      .getMetadata()
+      .getMetadata(this.currentEntity)
       .tableMetadata!.oneToManyRelations.push(relationMeta);
   }
 
@@ -54,19 +70,25 @@ export class RelationsHandler<T> {
     target: ClassConstructor<any>,
     options: Partial<RelationMetadata>,
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for RelationsHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set relation. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set relation. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
+
     const relationMeta: ManyToOneMetadata = {
       propertyKey,
       target,
       cascade: options.cascade || false,
-      // You can map additional options here
+      // Map additional options here
     };
+
     this.schema
-      .getMetadata()
+      .getMetadata(this.currentEntity)
       .tableMetadata!.manyToOneRelations.push(relationMeta);
   }
 
@@ -81,11 +103,16 @@ export class RelationsHandler<T> {
     target: ClassConstructor<any>,
     options: Partial<RelationMetadata>,
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for RelationsHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set relation. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set relation. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
+
     const relationMeta: ManyToManyMetadata = {
       propertyKey,
       target,
@@ -93,8 +120,9 @@ export class RelationsHandler<T> {
       joinTable: options.joinTable,
       // Map additional options as needed
     };
+
     this.schema
-      .getMetadata()
+      .getMetadata(this.currentEntity)
       .tableMetadata!.manyToManyRelations.push(relationMeta);
   }
 
@@ -109,21 +137,25 @@ export class RelationsHandler<T> {
     target: ClassConstructor<any>,
     options: Partial<RelationMetadata>,
   ): void {
-    if (!this.schema.isTable()) {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for RelationsHandler.');
+    }
+
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set relation. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set relation. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
+
     const relationMeta: OneToOneMetadata = {
       propertyKey,
       target,
       cascade: options.cascade || false,
       // Map additional options as needed
     };
+
     this.schema
-      .getMetadata()
+      .getMetadata(this.currentEntity)
       .tableMetadata!.oneToOneRelations.push(relationMeta);
   }
-
-  // You can add more methods for other types of relations or modify existing ones
 }

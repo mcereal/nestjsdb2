@@ -37,8 +37,8 @@ export class Db2Module {
   }
 
   static forFeature(entities: Function[]): DynamicModule {
-    const modelProviders: Provider[] = entities.map((entity) =>
-      this.createModelProvider(entity as ClassConstructor),
+    const modelProviders: Provider[] = this.createModelProviders(
+      entities as ClassConstructor<any>[],
     );
 
     return {
@@ -56,8 +56,8 @@ export class Db2Module {
     ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
     inject?: any[];
   }): DynamicModule {
-    const modelProviders: Provider[] = options.entities.map((entity) =>
-      this.createModelProvider(entity as ClassConstructor),
+    const modelProviders: Provider[] = this.createModelProviders(
+      options.entities as ClassConstructor<any>[],
     );
 
     return {
@@ -91,17 +91,28 @@ export class Db2Module {
     });
   }
 
-  private static createModelProvider(entity: ClassConstructor): Provider {
+  private static createModelProviders(
+    entities: ClassConstructor<any>[],
+  ): Provider[] {
+    const schema = new Schema(entities); // Create a Schema instance with multiple entities
+
+    return entities.map((entity) => this.createModelProvider(entity, schema));
+  }
+
+  private static createModelProvider(
+    entity: ClassConstructor<any>,
+    schema: Schema<ClassConstructor<any>[]>,
+  ): Provider {
     const metadata = EntityMetadataStorage.getEntityMetadata(entity);
     if (!metadata || metadata.entityType !== 'table') {
       throw new Error(`Entity ${entity.name} is not a valid table entity.`);
     }
-    const schema = new Schema(entity);
 
     return {
       provide: `${entity.name}Model`,
       useFactory: (db2Service: Db2Service, modelRegistry: ModelRegistry) => {
         const model = new Model(db2Service, schema, modelRegistry);
+        model.setEntity(entity);
         modelRegistry.registerModel(`${entity.name}Model`, model);
         return model;
       },
@@ -144,7 +155,7 @@ export class Db2Module {
         }),
       ],
       providers: [
-        ModelRegistry, // Register ModelRegistry as a provider
+        ModelRegistry,
         Db2PoolManager,
         Db2ConnectionManager,
         Db2Client,
@@ -178,7 +189,7 @@ export class Db2Module {
         I_TRANSACTION_MANAGER,
         I_DB2_MIGRATION_SERVICE,
         I_DB2_CONFIG,
-        ModelRegistry, // Export ModelRegistry if external access is needed
+        ModelRegistry,
       ],
     };
   }

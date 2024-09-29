@@ -1,15 +1,26 @@
 // src/orm/schema-handlers/foreign-keys.handler.ts
 import { Schema } from '../schema';
 import { ForeignKeyMetadata } from '../../interfaces';
+import { ClassConstructor } from '../../types';
 
 /**
  * Handles foreign key-related operations for a schema.
  */
-export class ForeignKeysHandler<T> {
-  constructor(private schema: Schema<T>) {}
+export class ForeignKeysHandler {
+  private currentEntity!: ClassConstructor<any>;
+
+  constructor(private schema: Schema<any>) {}
 
   /**
-   * Defines a foreign key on a column.
+   * Sets the entity on which the handler will operate.
+   * @param entity - The entity class constructor.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.currentEntity = entity;
+  }
+
+  /**
+   * Defines a foreign key on a column for the current entity.
    * @param propertyKey - The property name in the entity.
    * @param options - Foreign key configuration options.
    * @throws Will throw an error if required options are missing or if the entity is not a table.
@@ -18,10 +29,14 @@ export class ForeignKeysHandler<T> {
     propertyKey: string,
     options: Partial<ForeignKeyMetadata>,
   ): void {
+    if (!this.currentEntity) {
+      throw new Error('No entity set for ForeignKeysHandler.');
+    }
+
     // Validate the entity type
-    if (!this.schema.isTable()) {
+    if (!this.schema.isTable(this.currentEntity)) {
       throw new Error(
-        `Cannot set foreign key. Entity '${this.schema.getEntityName()}' is not a table.`,
+        `Cannot set foreign key. Entity '${this.schema.getEntityName(this.currentEntity)}' is not a table.`,
       );
     }
 
@@ -60,7 +75,9 @@ export class ForeignKeysHandler<T> {
       include: options.include,
     };
 
-    // Push the foreign key metadata to the table metadata in the schema
-    this.schema.getMetadata().tableMetadata!.foreignKeys.push(foreignKeyMeta);
+    // Push the foreign key metadata to the table metadata of the current entity
+    this.schema
+      .getMetadata(this.currentEntity)
+      .tableMetadata!.foreignKeys.push(foreignKeyMeta);
   }
 }

@@ -216,6 +216,7 @@ export type EntityType = 'table' | 'view';
 
 export interface EntityMetadata {
   entityType: EntityType;
+  name: string;
   tableMetadata?: TableMetadata;
   viewMetadata?: ViewMetadata;
 }

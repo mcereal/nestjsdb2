@@ -17,33 +17,35 @@ import { ClassConstructor } from '../types';
 @Injectable()
 export class Model<T> {
   private readonly logger = new Logger(Model.name);
-  private schema: Schema<T>;
-  private entityConstructor: ClassConstructor<T>;
+  private schema: Schema<ClassConstructor<any>[]>;
+  private currentEntity?: ClassConstructor<any>;
 
   constructor(
     private db2Service: Db2Service,
-    schema: Schema<T>,
+    schema: Schema<ClassConstructor<any>[]>,
     private modelRegistry: ModelRegistry,
   ) {
     this.schema = schema;
-    const metadata = this.schema.getMetadata();
-    if (!metadata.tableMetadata) {
-      throw new Error('Schema must have table metadata.');
-    }
-    this.entityConstructor = this.schema.getConstructor();
+  }
+
+  /**
+   * Set the current entity context for schema operations.
+   * @param entity - The class constructor of the entity.
+   */
+  setEntity(entity: ClassConstructor<any>): void {
+    this.schema.setEntity(entity);
+    this.currentEntity = entity;
   }
 
   // Integrate QueryBuilder for advanced queries
   createQueryBuilder(): IQueryBuilder {
-    return new QueryBuilder(
-      this.schema.getMetadata().tableMetadata!.tableName,
-      this.db2Service,
-    );
+    const metadata = this.schema.getCurrentMetadata();
+    return new QueryBuilder(metadata.tableMetadata!.tableName, this.db2Service);
   }
 
   // Create a new instance of the model with validation and default values
   create(data: Partial<T>): T {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     if (!metadata.tableMetadata)
       throw new Error('Invalid schema metadata for model.');
 
@@ -96,7 +98,7 @@ export class Model<T> {
 
   // Save the instance to the database
   async save(instance: T): Promise<T> {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
@@ -162,12 +164,12 @@ export class Model<T> {
     try {
       const results = await this.db2Service.query<T[]>(sql, params);
       this.logger.log(
-        `Query executed successfully on ${this.schema.getMetadata().tableMetadata!.tableName}: ${sql}`,
+        `Query executed successfully on ${this.schema.getCurrentMetadata().tableMetadata!.tableName}: ${sql}`,
       );
       return results;
     } catch (error) {
       this.logger.error(
-        `Error executing query on ${this.schema.getMetadata().tableMetadata!.tableName}: ${error.message}`,
+        `Error executing query on ${this.schema.getCurrentMetadata().tableMetadata!.tableName}: ${error.message}`,
         error.stack,
       );
       throw new Error(
@@ -178,7 +180,7 @@ export class Model<T> {
 
   // Query methods like find, findOne, update, delete
   async find(query: Partial<T>): Promise<T[]> {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
@@ -207,7 +209,7 @@ export class Model<T> {
   }
 
   async update(query: Partial<T>, data: Partial<T>): Promise<void> {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
@@ -240,7 +242,7 @@ export class Model<T> {
   }
 
   async delete(query: Partial<T>): Promise<void> {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
@@ -267,7 +269,7 @@ export class Model<T> {
   }
 
   async softDelete(query: Partial<T>): Promise<void> {
-    const metadata = this.schema.getMetadata();
+    const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
@@ -324,15 +326,15 @@ export class Model<T> {
 
   async populate(instance: T, path: keyof T & string): Promise<T> {
     const oneToManyRelations = getPropertyMetadata(
-      this.entityConstructor,
+      this.currentEntity,
       'oneToManyRelations',
     );
     const manyToOneRelations = getPropertyMetadata(
-      this.entityConstructor,
+      this.currentEntity,
       'manyToOneRelations',
     );
     const manyToManyRelations = getPropertyMetadata(
-      this.entityConstructor,
+      this.currentEntity,
       'manyToManyRelations',
     );
 
@@ -352,7 +354,7 @@ export class Model<T> {
 
     if (!relationMetadata) {
       throw new Error(
-        `Relation '${path}' not found on '${this.schema.getMetadata().tableMetadata?.tableName}'.`,
+        `Relation '${path}' not found on '${this.schema.getCurrentMetadata().tableMetadata?.tableName}'.`,
       );
     }
 
@@ -403,8 +405,6 @@ export class Model<T> {
     return instance;
   }
 
-  // src/orm/model.ts
-
   async findPaginated(
     query: Partial<T>,
     page: number = 1,
@@ -435,7 +435,7 @@ export class Model<T> {
     const total = countResult.length > 0 ? countResult[0].count : 0;
 
     this.logger.log(
-      `Paginated query executed successfully on ${this.schema.getMetadata().tableMetadata!.tableName}: ${sql}`,
+      `Paginated query executed successfully on ${this.schema.getCurrentMetadata().tableMetadata!.tableName}: ${sql}`,
     );
 
     return { data, total, page, pageSize };
