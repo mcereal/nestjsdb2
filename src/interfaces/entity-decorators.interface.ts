@@ -71,6 +71,11 @@ export interface ForeignKeyMetadata {
   functional?: boolean;
   expression?: string;
   include?: string[];
+  columnNames?: string[];
+  referencedTable?: string;
+  referencedColumnNames?: string[];
+  deferrable?: boolean;
+  match?: string;
 }
 
 export interface IndexedColumnMetadata {

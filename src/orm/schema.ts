@@ -5,11 +5,17 @@ import {
   EntityMetadata,
   ColumnMetadata,
   RelationMetadata,
+  ForeignKeyMetadata,
+  IndexedColumnMetadata,
 } from '../interfaces';
 import { ClassConstructor } from '../types';
 import { ColumnsHandler } from './schema-handlers/columns.handler';
 import { RelationsHandler } from './schema-handlers/relations.handler';
 import { ConstraintsHandler } from './schema-handlers/constraints.handler';
+import { IndexesHandler } from './schema-handlers/indexes.handler';
+import { ForeignKeysHandler } from './schema-handlers/foreign-keys.handler';
+import { DefaultValuesHandler } from './schema-handlers/default-values.handler';
+import { CompositeKeysHandler } from './schema-handlers/composite-keys.handler';
 
 /**
  * Represents the schema definition for an entity.
@@ -20,7 +26,10 @@ export class Schema<T> {
   private columnsHandler: ColumnsHandler<T>;
   private relationsHandler: RelationsHandler<T>;
   private constraintsHandler: ConstraintsHandler<T>;
-  // You can add more handlers as needed (e.g., IndexesHandler)
+  private indexesHandler: IndexesHandler<T>;
+  private foreignKeysHandler: ForeignKeysHandler<T>;
+  private defaultValuesHandler: DefaultValuesHandler<T>;
+  private compositeKeysHandler: CompositeKeysHandler<T>;
 
   /**
    * Initializes the Schema with the given entity.
@@ -32,10 +41,15 @@ export class Schema<T> {
       throw new Error(`No metadata found for entity: ${this.entity.name}`);
     }
     this.metadata = metadata;
+
+    // Initialize handlers
     this.columnsHandler = new ColumnsHandler(this);
     this.relationsHandler = new RelationsHandler(this);
     this.constraintsHandler = new ConstraintsHandler(this);
-    // Initialize other handlers here
+    this.indexesHandler = new IndexesHandler(this);
+    this.foreignKeysHandler = new ForeignKeysHandler(this);
+    this.defaultValuesHandler = new DefaultValuesHandler(this);
+    this.compositeKeysHandler = new CompositeKeysHandler(this);
   }
 
   /**
@@ -91,7 +105,43 @@ export class Schema<T> {
     this.constraintsHandler.setConstraint(propertyKey, options, constraint);
   }
 
-  // Similarly, you can add methods for other operations like setting foreign keys, indexes, etc.
+  /**
+   * Defines a foreign key on a column.
+   * @param propertyKey - The property name in the entity.
+   * @param options - Foreign key configuration options.
+   */
+  setForeignKey(
+    propertyKey: string,
+    options: Partial<ForeignKeyMetadata>,
+  ): void {
+    this.foreignKeysHandler.setForeignKey(propertyKey, options);
+  }
+
+  /**
+   * Defines an index on a column.
+   * @param propertyKey - The property name in the entity.
+   * @param options - Index configuration options.
+   */
+  setIndex(propertyKey: string, options: Partial<IndexedColumnMetadata>): void {
+    this.indexesHandler.setIndex(propertyKey, options);
+  }
+
+  /**
+   * Defines a default value on a column.
+   * @param propertyKey - The property name in the entity.
+   * @param value - The default value.
+   */
+  setDefaultValue(propertyKey: string, value: any): void {
+    this.defaultValuesHandler.setDefaultValue(propertyKey, value);
+  }
+
+  /**
+   * Defines a composite key on columns.
+   * @param propertyKeys - The property names in the entity.
+   */
+  setCompositeKey(propertyKeys: string[]): void {
+    this.compositeKeysHandler.setCompositeKey(propertyKeys);
+  }
 
   /**
    * Finalizes the schema by performing validations.
@@ -99,7 +149,6 @@ export class Schema<T> {
    */
   finalizeSchema(): void {
     this.validateSchema();
-    // Optionally, register the schema or perform other finalization steps
   }
 
   /**
