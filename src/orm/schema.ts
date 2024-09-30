@@ -18,6 +18,11 @@ import {
   ForeignKeyMetadata,
   PrimaryKeyMetadata,
 } from './interfaces/keys.interfaces';
+import {
+  validateOrReject,
+  registerValidation,
+} from '../validation/validateOrReject';
+import { ConstraintMetadata } from './interfaces/constraints.interfaces';
 
 /**
  * Represents the schema definition for multiple entities.
@@ -63,9 +68,31 @@ export class Schema<T extends ClassConstructor<any>[]> {
       this.defaultValuesHandler = new DefaultValuesHandler(this);
       this.compositeKeysHandler = new CompositeKeysHandler(this);
       this.primaryKeysHandler = new PrimaryKeysHandler(this);
+
+      // Register validation rules for entities
+      this.entities.forEach((entity) => {
+        this.registerEntityValidation(entity);
+      });
     } catch (error: any) {
       throw new Error(`Failed to initialize Schema: ${error.message}`);
     }
+  }
+
+  /**
+   * Registers validation rules for a given entity.
+   * This method should define the validation rules for the entity's properties.
+   * @param entity - The class constructor of the entity.
+   */
+  private registerEntityValidation<U>(entity: ClassConstructor<U>): void {
+    const validationRules = {
+      // Define validation rules for the entity's properties
+      columnName: [
+        (value: any) => (value ? null : 'Column name cannot be empty'),
+      ],
+      name: [(value: any) => (value ? null : 'Name cannot be empty')],
+    };
+
+    registerValidation(entity, validationRules);
   }
 
   /**
@@ -79,12 +106,6 @@ export class Schema<T extends ClassConstructor<any>[]> {
       if (!metadata) {
         throw new Error('Metadata is undefined or null');
       }
-
-      // Set the schema name if it's not already set
-      if (!metadata.schemaName) {
-        metadata.schemaName = 'public'; // Default schema if not specified
-      }
-
       return metadata;
     } catch (error: any) {
       throw new Error(
@@ -159,17 +180,19 @@ export class Schema<T extends ClassConstructor<any>[]> {
   }
 
   /**
-   * Adds a column to the specified entity's schema.
+   * Adds a column to the specified entity's schema with validation.
    * @param entity - The entity class constructor.
    * @param propertyKey - The property name in the entity.
    * @param options - Column configuration options.
    */
-  addColumn<U>(
+  async addColumn<U>(
     entity: ClassConstructor<U>,
     propertyKey: string,
     options: ColumnMetadata,
-  ): void {
+  ): Promise<void> {
     try {
+      await validateOrReject(entity);
+
       this.columnsHandler.setEntity(entity);
       this.columnsHandler.addColumn(propertyKey, options);
     } catch (error) {
@@ -178,7 +201,6 @@ export class Schema<T extends ClassConstructor<any>[]> {
       );
     }
   }
-
   /**
    * Defines a one-to-many relationship for a specific entity.
    * @param entity - The entity class constructor.
@@ -226,17 +248,20 @@ export class Schema<T extends ClassConstructor<any>[]> {
   }
 
   /**
-   * Defines a foreign key on a column for a specific entity.
+   * Defines a foreign key on a column for a specific entity with validation.
    * @param entity - The entity class constructor.
    * @param propertyKey - The property name in the entity.
    * @param options - Foreign key configuration options.
    */
-  setForeignKey<U>(
+  async setForeignKey<U>(
     entity: ClassConstructor<U>,
     propertyKey: string,
     options: Partial<ForeignKeyMetadata>,
-  ): void {
+  ): Promise<void> {
     try {
+      // Validate the entity's current state before making changes
+      await validateOrReject(entity);
+
       this.foreignKeysHandler.setEntity(entity);
       this.foreignKeysHandler.setForeignKey(propertyKey, options);
     } catch (error) {
@@ -333,11 +358,12 @@ export class Schema<T extends ClassConstructor<any>[]> {
   /**
    * Finalizes the schema for all entities by performing validations.
    */
-  finalizeSchema(): void {
+  async finalizeSchema(): Promise<void> {
     try {
-      this.entities.forEach((entity) => {
+      for (const entity of this.entities) {
+        await validateOrReject(entity);
         this.validateSchema(entity);
-      });
+      }
     } catch (error) {
       throw new Error(`Failed to finalize schema: ${error.message}`);
     }
@@ -353,29 +379,59 @@ export class Schema<T extends ClassConstructor<any>[]> {
 
       if (metadata.entityType === 'table') {
         const tableMeta = metadata.tableMetadata!;
+
+        // Set default tableName if not provided
+        if (!tableMeta.tableName) {
+          tableMeta.tableName = this.toSnakeCase(entity.name) + 's'; // Example: 'Post' -> 'posts'
+        }
+
+        // Validate table name
         if (!tableMeta.tableName) {
           throw new Error(`Table name is not set for entity: ${entity.name}`);
         }
+
+        // Validate columns
         if (tableMeta.columns.length === 0) {
           throw new Error(
             `No columns defined for table: ${tableMeta.tableName}`,
           );
         }
+        this.validateColumns(tableMeta.columns, entity);
+
+        // Validate primary keys
         if (tableMeta.primaryKeys.length === 0) {
           throw new Error(
             `Primary key not defined for table: ${tableMeta.tableName}`,
           );
         }
+        this.validatePrimaryKeys(
+          tableMeta.primaryKeys,
+          tableMeta.columns,
+          entity,
+        );
+
+        // Validate foreign keys
+        this.validateForeignKeys(tableMeta.foreignKeys, entity);
+
+        // Validate constraints
+        this.validateConstraints(tableMeta.constraints, entity);
       } else if (metadata.entityType === 'view') {
         const viewMeta = metadata.viewMetadata!;
+
+        // Validate view name
         if (!viewMeta.viewName) {
           throw new Error(`View name is not set for entity: ${entity.name}`);
         }
+
+        // Validate underlying query
         if (!viewMeta.underlyingQuery) {
           throw new Error(
             `Underlying query is not set for view: ${viewMeta.viewName}`,
           );
         }
+
+        // Validate columns in view
+        this.validateColumns(viewMeta.columns, entity);
       } else {
         throw new Error(`Unknown entity type for entity: ${entity.name}`);
       }
@@ -384,6 +440,111 @@ export class Schema<T extends ClassConstructor<any>[]> {
         `Failed to validate schema for entity '${entity.name}': ${error.message}`,
       );
     }
+  }
+
+  // Helper method to convert PascalCase to snake_case (example implementation)
+  private toSnakeCase(name: string): string {
+    return name
+      .replace(/([A-Z])/g, '_$1')
+      .toLowerCase()
+      .replace(/^_/, '');
+  }
+
+  // Helper method to validate columns
+  private validateColumns(
+    columns: ColumnMetadata[],
+    entity: ClassConstructor<any>,
+  ): void {
+    const columnNames = new Set<string>();
+    columns.forEach((column, index) => {
+      if (!column.name) {
+        throw new Error(
+          `Column at index ${index} in entity '${entity.name}' has no name.`,
+        );
+      }
+      if (columnNames.has(column.name)) {
+        throw new Error(
+          `Duplicate column name '${column.name}' found in entity '${entity.name}'.`,
+        );
+      }
+      columnNames.add(column.name);
+
+      if (!column.type) {
+        throw new Error(
+          `Column '${column.name}' in entity '${entity.name}' has no type defined.`,
+        );
+      }
+      // Additional column-specific validation logic can be added here
+    });
+  }
+
+  // Helper method to validate primary keys
+  // Helper method to validate primary keys
+  private validatePrimaryKeys(
+    primaryKeys: PrimaryKeyMetadata[],
+    columns: ColumnMetadata[],
+    entity: ClassConstructor<any>,
+  ): void {
+    const columnNames = columns.map((col) => col.name);
+    primaryKeys.forEach((pk, index) => {
+      console.log(
+        `Validating primary key ${index} for entity '${entity.name}':`,
+        pk,
+      );
+
+      if (!pk.propertyKey) {
+        // Changed from columnName to propertyKey
+        throw new Error(
+          `Primary key at index ${index} in entity '${entity.name}' has no property key.`,
+        );
+      }
+      if (!columnNames.includes(pk.propertyKey)) {
+        // Changed from columnName to propertyKey
+        throw new Error(
+          `Primary key '${pk.propertyKey}' in entity '${entity.name}' is not a valid column.`,
+        );
+      }
+    });
+  }
+
+  // Helper method to validate foreign keys
+  private validateForeignKeys(
+    foreignKeys: ForeignKeyMetadata[],
+    entity: ClassConstructor<any>,
+  ): void {
+    foreignKeys.forEach((fk, index) => {
+      if (!fk.columnNames) {
+        throw new Error(
+          `Foreign key at index ${index} in entity '${entity.name}' has no column name.`,
+        );
+      }
+      if (!fk.referencedTable) {
+        throw new Error(
+          `Foreign key '${fk.columnNames}' in entity '${entity.name}' has no referenced table defined.`,
+        );
+      }
+      if (!fk.referencedColumnNames) {
+        throw new Error(
+          `Foreign key '${fk.columnNames}' in entity '${entity.name}' has no referenced column defined.`,
+        );
+      }
+      // Additional foreign key validation logic can be added here
+    });
+  }
+
+  // Helper method to validate constraints
+  private validateConstraints(
+    constraints: ConstraintMetadata[],
+    entity: ClassConstructor<any>,
+  ): void {
+    constraints.forEach((constraint, index) => {
+      if (!constraint.constraint.name) {
+        throw new Error(
+          `Constraint at index ${index} in entity '${entity.name}' has no name.`,
+        );
+      }
+      // Additional constraint-specific validation logic can be added here
+    });
   }
 
   /**

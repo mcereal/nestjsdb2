@@ -6,7 +6,7 @@ import { Model } from '@mcereal/nestjsdb2';
 @Injectable()
 export class UserRoleService {
   constructor(
-    @Inject('USER_ROLE_VIEW')
+    @Inject('USERROLE_MODEL')
     private readonly userRoleModel: Model<UserRoleView>,
   ) {}
 

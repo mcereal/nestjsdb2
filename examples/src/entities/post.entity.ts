@@ -8,6 +8,8 @@ import { Category } from './category.entity';
 @Entity({
   name: 'Post',
   entityType: 'table',
+  schemaName: 'public',
+  // tableName: 'posts',
 })
 export class Post {
   @PrimaryKey({ type: 'integer', autoIncrement: true, nullable: false })

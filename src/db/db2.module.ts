@@ -102,7 +102,9 @@ export class Db2Module implements IDb2ConfigManager {
    * Registers entity models.
    * @param entities Array of entity classes to register.
    */
-  public static forFeature(entities: ClassConstructor<any>[]) {
+  public static forFeature(
+    entities: ClassConstructor<any>[],
+  ): Promise<ClassConstructor<any>[]> {
     if (!this.instance || !this.modelRegistry) {
       throw new Error(
         'Db2Module must be initialized with forRoot or forRootAsync before registering entities.',
@@ -117,13 +119,13 @@ export class Db2Module implements IDb2ConfigManager {
    */
   public static async forFeatureAsync(
     entities: ClassConstructor<any>[],
-  ): Promise<void> {
+  ): Promise<ClassConstructor<any>[]> {
     if (!this.instance || !this.modelRegistry) {
       throw new Error(
         'Db2Module must be initialized with forRoot or forRootAsync before registering entities.',
       );
     }
-    await this.instance.registerEntitiesAsync(entities);
+    return await this.instance.registerEntitiesAsync(entities);
   }
 
   /**
@@ -158,9 +160,15 @@ export class Db2Module implements IDb2ConfigManager {
    */
   private async registerEntitiesAsync(
     entities: ClassConstructor<any>[],
-  ): Promise<void> {
-    this.registerEntities(entities);
-    // Add any asynchronous initialization if required
+  ): Promise<ClassConstructor<any>[]> {
+    try {
+      await this.registerEntities(entities);
+      this.logger.info('Entities registered successfully.');
+      return entities;
+    } catch (error) {
+      this.logger.error('Failed to register entities:', error);
+      throw error; // Propagate the error after logging
+    }
   }
 
   /**
@@ -217,7 +225,9 @@ export class Db2Module implements IDb2ConfigManager {
    * Registers entities by creating and registering their corresponding models.
    * @param entities Array of entity classes to register.
    */
-  private registerEntities(entities: ClassConstructor<any>[]): void {
+  private registerEntities(
+    entities: ClassConstructor<any>[],
+  ): Promise<ClassConstructor<any>[]> {
     const schema = new Schema(entities);
 
     // Initialize metadata for all entities
@@ -243,6 +253,7 @@ export class Db2Module implements IDb2ConfigManager {
     });
 
     this.logger.info('Entities registered successfully.');
+    return Promise.resolve(entities);
   }
   /**
    * Runs database migrations using the MigrationService.

@@ -187,7 +187,4 @@ export interface EntityMetadata {
 
   /** Metadata for the view, if the entity is a view. */
   viewMetadata?: ViewMetadata;
-
-  /** The name of the schema to which the entity belongs. */
-  schemaName?: string;
 }

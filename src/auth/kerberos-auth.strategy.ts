@@ -1,15 +1,14 @@
 // src/auth/kerberos-auth.strategy.ts
 
-import { Inject, Logger } from '@nestjs/common';
 import { Db2AuthStrategy } from './db2-auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
+import { Logger } from '../utils';
 import {
   IDb2ConfigOptions,
   IConnectionManager,
   Db2KerberosAuthOptions,
 } from '../interfaces';
-import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
 import { KerberosClient } from './kerberos.client';
 
 export class KerberosAuthStrategy extends Db2AuthStrategy {
@@ -18,7 +17,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
 
   constructor(
     config: IDb2ConfigOptions,
-    @Inject(I_CONNECTION_MANAGER) connectionManager: IConnectionManager,
+    connectionManager: IConnectionManager,
   ) {
     super(config, connectionManager);
     if (!connectionManager) {
@@ -37,14 +36,14 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
       this.connectionManager.getState().connectionState ===
       Db2ConnectionState.CONNECTED
     ) {
-      this.logger.log('Already authenticated. Skipping...');
+      this.logger.info('Already authenticated. Skipping...');
       return;
     }
 
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
-    this.logger.log('Starting Kerberos authentication...');
+    this.logger.info('Starting Kerberos authentication...');
 
     const authOptions = this.config.auth as Db2KerberosAuthOptions;
     const { krbServiceName, username, krbKeytab, krbKdc, password } =
@@ -67,7 +66,7 @@ export class KerberosAuthStrategy extends Db2AuthStrategy {
     try {
       await this.kerberosClient.initializeClient();
       await this.kerberosClient.acquireKerberosTicket();
-      this.logger.log('Authentication successful using Kerberos strategy.');
+      this.logger.info('Authentication successful using Kerberos strategy.');
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.CONNECTED,
       });

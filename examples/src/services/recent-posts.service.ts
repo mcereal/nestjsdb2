@@ -6,7 +6,7 @@ import { Model } from '@mcereal/nestjsdb2';
 @Injectable()
 export class RecentPostsService {
   constructor(
-    @Inject('RECENT_POSTS_VIEW')
+    @Inject('RECENTPOSTSVIEW_MODEL')
     private readonly recentPostsModel: Model<RecentPostsView>,
   ) {}
 

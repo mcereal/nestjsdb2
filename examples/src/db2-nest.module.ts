@@ -1,42 +1,60 @@
-import { Module, DynamicModule, Provider } from '@nestjs/common';
-import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
+// src/db2-nest.module.ts
 
+import { Module, DynamicModule, Provider, Global } from '@nestjs/common';
+import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
+import { Schema } from '@mcereal/nestjsdb2';
+
+@Global() // Makes the module global
 @Module({})
 export class Db2NestModule {
   /**
    * Initializes the Db2NestModule instance asynchronously.
-   * @param configFactory A factory function to provide configuration options.
+   * @param options An object containing the asynchronous configuration options.
    * @returns A dynamic module for NestJS.
    */
-  static async forRootAsync(
-    configFactory: () => Promise<IDb2ConfigOptions> | IDb2ConfigOptions,
-  ): Promise<DynamicModule> {
-    // Initialize the standalone Db2Module instance asynchronously
-    const db2ModuleInstance = await Db2Module.forRootAsync(configFactory);
-
+  static forRootAsync(options: {
+    imports?: any[]; // Modules required by the factory
+    useFactory: (
+      ...args: any[]
+    ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
+    inject?: any[]; // Providers to inject into the factory
+  }): DynamicModule {
     const db2ModuleProvider: Provider = {
       provide: 'DB2_MODULE',
-      useValue: db2ModuleInstance,
+      useFactory: async (...args: any[]) => {
+        const config = await options.useFactory(...args);
+        return await Db2Module.forRootAsync(() => config);
+      },
+      inject: options.inject || [],
     };
 
     return {
       module: Db2NestModule,
+      imports: options.imports || [],
       providers: [db2ModuleProvider],
-      exports: [db2ModuleProvider],
+      exports: ['DB2_MODULE'],
     };
   }
 
   /**
-   * Registers entity models.
-   * @param entities Array of entity classes to register.
+   * Registers entity models and views.
+   * @param entities Array of entity and view classes to register.
    * @returns A dynamic module for NestJS.
    */
-  static forFeature(entities: any[]): DynamicModule {
-    // Register entities with the standalone Db2Module
-    Db2Module.forFeature(entities);
+  static forFeature(schema: Schema<any>): DynamicModule {
+    const db2FeatureProvider: Provider = {
+      provide: 'DB2_FEATURE',
+      useFactory: async (db2Module: any) => {
+        await db2Module.forFeature(schema.getEntities());
+        return db2Module;
+      },
+      inject: ['DB2_MODULE'],
+    };
 
     return {
       module: Db2NestModule,
+      providers: [db2FeatureProvider],
+      exports: [db2FeatureProvider],
     };
   }
 }

@@ -13,7 +13,12 @@ export class Comment {
   @PrimaryKey({ type: 'integer', autoIncrement: true })
   id!: number;
 
-  @ForeignKey({ target: BlogPost })
+  @ForeignKey({
+    target: BlogPost,
+    reference: 'posts(id)',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   post_id!: number;
 
   @ForeignKey({
