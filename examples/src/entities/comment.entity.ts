@@ -7,7 +7,6 @@ import { Post as BlogPost } from './post.entity';
 @Entity({
   name: 'Comment',
   entityType: 'table',
-  schemaName: 'public',
 })
 export class Comment {
   @PrimaryKey({ type: 'integer', autoIncrement: true })

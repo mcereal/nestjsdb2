@@ -44,8 +44,8 @@ export class Db2NestModule {
   static forFeature(schema: Schema<any>): DynamicModule {
     const db2FeatureProvider: Provider = {
       provide: 'DB2_FEATURE',
-      useFactory: async (db2Module: any) => {
-        await db2Module.forFeature(schema.getEntities());
+      useFactory: async (db2Module: Db2Module) => {
+        await Db2Module.forFeature(schema.getEntities());
         return db2Module;
       },
       inject: ['DB2_MODULE'],
