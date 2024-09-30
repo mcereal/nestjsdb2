@@ -14,7 +14,6 @@ import { Db2NestModule } from './db2-nest.module';
 
 import { UserController } from './controllers/user.controller';
 import { PostController } from './controllers/post.controller';
-import { CommentController } from './controllers/comment.controller';
 import { CategoryController } from './controllers/category.controller';
 import { UserRoleController } from './controllers/user-role.controller';
 import { UserPostCountController } from './controllers/user-post-count.controller';
@@ -62,7 +61,6 @@ import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
   controllers: [
     UserController,
     PostController,
-    CommentController,
     CategoryController,
     UserRoleController,
     UserPostCountController,

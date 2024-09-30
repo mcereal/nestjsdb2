@@ -3,11 +3,13 @@
 import { MetadataManager, MetadataType } from '../metadata/metadata-manager';
 import { ForeignKeyMetadata } from '../interfaces';
 import { ClassConstructor } from '../types';
+import { Logger } from '../../utils/logger';
 
 /**
  * ForeignKeyDecorator class to handle foreign key metadata using MetadataManager.
  */
 class ForeignKeyDecorator {
+  private logger = new Logger('ForeignKeyDecorator');
   private metadataType: MetadataType = 'foreignKeys';
   private metadataManager: MetadataManager;
 
@@ -26,6 +28,7 @@ class ForeignKeyDecorator {
       !options.reference.includes('(') ||
       !options.reference.includes(')')
     ) {
+      this.logger.error(`Received invalid reference: ${options.reference}`);
       throw new Error(
         "ForeignKey decorator requires a 'reference' string in the format 'referenced_table(referenced_column)'.",
       );
@@ -36,6 +39,9 @@ class ForeignKeyDecorator {
       options.onDelete &&
       !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
     ) {
+      this.logger.error(
+        `Received invalid onDelete option: ${options.onDelete}`,
+      );
       throw new Error(
         "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
       );
@@ -46,6 +52,9 @@ class ForeignKeyDecorator {
       options.onUpdate &&
       !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onUpdate)
     ) {
+      this.logger.error(
+        `Received invalid onUpdate option: ${options.onUpdate}`,
+      );
       throw new Error(
         "ForeignKey decorator 'onUpdate' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
       );

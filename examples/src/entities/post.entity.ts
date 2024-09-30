@@ -10,13 +10,18 @@ import { Category } from './category.entity';
   entityType: 'table',
 })
 export class Post {
-  @PrimaryKey({ type: 'integer', autoIncrement: true })
+  @PrimaryKey({ type: 'integer', autoIncrement: true, nullable: false })
   id!: number;
 
-  @ForeignKey({ target: User, nullable: false })
+  @ForeignKey({
+    target: User,
+    reference: 'users(id)', // Added 'reference' property
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   user_id!: number;
 
-  @Column({ type: 'varchar', length: 150, nullable: false })
+  @Column({ type: 'varchar', length: 150, nullable: false, unique: true })
   title!: string;
 
   @Column({ type: 'text', nullable: false })
