@@ -173,7 +173,7 @@ export interface ForeignKeyMetadata {
   propertyKey: string | symbol;
 
   /** The target entity for the foreign key reference. */
-  target?: EntityMetadata;
+  target?: Function;
 
   /** The reference in the format 'referenced_table(referenced_column)'. */
   reference: string;

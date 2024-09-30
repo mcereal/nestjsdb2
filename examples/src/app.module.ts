@@ -12,12 +12,7 @@ import { UserPostCountView } from './entities/user-post-count.view';
 import { RecentPostsView } from './entities/recent-posts.view';
 import { UserCommentsView } from './entities/user-comments.view';
 
-import {
-  Db2Module,
-  Db2AuthType,
-  IDb2ConfigOptions,
-  db2ValidationSchema,
-} from '@mcereal/nestjsdb2';
+import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
 
 import { UserController } from './controllers/user.controller';
 import { PostController } from './controllers/post.controller';
@@ -35,6 +30,7 @@ import { UserRoleService } from './services/user-role.service';
 import { UserPostCountService } from './services/user-post-count.service';
 import { RecentPostsService } from './services/recent-posts.service';
 import { UserCommentsService } from './services/user-comments.service';
+import { db2ValidationSchema } from './config/db2.config';
 
 @Module({
   imports: [

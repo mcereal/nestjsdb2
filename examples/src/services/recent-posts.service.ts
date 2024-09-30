@@ -11,6 +11,6 @@ export class RecentPostsService {
   ) {}
 
   async getRecentPosts(): Promise<RecentPostsView[]> {
-    return await this.recentPostsModel.find();
+    return await this.recentPostsModel.find({});
   }
 }

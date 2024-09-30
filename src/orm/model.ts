@@ -362,7 +362,7 @@ export class Model<T> {
    * await model.delete({ username: 'john_doe' });
    * ```
    */
-  async delete(query: Partial<T>): Promise<void> {
+  async delete(query: Partial<T>): Promise<boolean> {
     const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
@@ -380,6 +380,7 @@ export class Model<T> {
       this.logger.log(
         `Deleted records from ${tableName} with query: ${JSON.stringify(query)}`,
       );
+      return true;
     } catch (error) {
       this.logger.error(
         `Error deleting from ${tableName}: ${error.message}`,

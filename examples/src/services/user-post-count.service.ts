@@ -11,6 +11,6 @@ export class UserPostCountService {
   ) {}
 
   async getUserPostCounts(): Promise<UserPostCountView[]> {
-    return await this.userPostCountModel.find();
+    return await this.userPostCountModel.find({});
   }
 }
