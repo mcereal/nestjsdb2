@@ -1,3 +1,10 @@
+## [1.1.19](https://github.com/mcereal/nestjsdb2/compare/v1.1.18...v1.1.19) (2024-09-30)
+
+
+### Bug Fixes
+
+* foreign key column names ([2306dd2](https://github.com/mcereal/nestjsdb2/commit/2306dd2abb5526f3cab3dd97d952e0cc1b1391cc))
+
 ## [1.1.18](https://github.com/mcereal/nestjsdb2/compare/v1.1.17...v1.1.18) (2024-09-30)
 
 
