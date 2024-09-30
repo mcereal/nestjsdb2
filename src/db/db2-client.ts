@@ -1,5 +1,4 @@
 import { Pool, Connection } from 'ibm_db';
-import { Inject, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   Db2AuthOptions,
   IDb2Client,
@@ -18,16 +17,13 @@ import {
   formatDb2Error,
 } from '../errors';
 import { Db2AuthStrategy } from '../auth/db2-auth.strategy';
-import { Db2ConfigManager } from './db2-config.manager';
+import { Db2Config } from './';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
-import {
-  I_CONNECTION_MANAGER,
-  I_DB2_CONFIG,
-  I_POOL_MANAGER,
-} from '../constants/injection-token.constant';
 import { Logger } from '../utils';
+import { MigrationService } from '../services/migration.service';
+import { MetadataManager } from '../orm/metadata';
 
-export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
+export class Db2Client implements IDb2Client {
   protected readonly config: IDb2ConfigOptions;
   protected readonly authConfig: Db2AuthOptions;
   protected readonly authStrategy: Db2AuthStrategy;
@@ -43,22 +39,25 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
   protected poolInitialized = false;
   private currentReconnectAttempts = 0;
   private idleConnections = 0;
+  private migrationService: MigrationService;
+  private metadataManager: MetadataManager;
 
   public constructor(
-    @Inject(I_DB2_CONFIG) // Inject the config
-    config: IDb2ConfigOptions,
-    @Inject(I_CONNECTION_MANAGER)
+    config: Db2Config,
     private readonly connectionManager: IConnectionManager,
-    @Inject(I_POOL_MANAGER)
     private readonly poolManager: IPoolManager,
   ) {
-    const configManager = new Db2ConfigManager(config);
-    this.config = configManager.getConfig();
+    this.config = config.config;
+
+    // Initialize MigrationService within Db2Client
+    this.migrationService = new MigrationService();
+
+    // Initialize MetadataManager
+    this.metadataManager = new MetadataManager();
   }
 
-  public async onModuleInit(): Promise<void> {
+  public async init(): Promise<void> {
     try {
-      // Wait for the pool to be initialized
       while (!this.poolManager.isPoolInitialized) {
         this.logger.info(
           'Waiting for the connection pool to be initialized...',
@@ -70,7 +69,8 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
         poolInitialized: true,
         connectionState: Db2ConnectionState.CONNECTED,
       });
-      this.logger.info('Db2 client module initialized successfully.');
+      this.logger.info('Db2 client initialized successfully.');
+
       this.startIdleTimeoutCheck(); // Start idle timeout checks after initialization
     } catch (error) {
       this.connectionManager.setState({
@@ -81,7 +81,10 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async onModuleDestroy(): Promise<void> {
+  /**
+   * Destroy the Db2Client. Should be called manually before shutting down the application.
+   */
+  public async destroy(): Promise<void> {
     await this.drainPool();
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.DISCONNECTED,
@@ -317,7 +320,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
    */
   public async query<T>(
     sql: string,
-    params: any[] = [],
+    params: Record<string, any> = [],
     timeout?: number,
   ): Promise<T> {
     const connection = await this.getConnection();
@@ -652,12 +655,57 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     try {
       this.logger.info('Executing query: ' + query);
       const connection = await this.getConnection();
-      const result = await this.query(query);
+      const result = await connection.query(query);
       this.logger.info('DB2 connection details retrieved successfully');
       return result;
     } catch (error) {
       this.logger.error('Failed to get DB connection details:', error);
       throw new Db2Error('Failed to get DB connection details');
+    }
+  }
+
+  /**
+   * Runs the migration scripts provided by the MigrationService.
+   */
+  private async runMigrations(): Promise<void> {
+    const entities = this.metadataManager.getAllEntities();
+
+    for (const entity of entities) {
+      let tableMetadata;
+      try {
+        tableMetadata =
+          this.metadataManager.getEntityMetadata(entity).tableMetadata;
+      } catch (error) {
+        this.logger.warn(
+          `No table metadata found for entity ${entity.name}. Skipping.`,
+        );
+        continue;
+      }
+
+      // Extract column details and options
+      const columns = tableMetadata.columns.reduce(
+        (acc, column) => {
+          acc[column.propertyKey] = column.type;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+
+      const options = {
+        primaryKeys: tableMetadata.primaryKeys
+          .map((pk) => pk.propertyKey)
+          .join(','),
+        // Add other options as needed
+      };
+
+      const createTableSQL = this.migrationService.generateCreateTableSQL(
+        tableMetadata.tableName,
+        columns,
+        options,
+      );
+
+      // Execute the generated SQL
+      await this.query(createTableSQL);
     }
   }
 }

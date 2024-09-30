@@ -1,14 +1,14 @@
 import { Db2IsolationLevel } from '../enums';
 import {
   Db2AuthOptions,
-  Db2BasicConnectionOptions,
+  Db2ConnectionOptions,
   Db2CacheOptions,
   Db2LoggingOptions,
   Db2MigrationOptions,
   Db2RetryOptions,
 } from './db2.interface';
 
-export interface IDb2ConfigOptions extends Db2BasicConnectionOptions {
+export interface IDb2ConfigOptions extends Db2ConnectionOptions {
   useTls?: boolean;
   sslCertificatePath?: string;
 

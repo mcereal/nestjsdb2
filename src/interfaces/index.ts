@@ -10,7 +10,7 @@
  * @requires Db2Client from "./db2-client.interface"
  * @requires Db2Service from "./db2-service.interface"
  * @requires TransactionManager from "./transaction-manager.interface"
- * @requires Db2QueryBuilder from "./db2-query-builder.interface"
+ * @requires QueryBuilder from "./query-builder.interface"
  * @requires Db2MigrationService from "./db2-migration-service.interface"
  *
  * @exports Db2ConfigOptions
@@ -18,7 +18,7 @@
  * @exports Db2Client
  * @exports Db2Service
  * @exports TransactionManager
- * @exports Db2QueryBuilder
+ * @exports QueryBuilder
  * @exports Db2MigrationService
  * @exports ConnectionManager
  * @exports IPoolManager
@@ -33,12 +33,12 @@ export * from './db2.interface';
 export * from './db2-client.interface';
 export * from './db2-service.interface';
 export * from './transaction-manager.interface';
-export * from './db2-query-builder.interface';
-export * from './db2-migration-service.interface';
+export * from './query-builder.interface';
+export * from './migration-service.interface';
 export * from './connection-mannager.interface';
 export * from './pool-manager.interface';
 export * from './transaction-manager.interface';
 export * from './db2-config-options.interface';
-export * from './entity-decorators.interface';
 export * from './kerberos-client.interface';
 export * from './logger.interface';
+export * from './config-manager.interface';

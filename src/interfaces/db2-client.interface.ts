@@ -2,16 +2,16 @@ import { Db2ConnectionState } from '../enums';
 import { Connection } from 'ibm_db';
 
 export interface IDb2Client {
-  // Lifecycle hooks
-  onModuleInit(): void;
-  onModuleDestroy(): void;
+  // Lifecycle methods
+  init(): Promise<void>;
 
   // Connection management methods
-
   closeConnection(connection: Connection): Promise<void>;
+  getConnection(): Promise<Connection>;
 
   // Connection pooling methods
   drainPool(): Promise<void>;
+  disconnect(): Promise<void>;
 
   // Transaction management methods
   beginTransaction(): Promise<void>;
@@ -19,7 +19,11 @@ export interface IDb2Client {
   rollbackTransaction(): Promise<void>;
 
   // Query execution methods
-  query<T>(sql: string, params?: any[], timeout?: number): Promise<T>;
+  query<T>(
+    sql: string,
+    params?: Record<string, any>,
+    timeout?: number,
+  ): Promise<T>;
   executePreparedStatement<T>(sql: string, params?: any[]): Promise<T>;
   batchInsert(
     tableName: string,
