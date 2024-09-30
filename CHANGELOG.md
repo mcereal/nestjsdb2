@@ -1,3 +1,19 @@
+## [1.1.10](https://github.com/mcereal/nestjsdb2/compare/v1.1.9...v1.1.10) (2024-09-30)
+
+
+### Bug Fixes
+
+* add handlers for schema ([0b3ac59](https://github.com/mcereal/nestjsdb2/commit/0b3ac59409bfcacac856effac05c431eb69bf474))
+* add primary keys handler ([a14ee13](https://github.com/mcereal/nestjsdb2/commit/a14ee1360de1a86b14dab840dce45adac8498887))
+* import statement ([4cfe3cb](https://github.com/mcereal/nestjsdb2/commit/4cfe3cb65af27dad50a21d45000e279c30c8ee50))
+* migration from db2 service to connection manager ([e5f44dc](https://github.com/mcereal/nestjsdb2/commit/e5f44dc9725ff6fa9351ea7c6afdc2883694aec8))
+* orm/migrations enabled ([665e96c](https://github.com/mcereal/nestjsdb2/commit/665e96c804b887578c1f8a52e5edecfef3200a2c))
+* reduce duplications ([f7696c2](https://github.com/mcereal/nestjsdb2/commit/f7696c276c2f3d5a0f4d55ae20a1153c0631034f))
+* refactor to use schema for columns and tables ([d020389](https://github.com/mcereal/nestjsdb2/commit/d02038940424816b923ed7362deee1b21fa93517))
+* remove nest dependencies ([d08930c](https://github.com/mcereal/nestjsdb2/commit/d08930cd90c64134abf259f57598c2ffe04bb152))
+* schema handles multiple models ([7302ecb](https://github.com/mcereal/nestjsdb2/commit/7302ecbe66fc59dd9701ad9bc98d56d902eb8c5b))
+* use base decorators for properties and classes ([ae51eea](https://github.com/mcereal/nestjsdb2/commit/ae51eeaab2a945e8f8553919ad38eb24d8b3dbfc))
+
 ## [1.1.9](https://github.com/mcereal/nestjsdb2/compare/v1.1.8...v1.1.9) (2024-09-25)
 
 
