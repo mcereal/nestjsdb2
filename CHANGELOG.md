@@ -1,3 +1,10 @@
+## [1.1.13](https://github.com/mcereal/nestjsdb2/compare/v1.1.12...v1.1.13) (2024-09-30)
+
+
+### Bug Fixes
+
+* add error handling/logging ([a909f67](https://github.com/mcereal/nestjsdb2/commit/a909f67ce05d22cab9bd2b6a76d10ad2b667edd0))
+
 ## [1.1.12](https://github.com/mcereal/nestjsdb2/compare/v1.1.11...v1.1.12) (2024-09-30)
 
 
