@@ -1,57 +1,33 @@
 // src/decorators/primary-key.decorator.ts
 
 import { BasePropertyDecorator } from './base-property.decorator';
-import { PrimaryKeyMetadata } from '../interfaces';
+import { PrimaryKeyMetadata, ColumnMetadata } from '../interfaces';
+import { ClassConstructor } from '../types';
 
 /**
- * PrimaryKeyDecorator class that extends BasePropertyDecorator to handle primary key metadata.
+ * PrimaryKeyDecorator class that extends BasePropertyDecorator to handle primary key metadata
+ * and simultaneously registers the primary key as a column.
  */
 class PrimaryKeyDecorator extends BasePropertyDecorator<
   Partial<PrimaryKeyMetadata>
 > {
   constructor() {
     super(
-      'primaryKeys', // MetadataType
+      'primaryKeys', // Use string literal instead of MetadataType.primaryKeys
       // Validation function for the primary key options
       (options: Partial<PrimaryKeyMetadata>) => {
         if (!options.type) {
           throw new Error('Primary key decorator requires a "type" option.');
         }
       },
-      // Metadata Creator
+      // Metadata Creator for primary keys
       (propertyKey, options) => ({
         propertyKey: propertyKey.toString(),
         name: options.name,
-        length: options.length,
         type: options.type,
-        generated: options.generated,
-        unique: options.unique,
-        nullable: options.nullable,
-        default: options.default,
-        onUpdate: options.onUpdate,
         autoIncrement: options.autoIncrement,
-        comment: options.comment,
-        collation: options.collation,
-        charset: options.charset,
-        precision: options.precision,
-        scale: options.scale,
-        zerofill: options.zerofill,
-        unsigned: options.unsigned,
-        spatial: options.spatial,
-        srid: options.srid,
-        geometryType: options.geometryType,
-        geometrySrid: options.geometrySrid,
-        geometryDimension: options.geometryDimension,
-        geometryTypeComment: options.geometryTypeComment,
-        enum: options.enum,
-        set: options.set,
-        asExpression: options.asExpression,
-        virtual: options.virtual,
-        stored: options.stored,
-        hidden: options.hidden,
-        defaultToNow: options.defaultToNow,
-        defaultToNowOnUpdate: options.defaultToNowOnUpdate,
-        defaultToUUID: options.defaultToUUID,
+        nullable: options.nullable,
+        // Include other properties as needed
       }),
       // Unique Check Function (optional)
       (existing: PrimaryKeyMetadata, newEntry: PrimaryKeyMetadata) =>
@@ -59,7 +35,35 @@ class PrimaryKeyDecorator extends BasePropertyDecorator<
     );
   }
 
-  // No need to implement createClassMetadata as it's a property decorator
+  /**
+   * Override the decorate method to also add column metadata.
+   * @param options - The primary key options.
+   * @returns PropertyDecorator
+   */
+  decorate(options: Partial<PrimaryKeyMetadata>): PropertyDecorator {
+    return (target: Object, propertyKey: string | symbol) => {
+      // First, decorate as primary key
+      super.decorate(options)(target, propertyKey);
+
+      // Then, register the same property as a column
+      const columnOptions: Partial<ColumnMetadata> = {
+        propertyKey: propertyKey.toString(),
+        name: options.name || propertyKey.toString(),
+        type: options.type || 'integer', // Default type if not provided
+        nullable: options.nullable !== undefined ? options.nullable : false,
+        // Include other relevant column options as needed
+      };
+
+      // Add column metadata
+      this.metadataManager.addMetadata(
+        target.constructor as ClassConstructor,
+        'columns', // Use string literal instead of MetadataType.columns
+        columnOptions,
+        (existing: ColumnMetadata, newEntry: ColumnMetadata) =>
+          existing.propertyKey === newEntry.propertyKey,
+      );
+    };
+  }
 }
 
 // Instance of PrimaryKeyDecorator
@@ -67,6 +71,7 @@ const primaryKeyDecoratorInstance = new PrimaryKeyDecorator();
 
 /**
  * @PrimaryKey decorator to define a primary key column.
+ * It registers both primary key metadata and column metadata.
  * @param options - The primary key options.
  * @returns PropertyDecorator
  */

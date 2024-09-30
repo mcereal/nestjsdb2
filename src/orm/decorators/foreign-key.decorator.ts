@@ -1,113 +1,74 @@
-// src/decorators/foreignKey.decorator.ts
+// src/decorators/foreign-key.decorator.ts
 
-import { MetadataManager, MetadataType } from '../metadata/metadata-manager';
-import { ForeignKeyMetadata } from '../interfaces';
+import { BasePropertyDecorator } from './base-property.decorator';
+import { ForeignKeyMetadata, ColumnMetadata } from '../interfaces';
+import { MetadataType } from '../metadata/metadata-manager';
 import { ClassConstructor } from '../types';
-import { Logger } from '../../utils/logger';
 
 /**
- * ForeignKeyDecorator class to handle foreign key metadata using MetadataManager.
+ * ForeignKeyDecorator class that extends BasePropertyDecorator to handle foreign key metadata
+ * and simultaneously registers the foreign key as a column.
  */
-class ForeignKeyDecorator {
-  private logger = new Logger('ForeignKeyDecorator');
-  private metadataType: MetadataType = 'foreignKeys';
-  private metadataManager: MetadataManager;
-
+class ForeignKeyDecorator extends BasePropertyDecorator<
+  Partial<ForeignKeyMetadata>
+> {
   constructor() {
-    this.metadataManager = new MetadataManager(); // Instantiate MetadataManager
-  }
-
-  /**
-   * Validation function for foreign key options.
-   * @param options - The options to validate.
-   */
-  private validateOptions(options: Partial<ForeignKeyMetadata>): void {
-    // Validate that the reference is a properly formatted string
-    if (
-      typeof options.reference !== 'string' ||
-      !options.reference.includes('(') ||
-      !options.reference.includes(')')
-    ) {
-      this.logger.error(`Received invalid reference: ${options.reference}`);
-      throw new Error(
-        "ForeignKey decorator requires a 'reference' string in the format 'referenced_table(referenced_column)'.",
-      );
-    }
-
-    // Validate that the onDelete option, if provided, is one of the allowed values
-    if (
-      options.onDelete &&
-      !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onDelete)
-    ) {
-      this.logger.error(
-        `Received invalid onDelete option: ${options.onDelete}`,
-      );
-      throw new Error(
-        "ForeignKey decorator 'onDelete' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
-      );
-    }
-
-    // Validate that the onUpdate option, if provided, is one of the allowed values
-    if (
-      options.onUpdate &&
-      !['CASCADE', 'SET NULL', 'RESTRICT'].includes(options.onUpdate)
-    ) {
-      this.logger.error(
-        `Received invalid onUpdate option: ${options.onUpdate}`,
-      );
-      throw new Error(
-        "ForeignKey decorator 'onUpdate' option must be 'CASCADE', 'SET NULL', or 'RESTRICT'.",
-      );
-    }
-  }
-
-  /**
-   * Metadata creation function.
-   * @param propertyKey - The property key of the metadata.
-   * @param options - The options for creating the metadata.
-   * @returns ForeignKeyMetadata
-   */
-  private createMetadata(
-    propertyKey: string | symbol,
-    options: Partial<ForeignKeyMetadata>,
-  ): ForeignKeyMetadata {
-    return {
-      propertyKey,
-      reference: options.reference!,
-      ...options,
-    };
-  }
-
-  /**
-   * Unique check function to avoid duplicate metadata entries.
-   * @param existing - The existing metadata.
-   * @param newEntry - The new metadata to add.
-   * @returns boolean - Whether the metadata is unique.
-   */
-  private isUnique(
-    existing: ForeignKeyMetadata,
-    newEntry: ForeignKeyMetadata,
-  ): boolean {
-    return (
-      existing.propertyKey === newEntry.propertyKey &&
-      existing.reference === newEntry.reference
+    super(
+      'foreignKeys', // Use string literal
+      // Validation function for the foreign key options
+      (options: Partial<ForeignKeyMetadata>) => {
+        if (!options.target) {
+          throw new Error('Foreign key decorator requires a "target" option.');
+        }
+        if (!options.reference) {
+          throw new Error(
+            'Foreign key decorator requires a "reference" option.',
+          );
+        }
+      },
+      // Metadata Creator for foreign keys
+      (propertyKey, options) => ({
+        propertyKey: propertyKey.toString(),
+        name: options.name,
+        target: options.target,
+        reference: options.reference,
+        onDelete: options.onDelete,
+        onUpdate: options.onUpdate,
+        // Include other properties as needed
+      }),
+      // Unique Check Function (optional)
+      (existing: ForeignKeyMetadata, newEntry: ForeignKeyMetadata) =>
+        existing.propertyKey === newEntry.propertyKey,
     );
   }
 
   /**
-   * Decorator method to add foreign key metadata to the entity.
-   * @param options - Configuration options for the foreign key.
+   * Override the decorate method to also add column metadata.
+   * @param options - The foreign key options.
    * @returns PropertyDecorator
    */
-  public decorate(options: Partial<ForeignKeyMetadata>): PropertyDecorator {
+  decorate(options: Partial<ForeignKeyMetadata>): PropertyDecorator {
     return (target: Object, propertyKey: string | symbol) => {
-      this.validateOptions(options);
-      const metadata = this.createMetadata(propertyKey, options);
+      // First, decorate as foreign key
+      super.decorate(options)(target, propertyKey);
+
+      // Then, register the same property as a column
+      const columnOptions: Partial<ColumnMetadata> = {
+        propertyKey: propertyKey.toString(),
+        name: options.name || propertyKey.toString(),
+        type: options.type || 'integer', // Default type if not provided
+        nullable: options.nullable !== undefined ? options.nullable : true,
+
+        // Include other relevant column options as needed
+      };
+
+      // Add column metadata
       this.metadataManager.addMetadata(
         target.constructor as ClassConstructor,
-        this.metadataType,
-        metadata,
-        this.isUnique,
+        'columns', // Use string literal
+        columnOptions,
+        (existing: ColumnMetadata, newEntry: ColumnMetadata) =>
+          existing.propertyKey === newEntry.propertyKey,
       );
     };
   }
@@ -117,25 +78,15 @@ class ForeignKeyDecorator {
 const foreignKeyDecoratorInstance = new ForeignKeyDecorator();
 
 /**
- * @ForeignKey decorator to define a foreign key relationship.
- * @param options - Configuration options for the foreign key.
+ * @ForeignKey decorator to define a foreign key column.
+ * It registers both foreign key metadata and column metadata.
+ * @param options - The foreign key options.
  * @returns PropertyDecorator
  */
 export const ForeignKey = (
   options: Partial<ForeignKeyMetadata>,
 ): PropertyDecorator => {
-  return foreignKeyDecoratorInstance.decorate(options);
-};
-
-/**
- * Retrieves foreign key metadata for a given class.
- * @param target - The constructor of the entity class.
- * @returns ForeignKeyMetadata[]
- */
-export const getForeignKeyMetadata = (target: any): ForeignKeyMetadata[] => {
-  const metadataManager = new MetadataManager(); // Create an instance of MetadataManager
-  return metadataManager.getMetadata(
-    target.constructor,
-    'foreignKeys',
-  ) as ForeignKeyMetadata[];
+  return (target: Object, propertyKey: string | symbol) => {
+    foreignKeyDecoratorInstance.decorate(options)(target, propertyKey);
+  };
 };
