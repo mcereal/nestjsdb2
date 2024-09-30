@@ -459,7 +459,8 @@ export class Schema<T extends ClassConstructor<any>[]> {
   ): void {
     const columnNames = new Set<string>();
     columns.forEach((column, index) => {
-      if (!column.name) {
+      const columnName = column.name || column.propertyKey;
+      if (!columnName) {
         this.logger.error(
           `Column at index ${index} in entity '${entity.name}' has no name.`,
         );
@@ -469,20 +470,20 @@ export class Schema<T extends ClassConstructor<any>[]> {
           `Column at index ${index} in entity '${entity.name}' has no name.`,
         );
       }
-      if (columnNames.has(column.name)) {
+      if (columnNames.has(columnName)) {
         throw new Error(
-          `Duplicate column name '${column.name}' found in entity '${entity.name}'.`,
+          `Duplicate column name '${columnName}' found in entity '${entity.name}'.`,
         );
       }
-      columnNames.add(column.name);
+      columnNames.add(columnName);
 
       if (!column.type) {
         throw new Error(
-          `Column '${column.name}' in entity '${entity.name}' has no type defined.`,
+          `Column '${columnName}' in entity '${entity.name}' has no type defined.`,
         );
       } else if (!column.propertyKey) {
         throw new Error(
-          `Column '${column.name}' in entity '${entity.name}' has no property key defined.`,
+          `Column '${columnName}' in entity '${entity.name}' has no property key defined.`,
         );
       }
     });
