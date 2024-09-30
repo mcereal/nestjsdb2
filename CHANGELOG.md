@@ -1,3 +1,10 @@
+## [1.1.12](https://github.com/mcereal/nestjsdb2/compare/v1.1.11...v1.1.12) (2024-09-30)
+
+
+### Bug Fixes
+
+* schema usage ([7dc507c](https://github.com/mcereal/nestjsdb2/commit/7dc507c1109a01e4003c5e215ba13f0efb9e1c15))
+
 ## [1.1.11](https://github.com/mcereal/nestjsdb2/compare/v1.1.10...v1.1.11) (2024-09-30)
 
 
