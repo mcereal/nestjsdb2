@@ -1,3 +1,10 @@
+## [1.1.15](https://github.com/mcereal/nestjsdb2/compare/v1.1.14...v1.1.15) (2024-09-30)
+
+
+### Bug Fixes
+
+* logging for validation ([ec17cca](https://github.com/mcereal/nestjsdb2/commit/ec17cca8f149b7a5230146db42b95047da509afa))
+
 ## [1.1.14](https://github.com/mcereal/nestjsdb2/compare/v1.1.13...v1.1.14) (2024-09-30)
 
 
