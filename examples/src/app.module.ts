@@ -1,5 +1,3 @@
-// testconnection/app.module.ts
-
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import config from './config';
@@ -12,7 +10,7 @@ import { UserPostCountView } from './entities/user-post-count.view';
 import { RecentPostsView } from './entities/recent-posts.view';
 import { UserCommentsView } from './entities/user-comments.view';
 
-import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
+import { Db2NestModule } from './db2-nest.module';
 
 import { UserController } from './controllers/user.controller';
 import { PostController } from './controllers/post.controller';
@@ -31,26 +29,26 @@ import { UserPostCountService } from './services/user-post-count.service';
 import { RecentPostsService } from './services/recent-posts.service';
 import { UserCommentsService } from './services/user-comments.service';
 import { db2ValidationSchema } from './config/db2.config';
+import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [config],
-      validationSchema: db2ValidationSchema, // Apply validation schema
+      validationSchema: db2ValidationSchema,
     }),
-    // Initialize Db2Module asynchronously
-    Db2Module.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (
-        configService: ConfigService,
-      ): Promise<IDb2ConfigOptions> => {
-        return configService.get<IDb2ConfigOptions>('db2');
-      },
-      inject: [ConfigService],
+    // Initialize Db2NestModule asynchronously
+    Db2NestModule.forRootAsync(async () => {
+      const configService = new ConfigService();
+      const db2Config = configService.get<IDb2ConfigOptions>('db2');
+      if (!db2Config) {
+        throw new Error('DB2 configuration not found');
+      }
+      return db2Config;
     }),
-    // Register entities and views with Db2Module
-    Db2Module.forFeature([
+    // Register entities and views with Db2NestModule
+    Db2NestModule.forFeature([
       User,
       BlogPost,
       Comment,
@@ -79,7 +77,6 @@ import { db2ValidationSchema } from './config/db2.config';
     UserPostCountService,
     RecentPostsService,
     UserCommentsService,
-    // Model Providers
     {
       provide: 'USER_MODEL',
       useFactory: (db2Module: Db2Module) =>

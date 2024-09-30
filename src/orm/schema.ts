@@ -79,6 +79,12 @@ export class Schema<T extends ClassConstructor<any>[]> {
       if (!metadata) {
         throw new Error('Metadata is undefined or null');
       }
+
+      // Set the schema name if it's not already set
+      if (!metadata.schemaName) {
+        metadata.schemaName = 'public'; // Default schema if not specified
+      }
+
       return metadata;
     } catch (error: any) {
       throw new Error(

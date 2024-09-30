@@ -61,7 +61,9 @@ export class Model<T> {
   createQueryBuilder(): IQueryBuilder {
     try {
       const metadata = this.schema.getCurrentMetadata();
-      return new QueryBuilder(metadata.tableMetadata!.tableName, this.client);
+      const schemaName = metadata.schemaName || 'public'; // Use schema if provided
+      const tableName = `${schemaName}.${metadata.tableMetadata!.tableName}`;
+      return new QueryBuilder(tableName, this.client);
     } catch (error) {
       this.logger.error(`Failed to create query builder: ${error.message}`);
       throw new Error(`Failed to create query builder: ${error.message}`);
@@ -164,9 +166,11 @@ export class Model<T> {
   // Save the instance to the database
   async save(instance: T): Promise<T> {
     const metadata = this.schema.getCurrentMetadata();
-    const tableName = metadata.tableMetadata?.tableName;
+    const schemaName = metadata.schemaName || 'public';
+    const tableName = `${schemaName}.${metadata.tableMetadata?.tableName}`;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
+    // Build the SQL statement
     const columns = metadata.tableMetadata.columns;
     const columnNames = columns.map((col) => col.propertyKey).join(', ');
     const placeholders = columns.map(() => '?').join(', ');
@@ -270,7 +274,8 @@ export class Model<T> {
    */
   async find(query: Partial<T>): Promise<T[]> {
     const metadata = this.schema.getCurrentMetadata();
-    const tableName = metadata.tableMetadata?.tableName;
+    const schemaName = metadata.schemaName || 'public';
+    const tableName = `${schemaName}.${metadata.tableMetadata?.tableName}`;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
     // Generate SELECT SQL using the schema's metadata and the query
@@ -321,7 +326,8 @@ export class Model<T> {
    */
   async update(query: Partial<T>, data: Partial<T>): Promise<void> {
     const metadata = this.schema.getCurrentMetadata();
-    const tableName = metadata.tableMetadata?.tableName;
+    const schemaName = metadata.schemaName || 'public';
+    const tableName = `${schemaName}.${metadata.tableMetadata?.tableName}`;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
     // Generate UPDATE SQL using parameterized queries
@@ -364,7 +370,8 @@ export class Model<T> {
    */
   async delete(query: Partial<T>): Promise<boolean> {
     const metadata = this.schema.getCurrentMetadata();
-    const tableName = metadata.tableMetadata?.tableName;
+    const schemaName = metadata.schemaName || 'public';
+    const tableName = `${schemaName}.${metadata.tableMetadata?.tableName}`;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
     // Generate DELETE SQL using parameterized queries
@@ -402,7 +409,8 @@ export class Model<T> {
    */
   async softDelete(query: Partial<T>): Promise<void> {
     const metadata = this.schema.getCurrentMetadata();
-    const tableName = metadata.tableMetadata?.tableName;
+    const schemaName = metadata.schemaName || 'public';
+    const tableName = `${schemaName}.${metadata.tableMetadata?.tableName}`;
     if (!tableName) throw new Error('Table name is not defined in the schema.');
 
     // Assume there's a 'deletedAt' column for soft deletes

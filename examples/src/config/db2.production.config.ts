@@ -8,13 +8,13 @@ import { Db2AuthType } from '@mcereal/nestjsdb2';
 export default registerAs(
   'db2',
   (): IDb2ConfigOptions => ({
-    host: process.env.DB2_HOSTNAME,
+    host: process.env.DB2_HOSTNAME || 'defaultHost',
     port: parseInt(process.env.DB2_PORT || '30376', 10),
-    database: process.env.DB2_DATABASE,
+    database: process.env.DB2_DATABASE || 'defaultDatabase',
     auth: {
       authType: process.env.DB2_AUTH_TYPE as Db2AuthType,
-      username: process.env.DB2_UID,
-      password: process.env.DB2_PWD,
+      username: process.env.DB2_UID || 'defaultUsername',
+      password: process.env.DB2_PWD || 'defaultPassword',
     },
     useTls: process.env.DB2_USE_TLS === 'true',
     sslCertificatePath: process.env.DB2_SSL_CERT_PATH,
