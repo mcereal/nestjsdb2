@@ -1,5 +1,7 @@
 // Purpose: Interfaces for keys metadata.
 
+import { EntityMetadata } from '../interfaces';
+
 /**
  * Metadata for a primary key in a table.
  * Defines the properties and behavior of the primary key, including constraints, type, and generation options.
@@ -169,6 +171,9 @@ export interface CompositeKeyMetadata {
 export interface ForeignKeyMetadata {
   /** The property name in the entity that maps to this foreign key column. */
   propertyKey: string | symbol;
+
+  /** The target entity for the foreign key reference. */
+  target?: EntityMetadata;
 
   /** The reference in the format 'referenced_table(referenced_column)'. */
   reference: string;
