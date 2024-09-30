@@ -10,20 +10,33 @@ import { UserRole } from './user-role.entity';
   entityType: 'view',
 })
 export class User {
-  @PrimaryKey({ type: 'integer', autoIncrement: true })
+  @PrimaryKey({ type: 'integer', name: 'id', autoIncrement: true })
   id!: number;
 
-  @Column({ type: 'varchar', length: 50, unique: true, nullable: false })
+  @Column({
+    type: 'varchar',
+    name: 'username',
+    length: 50,
+    unique: true,
+    nullable: false,
+  })
   username!: string;
 
-  @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
+  @Column({
+    type: 'varchar',
+    name: 'email',
+    length: 100,
+    unique: true,
+    nullable: false,
+  })
   email!: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: false })
+  @Column({ type: 'varchar', name: 'password', length: 255, nullable: false })
   password!: string;
 
   @Column({
     type: 'timestamp',
+    name: 'created_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })
@@ -31,6 +44,7 @@ export class User {
 
   @Column({
     type: 'timestamp',
+    name: 'updated_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })

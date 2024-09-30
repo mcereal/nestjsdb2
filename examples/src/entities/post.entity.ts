@@ -8,32 +8,48 @@ import { Category } from './category.entity';
 @Entity({
   name: 'Post',
   entityType: 'table',
-  schemaName: 'public',
-  // tableName: 'posts',
 })
 export class Post {
-  @PrimaryKey({ type: 'integer', autoIncrement: true, nullable: false })
+  @PrimaryKey({
+    type: 'integer',
+    name: 'id',
+    autoIncrement: true,
+    nullable: false,
+  })
   id!: number;
 
   @ForeignKey({
     target: User,
+    name: 'user_id',
     reference: 'users(id)', // Added 'reference' property
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   user_id!: number;
 
-  @Column({ type: 'varchar', length: 150, nullable: false, unique: true })
+  @Column({
+    type: 'varchar',
+    name: 'title',
+    length: 150,
+    nullable: false,
+    unique: true,
+  })
   title!: string;
 
-  @Column({ type: 'text', nullable: false })
+  @Column({ type: 'text', name: 'content', nullable: false })
   content!: string;
 
-  @Column({ type: 'boolean', default: false, nullable: false })
+  @Column({
+    type: 'boolean',
+    name: 'published',
+    default: false,
+    nullable: false,
+  })
   published!: boolean;
 
   @Column({
     type: 'timestamp',
+    name: 'created_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })
@@ -41,6 +57,7 @@ export class Post {
 
   @Column({
     type: 'timestamp',
+    name: 'updated_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })

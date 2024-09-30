@@ -13,7 +13,7 @@ import { RecentPostsView } from './entities/recent-posts.view';
 import { UserCommentsView } from './entities/user-comments.view';
 
 import { Db2NestModule } from './db2-nest.module';
-import appSchema from './schemas/public.schema'; // Import your schema
+import publicSchema from './schemas/public.schema';
 
 import { PostController } from './controllers/post.controller';
 import { CategoryController } from './controllers/category.controller';
@@ -39,7 +39,7 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [config],
+      load: config,
       validationSchema: db2ValidationSchema,
     }),
     // Initialize Db2NestModule asynchronously with proper DI
@@ -55,7 +55,7 @@ import {
       inject: [ConfigService], // Inject ConfigService into the factory
     }),
     // Register entities and views with Db2NestModule using the schema
-    Db2NestModule.forFeature(appSchema),
+    Db2NestModule.forFeature(publicSchema),
   ],
   controllers: [
     PostController,

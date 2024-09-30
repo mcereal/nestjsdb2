@@ -23,6 +23,7 @@ import {
   registerValidation,
 } from '../validation/validateOrReject';
 import { ConstraintMetadata } from './interfaces/constraints.interfaces';
+import { Logger } from '../utils';
 
 /**
  * Represents the schema definition for multiple entities.
@@ -37,6 +38,7 @@ import { ConstraintMetadata } from './interfaces/constraints.interfaces';
  * ```
  */
 export class Schema<T extends ClassConstructor<any>[]> {
+  private logger = new Logger('Schema');
   private currentEntity?: ClassConstructor<any>;
   private metadataManager: MetadataManager;
 
@@ -458,6 +460,11 @@ export class Schema<T extends ClassConstructor<any>[]> {
     const columnNames = new Set<string>();
     columns.forEach((column, index) => {
       if (!column.name) {
+        this.logger.error(
+          `Column at index ${index} in entity '${entity.name}' has no name.`,
+        );
+        this.logger.error(`Column: ${JSON.stringify(column)}`);
+        this.logger.error(`Entity: ${JSON.stringify(entity)}`);
         throw new Error(
           `Column at index ${index} in entity '${entity.name}' has no name.`,
         );
