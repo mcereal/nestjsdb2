@@ -7,16 +7,21 @@ import { Post as BlogPost } from './post.entity';
 @Entity({
   name: 'Comment',
   entityType: 'table',
-  schema: 'public',
+  schemaName: 'public',
 })
 export class Comment {
   @PrimaryKey({ type: 'integer', autoIncrement: true })
   id!: number;
 
-  @ForeignKey({ target: BlogPost, nullable: false })
+  @ForeignKey({ target: BlogPost })
   post_id!: number;
 
-  @ForeignKey({ target: User, nullable: false })
+  @ForeignKey({
+    target: User,
+    reference: 'users(id)',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   user_id!: number;
 
   @Column({ type: 'text', nullable: false })
