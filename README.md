@@ -25,7 +25,8 @@ The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that
   - [Decorators](#decorators)
   - [Error Handling](#error-handling)
   - [Health Checks](#health-checks)
-  - [Security](#security)
+- [Examples](#examples)
+- [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -417,6 +418,10 @@ import { Db2HealthIndicator } from '@mcereal/nestjsdb2';
 })
 export class HealthModule {}
 ```
+
+## Examples
+
+You can find examples of how to use the `@mcereal/nestjsdb2` package in the [examples](examples) directory. This directory contains sample applications that demonstrate various features of the package, including basic query execution, batch operations, transaction management, and ORM support. To run the examples, follow the instructions in the [examples/README.md](examples/README.md) file.
 
 ## Security
 
