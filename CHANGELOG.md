@@ -1,3 +1,10 @@
+## [1.1.16](https://github.com/mcereal/nestjsdb2/compare/v1.1.15...v1.1.16) (2024-09-30)
+
+
+### Bug Fixes
+
+* column validation ([d989540](https://github.com/mcereal/nestjsdb2/commit/d98954068aaa041ecc21815b1ff1f8857b5fc7dc))
+
 ## [1.1.15](https://github.com/mcereal/nestjsdb2/compare/v1.1.14...v1.1.15) (2024-09-30)
 
 
