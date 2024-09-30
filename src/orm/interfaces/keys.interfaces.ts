@@ -172,6 +172,10 @@ export interface ForeignKeyMetadata {
   /** The property name in the entity that maps to this foreign key column. */
   propertyKey: string | symbol;
 
+  type?: string;
+
+  nullable?: boolean;
+
   /** The target entity for the foreign key reference. */
   target?: Function;
 

@@ -18,7 +18,7 @@ export abstract class BasePropertyDecorator<T> {
     ) => any,
     protected uniqueCheckFn?: (existing: any, newEntry: any) => boolean,
   ) {
-    this.metadataManager = new MetadataManager(); // Instantiate MetadataManager
+    this.metadataManager = MetadataManager.getInstance(); // Use singleton instance
   }
 
   /**
