@@ -1,12 +1,14 @@
 // src/decorators/base-property.decorator.ts
 
+import { MetadataManager, MetadataType } from '../metadata/metadata-manager';
 import { ClassConstructor } from '../types';
-import { addPropertyMetadata, MetadataType } from './utils';
 
 /**
  * Abstract base class for property-level decorators.
  */
 export abstract class BasePropertyDecorator<T> {
+  protected metadataManager: MetadataManager;
+
   constructor(
     protected metadataType: MetadataType,
     protected optionsValidator: (options: T) => void,
@@ -15,7 +17,9 @@ export abstract class BasePropertyDecorator<T> {
       options: T,
     ) => any,
     protected uniqueCheckFn?: (existing: any, newEntry: any) => boolean,
-  ) {}
+  ) {
+    this.metadataManager = new MetadataManager(); // Instantiate MetadataManager
+  }
 
   /**
    * Returns a PropertyDecorator function.
@@ -29,8 +33,8 @@ export abstract class BasePropertyDecorator<T> {
       // Create metadata entry
       const metadataEntry = this.metadataCreator(propertyKey, options);
 
-      // Add metadata to the storage
-      addPropertyMetadata(
+      // Add metadata to the storage using MetadataManager
+      this.metadataManager.addMetadata(
         target.constructor as ClassConstructor,
         this.metadataType,
         metadataEntry,

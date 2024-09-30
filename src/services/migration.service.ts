@@ -6,23 +6,23 @@ import {
   Db2MigrationOptions,
   IDb2MigrationService,
   IDb2Client,
-  TableMetadata,
-  ViewMetadata,
 } from '../interfaces';
 import { handleDb2Error } from '../errors';
-import { EntityMetadataStorage } from '../metadata';
-import { EntityMetadata } from '../interfaces';
+import { EntityMetadata, TableMetadata, ViewMetadata } from '../orm';
+import { MetadataManager } from '../orm/metadata';
 
-export class Db2MigrationService implements IDb2MigrationService {
-  private readonly logger = new Logger(Db2MigrationService.name);
+export class MigrationService implements IDb2MigrationService {
+  private readonly logger = new Logger(MigrationService.name);
   private migrationConfig: Db2MigrationOptions;
   protected readonly config: IDb2ConfigOptions;
+  private readonly metadataManager: MetadataManager;
 
   public constructor(
     private db2Client: IDb2Client,
     migrationConfig: Db2MigrationOptions,
   ) {
     this.migrationConfig = migrationConfig;
+    this.metadataManager = new MetadataManager();
   }
 
   /**
@@ -34,12 +34,13 @@ export class Db2MigrationService implements IDb2MigrationService {
       return;
     }
 
-    const entities = EntityMetadataStorage.getEntities();
+    const entities = this.metadataManager.getAllEntities();
 
     for (const entity of entities) {
-      const metadata: EntityMetadata =
-        EntityMetadataStorage.getEntityMetadata(entity);
-      if (!metadata) {
+      let metadata: EntityMetadata;
+      try {
+        metadata = this.metadataManager.getEntityMetadata(entity);
+      } catch (error) {
         this.logger.warn(
           `No metadata found for entity ${entity.name}. Skipping.`,
         );

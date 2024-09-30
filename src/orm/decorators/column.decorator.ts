@@ -1,7 +1,7 @@
 // src/decorators/column.decorator.ts
 
 import { BasePropertyDecorator } from './base-property.decorator';
-import { ColumnMetadata } from '../interfaces/entity-decorators.interface';
+import { ColumnMetadata } from '../interfaces';
 
 /**
  * ColumnDecorator class that extends BasePropertyDecorator to handle column metadata.

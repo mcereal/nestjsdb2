@@ -4,19 +4,19 @@ import { IConnectionManager } from '../interfaces';
 
 /**
  * @function CheckDb2ConnectionState
- * @description A method decorator that checks the state of the Db2Service's connection using the Db2ConnectionManager
- * before proceeding with the method execution. If the current state of the Db2 connection does not match the required state,
+ * @description A method decorator that checks the state of the DB2 connection using the ConnectionManager
+ * before proceeding with the method execution. If the current state of the DB2 connection does not match the required state,
  * an error is thrown. This is useful for ensuring that certain operations only proceed when the database connection is in a specific state.
  *
- * @param {Db2ConnectionState | Db2ConnectionState[]} requiredStates - The required state or states of the Db2 connection for the method to execute.
+ * @param {Db2ConnectionState | Db2ConnectionState[]} requiredStates - The required state or states of the DB2 connection for the method to execute.
  * @returns {MethodDecorator} - A method decorator that wraps the original method with a connection state check.
  *
- * @throws Error if the Db2ConnectionManager is not available or if the Db2 connection state does not match any of the required states.
+ * @throws Error if the ConnectionManager is not available or if the DB2 connection state does not match any of the required states.
  *
  * @example
  * // Example usage of the decorator
  * class ExampleClass {
- *   constructor(private db2ConnectionManager: Db2ConnectionManager) {}
+ *   constructor(private connectionManager: ConnectionManager) {}
  *
  *   @CheckDb2ConnectionState(Db2ConnectionState.CONNECTED)
  *   async someMethod() {
@@ -24,10 +24,10 @@ import { IConnectionManager } from '../interfaces';
  *   }
  * }
  */
-export const GetConnectionState = (
+export const CheckConnectionState = (
   requiredStates: Db2ConnectionState | Db2ConnectionState[],
 ): MethodDecorator => {
-  const logger = new Logger('CheckDb2ConnectionStateDecorator');
+  const logger = new Logger('ConnectionManagerDecorator');
 
   return (
     _target: new (...args: any[]) => any,
@@ -37,13 +37,13 @@ export const GetConnectionState = (
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
-      // Attempt to get the Db2ConnectionManager instance from the class using 'this'
-      const db2ConnectionManager: IConnectionManager = (this as any)
+      // Attempt to get the ConnectionManager instance from the class using 'this'
+      const connectionManager: IConnectionManager = (this as any)
         .db2ConnectionManager;
 
-      // Check if Db2ConnectionManager is available
-      if (!db2ConnectionManager) {
-        const errorMessage = `Db2ConnectionManager is not available in ${propertyKey.toString()}`;
+      // Check if ConnectionManager is available
+      if (!connectionManager) {
+        const errorMessage = `ConnectionManager is not available in ${propertyKey.toString()}`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
       }
@@ -53,8 +53,15 @@ export const GetConnectionState = (
         ? requiredStates
         : [requiredStates];
 
-      // Get the current state of the Db2 connection
-      const currentState = db2ConnectionManager.getState().connectionState;
+      // Get the current state of the DB2 connection
+      let currentState;
+      try {
+        currentState = connectionManager.getState().connectionState;
+      } catch (error) {
+        const errorMessage = `Failed to get DB2 connection state: ${error.message}`;
+        logger.error(errorMessage);
+        throw new Error(errorMessage);
+      }
 
       // Check if the current state is one of the required states
       if (!requiredStatesArray.includes(currentState)) {

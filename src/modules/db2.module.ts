@@ -1,11 +1,10 @@
 // src/db2.module.ts
 import { Module, DynamicModule, Global, Provider } from '@nestjs/common';
-import { Db2Service } from '../services/db2.service';
 import { Db2Client } from '../db/db2-client';
 import { TransactionManager } from '../db/transaction-manager';
-import { Db2MigrationService } from '../services/migration.service';
+import { MigrationService } from '../';
 import { Db2PoolManager } from '../db/db2-pool.manager';
-import { Db2ConnectionManager } from '../db/db2-connection.manger';
+import { CheckConnectionState } from '../db/connection-state';
 import { IDb2ConfigOptions, IConnectionManager } from '../interfaces';
 import { CacheModule, CacheModuleOptions } from '@nestjs/cache-manager';
 import {
@@ -19,8 +18,8 @@ import {
 } from '../constants/injection-token.constant';
 import { Db2ConfigModule } from './db2-config.module';
 import { createAuthStrategy } from '../auth';
-import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
-import { ClassConstructor } from '../types';
+import { EntityMetadataStorage } from '../orm/metadata';
+import { ClassConstructor } from '../orm/types';
 import { Schema } from '../orm/schema';
 import { Model } from '../orm/model';
 import { ModelRegistry } from '../orm/model-registry';
@@ -110,13 +109,13 @@ export class Db2Module {
 
     return {
       provide: `${entity.name}Model`,
-      useFactory: (db2Service: Db2Service, modelRegistry: ModelRegistry) => {
-        const model = new Model(db2Service, schema, modelRegistry);
+      useFactory: (client: Db2Client, modelRegistry: ModelRegistry) => {
+        const model = new Model(client, schema, modelRegistry);
         model.setEntity(entity);
         modelRegistry.registerModel(`${entity.name}Model`, model);
         return model;
       },
-      inject: [I_DB2_SERVICE, ModelRegistry],
+      inject: [ModelRegistry],
     };
   }
 
@@ -157,14 +156,10 @@ export class Db2Module {
       providers: [
         ModelRegistry,
         Db2PoolManager,
-        Db2ConnectionManager,
+        CheckConnectionState,
         Db2Client,
         TransactionManager,
-        Db2MigrationService,
-        {
-          provide: I_DB2_SERVICE,
-          useClass: Db2Service,
-        },
+        MigrationService,
         {
           provide: 'DB2_AUTH_STRATEGY',
           useFactory: (
@@ -174,11 +169,10 @@ export class Db2Module {
           inject: [I_DB2_CONFIG, I_CONNECTION_MANAGER],
         },
         { provide: I_POOL_MANAGER, useExisting: Db2PoolManager },
-        { provide: I_CONNECTION_MANAGER, useExisting: Db2ConnectionManager },
+        { provide: I_CONNECTION_MANAGER, useExisting: CheckConnectionState },
         { provide: I_DB2_CLIENT, useExisting: Db2Client },
         { provide: I_TRANSACTION_MANAGER, useExisting: TransactionManager },
-        { provide: I_DB2_MIGRATION_SERVICE, useExisting: Db2MigrationService },
-        { provide: I_DB2_SERVICE, useExisting: Db2Service },
+        { provide: I_DB2_MIGRATION_SERVICE, useExisting: MigrationService },
         ...(options.additionalProviders || []),
       ],
       exports: [

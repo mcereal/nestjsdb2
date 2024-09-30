@@ -1,6 +1,6 @@
 // src/modules/db2/query-builder.ts
 
-import { Db2Service } from '../services';
+import { Db2Client } from '../db';
 import { IQueryBuilder } from '../interfaces';
 
 export class QueryBuilder<T> implements IQueryBuilder {
@@ -24,8 +24,10 @@ export class QueryBuilder<T> implements IQueryBuilder {
 
   constructor(
     private table: string,
-    private db2Service: Db2Service,
-  ) {}
+    private client: Db2Client,
+  ) {
+    this.tableName = table;
+  }
 
   public reset(): IQueryBuilder {
     this.selectColumns = [];
@@ -257,5 +259,10 @@ export class QueryBuilder<T> implements IQueryBuilder {
     sql = sql.trim() + ';';
     const params = [...this.whereParams, ...this.havingParams];
     return { query: sql, params };
+  }
+
+  public async execute(): Promise<any> {
+    const { query, params } = this.build();
+    return this.client.query(query, params);
   }
 }

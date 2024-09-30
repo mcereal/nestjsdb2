@@ -1,9 +1,8 @@
 // src/decorators/view.decorator.ts
 
 import { BaseClassDecorator } from './base-class.decorator';
-import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
 import { ClassConstructor } from '../types';
-import { ViewMetadata, EntityMetadata } from '../interfaces';
+import { EntityMetadata } from '../interfaces';
 
 interface ViewOptions {
   schema: string;

@@ -317,7 +317,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
    */
   public async query<T>(
     sql: string,
-    params: any[] = [],
+    params: Record<string, any> = [],
     timeout?: number,
   ): Promise<T> {
     const connection = await this.getConnection();
@@ -652,7 +652,7 @@ export class Db2Client implements IDb2Client, OnModuleInit, OnModuleDestroy {
     try {
       this.logger.info('Executing query: ' + query);
       const connection = await this.getConnection();
-      const result = await this.query(query);
+      const result = await connection.query(query);
       this.logger.info('DB2 connection details retrieved successfully');
       return result;
     } catch (error) {

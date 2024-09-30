@@ -1,5 +1,7 @@
 // src/orm/model.ts
-import { Db2Service } from '../services';
+// Usage: Create a Model class to interact
+// with the database using the schema.
+
 import { Schema } from './schema';
 import { Injectable, Logger } from '@nestjs/common';
 import { IQueryBuilder } from '../interfaces/db2-query-builder.interface';
@@ -10,69 +12,120 @@ import {
   ManyToManyMetadata,
   ManyToOneMetadata,
   OneToManyMetadata,
-} from '../interfaces';
-import { getPropertyMetadata } from '../decorators/utils';
-import { ClassConstructor } from '../types';
+} from './interfaces/relations.interfaces';
+import { MetadataManager } from './metadata';
+import { ClassConstructor } from './types';
+import { Db2Client } from '../db';
 
 @Injectable()
 export class Model<T> {
   private readonly logger = new Logger(Model.name);
   private schema: Schema<ClassConstructor<any>[]>;
   private currentEntity?: ClassConstructor<any>;
+  private metadataManager: MetadataManager;
 
   constructor(
-    private db2Service: Db2Service,
+    private client: Db2Client,
     schema: Schema<ClassConstructor<any>[]>,
     private modelRegistry: ModelRegistry,
   ) {
     this.schema = schema;
+    this.metadataManager = new MetadataManager(); // Instantiate MetadataManager
   }
 
   /**
    * Set the current entity context for schema operations.
    * @param entity - The class constructor of the entity.
+   * @throws Will throw an error if setting the entity fails.
    */
   setEntity(entity: ClassConstructor<any>): void {
-    this.schema.setEntity(entity);
-    this.currentEntity = entity;
-  }
-
-  // Integrate QueryBuilder for advanced queries
-  createQueryBuilder(): IQueryBuilder {
-    const metadata = this.schema.getCurrentMetadata();
-    return new QueryBuilder(metadata.tableMetadata!.tableName, this.db2Service);
-  }
-
-  // Create a new instance of the model with validation and default values
-  create(data: Partial<T>): T {
-    const metadata = this.schema.getCurrentMetadata();
-    if (!metadata.tableMetadata)
-      throw new Error('Invalid schema metadata for model.');
-
-    const instance = {} as T;
-
-    // Initialize columns with data, defaults, and validation using schema columns
-    for (const column of metadata.tableMetadata.columns) {
-      const { propertyKey, default: defaultValue, nullable } = column;
-      const value = data[propertyKey as keyof T];
-
-      if (value !== undefined) {
-        // Use provided value
-        instance[propertyKey as keyof T] = value;
-      } else if (defaultValue !== undefined) {
-        // Set default value if not provided
-        instance[propertyKey as keyof T] =
-          typeof defaultValue === 'function' ? defaultValue() : defaultValue;
-      } else if (!nullable) {
-        // Handle required columns or constraints
-        throw new Error(
-          `Property '${propertyKey}' is required in table '${metadata.tableMetadata.tableName}'.`,
-        );
-      }
+    try {
+      this.schema.setEntity(entity);
+      this.currentEntity = entity;
+    } catch (error) {
+      this.logger.error(`Failed to set entity: ${error.message}`);
+      throw new Error(`Failed to set entity: ${error.message}`);
     }
-    return instance;
   }
 
+  /**
+   * Integrate QueryBuilder for advanced queries.
+   * @returns A new instance of the QueryBuilder.
+   * @throws Will throw an error if retrieving the metadata fails.
+   *
+   * @example
+   * ```ts
+   * const queryBuilder = model.createQueryBuilder();
+   * ```
+   */
+  createQueryBuilder(): IQueryBuilder {
+    try {
+      const metadata = this.schema.getCurrentMetadata();
+      return new QueryBuilder(metadata.tableMetadata!.tableName, this.client);
+    } catch (error) {
+      this.logger.error(`Failed to create query builder: ${error.message}`);
+      throw new Error(`Failed to create query builder: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a new instance of the model with validation and default values.
+   * @param data - Partial data to initialize the model.
+   * @returns A new instance of the model.
+   * @throws Will throw an error if schema metadata is invalid or required properties are missing.
+   *
+   * @example
+   * ```ts
+   * const user = model.create({ username: 'john_doe', age: 25 });
+   * ```
+   */
+  create(data: Partial<T>): T {
+    try {
+      const metadata = this.schema.getCurrentMetadata();
+      if (!metadata.tableMetadata) {
+        throw new Error('Invalid schema metadata for model.');
+      }
+
+      const instance = {} as T;
+
+      // Initialize columns with data, defaults, and validation using schema columns
+      for (const column of metadata.tableMetadata.columns) {
+        const { propertyKey, default: defaultValue, nullable } = column;
+        const value = data[propertyKey as keyof T];
+
+        if (value !== undefined) {
+          // Use provided value
+          instance[propertyKey as keyof T] = value;
+        } else if (defaultValue !== undefined) {
+          // Set default value if not provided
+          instance[propertyKey as keyof T] =
+            typeof defaultValue === 'function' ? defaultValue() : defaultValue;
+        } else if (!nullable) {
+          // Handle required columns or constraints
+          throw new Error(
+            `Property '${propertyKey}' is required in table '${metadata.tableMetadata.tableName}'.`,
+          );
+        }
+      }
+
+      return instance;
+    } catch (error) {
+      this.logger.error(`Failed to create model instance: ${error.message}`);
+      throw new Error(`Failed to create model instance: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create and validate a new instance of the model.
+   * @param data - Partial data to initialize the model.
+   * @returns A new instance of the model.
+   * @throws Will throw an error if validation fails.
+   *
+   * @example
+   * ```ts
+   * const user = await model.createAndValidate({ username: 'john_doe', age: 25 });
+   * ```
+   */
   async createAndValidate(data: Partial<T>): Promise<T> {
     try {
       const instance = this.create(data);
@@ -88,6 +141,18 @@ export class Model<T> {
       );
     }
   }
+
+  /**
+   * Save the instance to the database.
+   * @param instance - The instance to save.
+   * @returns The saved instance.
+   * @throws Will throw an error if the table name is not defined or the insert operation fails.
+   *
+   * @example
+   * ```ts
+   * const user = await model.save({ username: 'john_doe', age: 25 });
+   * ```
+   */
 
   private buildConditions(query: Partial<T>): string {
     // Convert the query object into SQL conditions
@@ -115,7 +180,7 @@ export class Model<T> {
     );
 
     try {
-      const result = await this.db2Service.query<T[]>(sql, values);
+      const result = await this.client.query<T[]>(sql, values);
       if (result.length > 0) {
         this.logger.log(
           `Inserted into ${tableName}: ${JSON.stringify(result[0])}`,
@@ -131,6 +196,19 @@ export class Model<T> {
       throw error;
     }
   }
+
+  /**
+   *  Find records with conditions. Supports sorting, limiting, and offset.
+   * @param query
+   * @param options
+   * @returns
+   * @throws Will throw an error if the query operation fails.
+   *
+   * @example
+   * ```ts
+   * const users = await model.findWithConditions({ age: 25 }, { sort: { username: 'ASC' }, limit: 10, offset: 0 });
+   * ```
+   */
 
   async findWithConditions(
     query: Partial<T>,
@@ -162,7 +240,7 @@ export class Model<T> {
     );
 
     try {
-      const results = await this.db2Service.query<T[]>(sql, params);
+      const results = await this.client.query<T[]>(sql, Object.values(params));
       this.logger.log(
         `Query executed successfully on ${this.schema.getCurrentMetadata().tableMetadata!.tableName}: ${sql}`,
       );
@@ -178,7 +256,18 @@ export class Model<T> {
     }
   }
 
-  // Query methods like find, findOne, update, delete
+  /**
+   * Find records with conditions and return the first result.
+   * @param query - The query conditions.
+   * @param options - Query options.
+   * @returns The first record matching the query.
+   * @throws Will throw an error if the query operation fails.
+   *
+   * @example
+   * ```ts
+   * const user = await model.findOneWithConditions({ username: 'john_doe' });
+   * ```
+   */
   async find(query: Partial<T>): Promise<T[]> {
     const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
@@ -191,7 +280,7 @@ export class Model<T> {
     );
 
     try {
-      const results = await this.db2Service.query<T[]>(sql, params);
+      const results = await this.client.query<T[]>(sql, params);
       this.logger.log(`Query executed successfully on ${tableName}: ${sql}`);
       return results;
     } catch (error) {
@@ -203,11 +292,33 @@ export class Model<T> {
     }
   }
 
+  /**
+   * Find a single record with conditions.
+   * @param query - The query conditions.
+   * @returns The first record matching the query or null if not found.
+   * @throws Will throw an error if the query operation fails.
+   *
+   * @example
+   * ```ts
+   * const user = await model.findOne({ username: 'john_doe' });
+   * ```
+   */
   async findOne(query: Partial<T>): Promise<T | null> {
     const results = await this.find(query);
     return results.length > 0 ? results[0] : null;
   }
 
+  /**
+   * Update records with conditions.
+   * @param query - The query conditions.
+   * @param data - The data to update.
+   * @throws Will throw an error if the update operation fails.
+   *
+   * @example
+   * ```ts
+   * await model.update({ username: 'john_doe' }, { age: 26 });
+   * ```
+   */
   async update(query: Partial<T>, data: Partial<T>): Promise<void> {
     const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
@@ -228,7 +339,7 @@ export class Model<T> {
     );
 
     try {
-      await this.db2Service.query(sql, values);
+      await this.client.query(sql, values);
       this.logger.log(
         `Updated records in ${tableName} with query: ${JSON.stringify(query)}`,
       );
@@ -241,6 +352,16 @@ export class Model<T> {
     }
   }
 
+  /**
+   * Delete records with conditions.
+   * @param query - The query conditions.
+   * @throws Will throw an error if the delete operation fails.
+   *
+   * @example
+   * ```ts
+   * await model.delete({ username: 'john_doe' });
+   * ```
+   */
   async delete(query: Partial<T>): Promise<void> {
     const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
@@ -255,7 +376,7 @@ export class Model<T> {
     );
 
     try {
-      await this.db2Service.query(sql, whereParams);
+      await this.client.query(sql, whereParams);
       this.logger.log(
         `Deleted records from ${tableName} with query: ${JSON.stringify(query)}`,
       );
@@ -268,6 +389,16 @@ export class Model<T> {
     }
   }
 
+  /**
+   * Soft delete records with conditions.
+   * @param query - The query conditions.
+   * @throws Will throw an error if the soft delete operation fails.
+   *
+   * @example
+   * ```ts
+   * await model.softDelete({ username: 'john_doe' });
+   * ```
+   */
   async softDelete(query: Partial<T>): Promise<void> {
     const metadata = this.schema.getCurrentMetadata();
     const tableName = metadata.tableMetadata?.tableName;
@@ -286,7 +417,7 @@ export class Model<T> {
     );
 
     try {
-      await this.db2Service.query(sql, values);
+      await this.client.query(sql, values);
       this.logger.log(
         `Soft deleted records in ${tableName} with query: ${JSON.stringify(query)}`,
       );
@@ -299,7 +430,16 @@ export class Model<T> {
     }
   }
 
-  // Utility method to generate a WHERE clause for SQL queries
+  /**
+   * Restore soft-deleted records with conditions.
+   * @param query - The query conditions.
+   * @throws Will throw an error if the restore operation fails.
+   *
+   * @example
+   * ```ts
+   * await model.restore({ username: 'john_doe' });
+   * ```
+   */
   private buildWhereClause(query: Partial<T>): { sql: string; params: any[] } {
     const keys = Object.keys(query);
     if (keys.length === 0) {
@@ -312,7 +452,18 @@ export class Model<T> {
     return { sql: `WHERE ${conditions}`, params };
   }
 
-  // Utility method to build SELECT query
+  /**
+   *      * Build a SELECT query with WHERE conditions.
+   * @param query
+   * @param tableName
+   * @returns
+   * @throws Will throw an error if the query operation fails.
+   *
+   * @example
+   * ```ts
+   * const { sql, params } = model.buildSelectQuery({ username: 'john_doe' }, 'users');
+   * ```
+   */
   private buildSelectQuery(
     query: Partial<T>,
     tableName: string,
@@ -322,21 +473,28 @@ export class Model<T> {
     return { sql, params };
   }
 
-  // Enhanced populate method using dependency injection
-
+  /**
+   * Populate a relation for an instance.
+   * @param instance - The instance to populate.
+   * @param path - The relation path to populate.
+   * @returns The instance with the populated relation.
+   * @throws Will throw an error if the relation is not found.
+   *
+   * @example
+   * ```ts
+   * const user = await model.populate(user, 'posts');
+   * ```
+   */
   async populate(instance: T, path: keyof T & string): Promise<T> {
-    const oneToManyRelations = getPropertyMetadata(
-      this.currentEntity,
-      'oneToManyRelations',
-    );
-    const manyToOneRelations = getPropertyMetadata(
-      this.currentEntity,
-      'manyToOneRelations',
-    );
-    const manyToManyRelations = getPropertyMetadata(
-      this.currentEntity,
-      'manyToManyRelations',
-    );
+    const oneToManyRelations = this.metadataManager.getPropertyMetadata<
+      OneToManyMetadata[]
+    >(this.currentEntity, 'oneToManyRelations');
+    const manyToOneRelations = this.metadataManager.getPropertyMetadata<
+      ManyToOneMetadata[]
+    >(this.currentEntity, 'manyToOneRelations');
+    const manyToManyRelations = this.metadataManager.getPropertyMetadata<
+      ManyToManyMetadata[]
+    >(this.currentEntity, 'manyToManyRelations');
 
     const relationMetadata:
       | ManyToManyMetadata
@@ -405,6 +563,19 @@ export class Model<T> {
     return instance;
   }
 
+  /**
+   * Find paginated records with conditions.
+   * @param query - The query conditions.
+   * @param page - The page number.
+   * @param pageSize - The page size.
+   * @returns Paginated data with total count.
+   * @throws Will throw an error if the paginated query operation fails.
+   *
+   * @example
+   * ```ts
+   * const { data, total, page, pageSize } = await model.findPaginated({ age: 25 }, 1, 10);
+   * ```
+   */
   async findPaginated(
     query: Partial<T>,
     page: number = 1,
@@ -418,7 +589,7 @@ export class Model<T> {
     this.logger.debug(
       `Executing SQL: ${sql} with params: ${JSON.stringify(params)}`,
     );
-    const data = await this.db2Service.query<T[]>(sql, params);
+    const data = await this.client.query<T[]>(sql, params);
 
     // Get total count
     const countQb = this.createQueryBuilder()
@@ -428,7 +599,7 @@ export class Model<T> {
     this.logger.debug(
       `Executing SQL: ${countSql} with params: ${JSON.stringify(countParams)}`,
     );
-    const countResult = await this.db2Service.query<{ count: number }[]>(
+    const countResult = await this.client.query<{ count: number }[]>(
       countSql,
       countParams,
     );
@@ -441,14 +612,27 @@ export class Model<T> {
     return { data, total, page, pageSize };
   }
 
+  /**
+   * Execute a transactional operation.
+   * @param operations - The operations to execute within the transaction.
+   * @throws Will throw an error if the transaction fails.
+   *
+   * @example
+   * ```ts
+   * await model.transactional(async () => {
+   *   await model.save(user);
+   *   await model.save(profile);
+   * });
+   * ```
+   */
   async transactional(operations: () => Promise<void>): Promise<void> {
     try {
-      await this.db2Service.beginTransaction();
+      await this.client.beginTransaction();
       await operations();
-      await this.db2Service.commitTransaction();
+      await this.client.commitTransaction();
       this.logger.log('Transaction committed successfully.');
     } catch (error) {
-      await this.db2Service.rollbackTransaction();
+      await this.client.rollbackTransaction();
       this.logger.error(`Transaction failed: ${error.message}`, error.stack);
       throw error;
     }

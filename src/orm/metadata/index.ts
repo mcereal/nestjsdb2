@@ -1,3 +1,2 @@
-// src/metadata/index.ts
-
 export * from './entity-metadata.storage';
+export * from './metadata-manager';
