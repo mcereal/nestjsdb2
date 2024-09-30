@@ -1,3 +1,10 @@
+## [1.1.20](https://github.com/mcereal/nestjsdb2/compare/v1.1.19...v1.1.20) (2024-09-30)
+
+
+### Bug Fixes
+
+* add entity an view decorator requirements ([5f0bcc8](https://github.com/mcereal/nestjsdb2/commit/5f0bcc8b597518eb283c274ad55b05eb0d0758db))
+
 ## [1.1.19](https://github.com/mcereal/nestjsdb2/compare/v1.1.18...v1.1.19) (2024-09-30)
 
 
