@@ -57,7 +57,7 @@ class PrimaryKeyDecorator extends BasePropertyDecorator<
       // Add column metadata
       this.metadataManager.addMetadata(
         target.constructor as ClassConstructor,
-        'columns', // Use string literal instead of MetadataType.columns
+        'columns', // Use string literal
         columnOptions,
         (existing: ColumnMetadata, newEntry: ColumnMetadata) =>
           existing.propertyKey === newEntry.propertyKey,

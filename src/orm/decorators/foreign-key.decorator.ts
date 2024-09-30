@@ -2,7 +2,6 @@
 
 import { BasePropertyDecorator } from './base-property.decorator';
 import { ForeignKeyMetadata, ColumnMetadata } from '../interfaces';
-import { MetadataType } from '../metadata/metadata-manager';
 import { ClassConstructor } from '../types';
 
 /**
@@ -38,9 +37,10 @@ class ForeignKeyDecorator extends BasePropertyDecorator<
       (propertyKey, options) => ({
         propertyKey: propertyKey.toString(),
         name: options.name,
-        target: options.target,
-        referencedTable: options.referencedTable,
-        referencedColumnNames: options.referencedColumnNames,
+        target: options.target!,
+        referencedTable: options.referencedTable!,
+        referencedColumnNames: options.referencedColumnNames!,
+        columnNames: options.columnNames || [propertyKey.toString()], // Ensure columnNames is set
         onDelete: options.onDelete,
         onUpdate: options.onUpdate,
         // Include other properties as needed

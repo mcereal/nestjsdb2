@@ -93,14 +93,13 @@ export class ForeignKeysHandler {
         propertyKey,
         name: options.name || `${propertyKey}_fk`, // Default name if not specified
         target: options.target!,
-        referencedTable: options.referencedTable,
-        referencedColumnNames: options.referencedColumnNames,
+        referencedTable: options.referencedTable!,
+        referencedColumnNames: options.referencedColumnNames!,
+        columnNames: options.columnNames || [propertyKey],
         onDelete: options.onDelete,
         onUpdate: options.onUpdate,
-        reference: `${options.referencedTable}(${options.referencedColumnNames.join(
-          ',',
-        )})`,
-        // Spread the rest of the options if needed
+        reference: options.reference,
+        ...options,
       };
 
       // Add foreign key metadata via MetadataManager
@@ -111,7 +110,7 @@ export class ForeignKeysHandler {
         (existing: ForeignKeyMetadata, newEntry: ForeignKeyMetadata) =>
           existing.propertyKey === newEntry.propertyKey,
       );
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(
         `Failed to set foreign key for property '${propertyKey}': ${error.message}`,
       );
@@ -177,18 +176,20 @@ export class ForeignKeysHandler {
         (fk) => fk.propertyKey !== propertyKey,
       );
 
-      // Update the foreignKeys metadata
-      // First, remove existing foreignKeys metadata
+      // Update the foreign keys metadata
+      metadataManager.addMetadata(
+        this.currentEntity,
+        'foreignKeys',
+        updatedForeignKeys,
+      );
+
+      // Remove the specific foreign key
       metadataManager.removeMetadata(
         this.currentEntity,
         'foreignKeys',
         (fk: ForeignKeyMetadata) => fk.propertyKey === propertyKey,
       );
-
-      // Alternatively, depending on MetadataManager's implementation, set the updated array
-      // If MetadataManager supports setting the entire array, use that
-      // Otherwise, ensure that individual removal is handled
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(
         `Failed to remove foreign key for property '${propertyKey}': ${error.message}`,
       );

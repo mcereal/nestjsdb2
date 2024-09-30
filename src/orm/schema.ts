@@ -490,7 +490,6 @@ export class Schema<T extends ClassConstructor<any>[]> {
   }
 
   // Helper method to validate primary keys
-  // Helper method to validate primary keys
   private validatePrimaryKeys(
     primaryKeys: PrimaryKeyMetadata[],
     columns: ColumnMetadata[],
