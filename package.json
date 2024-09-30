@@ -47,8 +47,9 @@
   ],
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
-    "build:dev": "cd testconnection && npm run build",
-    "install:dev": "cd testconnection && npm install",
+    "build:examples": "cd examples && npm run build",
+    "install:examples": "cd testconnection && npm install",
+    "start:dev:examples": "cd examples && npm run start:dev",
     "test": "jest --detectOpenHandles --forceExit --config jest.config.ts",
     "test:watch": "jest --watch --config jest.config.ts",
     "test:coverage": "jest --detectOpenHandles --forceExit --config jest.config.ts --coverage",
