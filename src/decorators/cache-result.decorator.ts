@@ -1,5 +1,7 @@
-import { Cache } from 'cache-manager';
+// import { Cache } from 'cache-manager';
 import { Logger } from '../utils';
+
+// DISABLED FOR NOW
 
 export const CacheResult = (ttl = 60): MethodDecorator => {
   const logger = new Logger('CacheResultDecorator');
@@ -28,18 +30,18 @@ export const CacheResult = (ttl = 60): MethodDecorator => {
 
       try {
         // Attempt to retrieve the result from cache
-        const cachedResult = await cache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          logger.debug(`Cache hit for key: ${cacheKey}`);
-          return cachedResult; // Return cached result if available
-        }
+        // const cachedResult = await cache.get(cacheKey);
+        // if (cachedResult !== undefined) {
+        //   logger.debug(`Cache hit for key: ${cacheKey}`);
+        //   return cachedResult; // Return cached result if available
+        // }
 
         logger.debug(`Cache miss for key: ${cacheKey}. Executing method.`);
         // Execute the original method
         const result = await originalMethod.apply(this, args);
 
         // Set the result in the cache with the specified TTL
-        await cache.set(cacheKey, result, ttl);
+        // await cache.set(cacheKey, result, ttl);
 
         return result; // Return the result of the method execution
       } catch (error) {

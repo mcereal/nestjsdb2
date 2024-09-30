@@ -1,4 +1,4 @@
-import { Db2QueryBuilder } from '../db';
+import { QueryBuilder } from '../db';
 import { Db2ClientState } from './db2-client.interface';
 import { Connection } from 'ibm_db';
 
@@ -42,7 +42,4 @@ export interface IDb2Service {
 
   // Cache management methods
   clearCache(sql: string, params?: any[]): Promise<boolean>;
-
-  // Query builder method
-  createQueryBuilder(): Db2QueryBuilder;
 }

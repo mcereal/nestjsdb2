@@ -1,7 +1,5 @@
-// src/decorators/db2-transaction.decorator.ts
-
-import { Db2Service } from '../services';
 import { Logger } from '../utils';
+import { IConnectionManager } from '../interfaces';
 
 /**
  * @function Transaction
@@ -12,17 +10,17 @@ import { Logger } from '../utils';
  *
  * @returns {MethodDecorator} - A method decorator that wraps the original method with transaction management.
  *
- * @throws Error if Db2Service is not available or if an error occurs during transaction management.
+ * @throws Error if Db2ConnectionManager is not available or if an error occurs during transaction management.
  *
  * @example
  * // Example usage of the Transaction decorator in a service class
  * import { Injectable } from "@nestjs/common";
  * import { Transaction } from "src/decorators/db2-transaction.decorator";
- * import { Db2Service } from "src/services/db2.service";
+ * import { Db2ConnectionManager } from "src/connection-manager/db2-connection-manager";
  *
  * @Injectable()
  * class ExampleService {
- *   constructor(private db2Service: Db2Service) {}
+ *   constructor(private db2ConnectionManager: Db2ConnectionManager) {}
  *
  *   @Transaction()
  *   async performDatabaseOperation() {
@@ -41,12 +39,22 @@ export function Transaction(): MethodDecorator {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
-      // Retrieve the Db2Service instance from the class instance
-      const db2Service = (this as any).db2Service as Db2Service;
+      // Retrieve the Db2ConnectionManager instance from the class
+      const db2ConnectionManager: IConnectionManager = (this as any)
+        .db2ConnectionManager;
 
-      // Check if Db2Service is available
-      if (!db2Service) {
-        const errorMessage = 'Db2Service is not available';
+      // Check if Db2ConnectionManager is available
+      if (!db2ConnectionManager) {
+        const errorMessage = 'Db2ConnectionManager is not available';
+        logger.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      // Retrieve the Db2Client instance from the connection manager
+      const db2Client = (this as any).db2Client;
+
+      if (!db2Client) {
+        const errorMessage = 'Db2Client is not available';
         logger.error(errorMessage);
         throw new Error(errorMessage);
       }
@@ -56,13 +64,13 @@ export function Transaction(): MethodDecorator {
         logger.debug(
           `Starting transaction for method ${propertyKey.toString()}`,
         );
-        await db2Service.beginTransaction();
+        await db2Client.beginTransaction();
 
         // Execute the original method within the transaction
         const result = await originalMethod.apply(this, args);
 
         // Commit the transaction if the method completes successfully
-        await db2Service.commitTransaction();
+        await db2Client.commitTransaction();
         logger.debug(
           `Transaction committed successfully for method ${propertyKey.toString()}`,
         );
@@ -71,20 +79,16 @@ export function Transaction(): MethodDecorator {
       } catch (error) {
         // Roll back the transaction if an error occurs
         logger.error(
-          `Transaction failed for method ${propertyKey.toString()}: ${
-            error.message
-          }`,
+          `Transaction failed for method ${propertyKey.toString()}: ${error.message}`,
         );
         try {
-          await db2Service.rollbackTransaction();
+          await db2Client.rollbackTransaction();
           logger.debug(
             `Transaction rolled back for method ${propertyKey.toString()}`,
           );
         } catch (rollbackError) {
           logger.error(
-            `Failed to roll back transaction for method ${propertyKey.toString()}: ${
-              rollbackError.message
-            }`,
+            `Failed to roll back transaction for method ${propertyKey.toString()}: ${rollbackError.message}`,
           );
         }
 
