@@ -1,3 +1,10 @@
+## [1.1.17](https://github.com/mcereal/nestjsdb2/compare/v1.1.16...v1.1.17) (2024-09-30)
+
+
+### Bug Fixes
+
+* metadata options for decorators ([6bc655f](https://github.com/mcereal/nestjsdb2/commit/6bc655f23fb8f5461113255bce9cbdd8c23a1f64))
+
 ## [1.1.16](https://github.com/mcereal/nestjsdb2/compare/v1.1.15...v1.1.16) (2024-09-30)
 
 
