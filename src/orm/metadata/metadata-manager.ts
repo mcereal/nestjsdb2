@@ -17,7 +17,9 @@ export type MetadataType =
   | 'compositeKeys'
   | 'primaryKeys'
   | 'uniqueColumns'
-  | 'entity';
+  | 'entity'
+  | 'view'
+  | 'table';
 
 export class MetadataManager {
   /**
@@ -25,6 +27,8 @@ export class MetadataManager {
    * @param constructor - The constructor of the entity class.
    * @returns The entity metadata.
    */
+  private static instance: MetadataManager;
+
   private getOrCreateMetadata(constructor: ClassConstructor): EntityMetadata {
     let entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
     if (!entityMetadata) {
@@ -184,10 +188,12 @@ export class MetadataManager {
     ) as unknown as T;
   }
 
-  /**
-   *
-   */
-
+  public static getInstance(): MetadataManager {
+    if (!MetadataManager.instance) {
+      MetadataManager.instance = new MetadataManager();
+    }
+    return MetadataManager.instance;
+  }
   /**
    * Retrieves all registered entity classes.
    * @returns Array of entity class constructors.

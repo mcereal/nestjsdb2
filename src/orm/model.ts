@@ -4,7 +4,7 @@
 
 import { Schema } from './schema';
 import { Injectable, Logger } from '@nestjs/common';
-import { IQueryBuilder } from '../interfaces/db2-query-builder.interface';
+import { IQueryBuilder } from '../interfaces/query-builder.interface';
 import { QueryBuilder } from '../db/query-builder';
 import { ModelRegistry } from './model-registry';
 import { validateOrReject } from '../validation/validateOrReject';
@@ -30,7 +30,7 @@ export class Model<T> {
     private modelRegistry: ModelRegistry,
   ) {
     this.schema = schema;
-    this.metadataManager = new MetadataManager(); // Instantiate MetadataManager
+    this.metadataManager = new MetadataManager();
   }
 
   /**

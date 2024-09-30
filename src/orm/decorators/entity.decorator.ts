@@ -1,4 +1,4 @@
-// src/decorators/entity.decorator.ts
+// src/orm/decorators/entity.decorator.ts
 
 import { MetadataManager, MetadataType } from '../metadata/metadata-manager';
 import { EntityMetadata } from '../interfaces';

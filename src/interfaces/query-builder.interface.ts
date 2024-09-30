@@ -1,4 +1,4 @@
-// src/interfaces/db2-query-builder.interface.ts
+// src/interfaces/query-builder.interface.ts
 
 export interface IQueryBuilder {
   /**

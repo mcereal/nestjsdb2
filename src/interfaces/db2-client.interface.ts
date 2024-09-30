@@ -2,16 +2,16 @@ import { Db2ConnectionState } from '../enums';
 import { Connection } from 'ibm_db';
 
 export interface IDb2Client {
-  // Lifecycle hooks
-  onModuleInit(): void;
-  onModuleDestroy(): void;
+  // Lifecycle methods
+  init(): Promise<void>;
 
   // Connection management methods
-
   closeConnection(connection: Connection): Promise<void>;
+  getConnection(): Promise<Connection>;
 
   // Connection pooling methods
   drainPool(): Promise<void>;
+  disconnect(): Promise<void>;
 
   // Transaction management methods
   beginTransaction(): Promise<void>;

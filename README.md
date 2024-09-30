@@ -13,16 +13,19 @@ The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [Usage](#usage)
+  - [Importing Db2Module](#importing-db2module)
+  - [Database Operations](#database-operations)
   - [Using Db2Module](#using-db2module)
   - [Query Execution](#query-execution)
-  - [Transaction Management](#transaction-management)
-  - [Using Query Builder](#using-query-builder)
+    - [Basic Query Execution](#basic-query-execution)
+    - [Batch Operations](#batch-operations)
+    - [Transaction Management](#transaction-management)
+    - [ORM Support](#orm-support)
+    - [Query Builder](#query-builder)
   - [Decorators](#decorators)
-- [ORM Support](#orm-support)
-- [Error Handling](#error-handling)
-- [Health Checks](#health-checks)
-- [Cache Management](#cache-management)
-- [Security](#security)
+  - [Error Handling](#error-handling)
+  - [Health Checks](#health-checks)
+  - [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -33,9 +36,10 @@ The `@mcereal/nestjs` package is a powerful and flexible TypeScript library that
 - **Connection Management**: Supports connection pooling, failover, and connection state monitoring.
 - **Query Builder**: A fluent API for building SQL queries with support for subqueries, parameterized queries, and more.
 - **Transaction Management**: Built-in support for transactions with `beginTransaction`, `commitTransaction`, and `rollbackTransaction`.
-- **Caching**: Integrated caching with customizable TTL to improve performance for expensive queries.
+- **Batch Operations**: Execute multiple queries in a single batch operation for improved performance.
 - **Decorators**: Custom decorators to enforce connection state checks and cache results.
 - **Health Checks**: Support for implementing health checks using NestJS Terminus.
+- **ORM Support**: Lightweight ORM-like interface for defining schemas and models.
 
 ## Installation
 
@@ -69,6 +73,11 @@ import { Db2Module } from '@mcereal/nestjsdb2';
       port: 50000,
       database: 'sampledb',
       useTls: false,
+      retry: {
+        maxReconnectAttempts: 5,
+        reconnectInterval: 3000,
+      },
+      queryTimeout: 10000, // in milliseconds
     }),
   ],
 })
@@ -82,65 +91,122 @@ The Db2Module can be configured either synchronously or asynchronously:
 ### Synchronous Configuration
 
 ```typescript
-Db2Module.forRoot({
-  auth: {
-    authType: 'password',
-    username: 'db2user',
-    password: 'password',
-  },
-  host: 'localhost',
-  port: 50000,
-  database: 'sampledb',
-  useTls: false,
-});
+import { Module } from '@nestjs/common';
+import { Db2Module } from '@mcereal/nestjsdb2';
+
+@Module({
+  imports: [
+    Db2Module.forRoot({
+      auth: {
+        authType: 'password',
+        username: 'db2user',
+        password: 'password',
+      },
+      host: 'localhost',
+      port: 50000,
+      database: 'sampledb',
+      useTls: false,
+      cacheEnabled: true,
+      retry: {
+        maxReconnectAttempts: 5,
+        reconnectInterval: 3000,
+      },
+      queryTimeout: 10000,
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
 ### Asynchronous Configuration
 
 ```typescript
-Db2Module.forRootAsync({
-  useFactory: async (configService: ConfigService) => ({
-    auth: {
-      authType: 'password',
-      username: configService.get<string>('DB_USER'),
-      password: configService.get<string>('DB_PASS'),
-    },
-    host: configService.get<string>('DB_HOST'),
-    port: configService.get<number>('DB_PORT'),
-    useTls: configService.get<boolean>('DB2_SSL_CONNECTION'),
-    database: configService.get<string>('DB_NAME'),
-    sslCertificatePath: configService.get<string>('DB_SSL_CERT_PATH'),
-  }),
-  inject: [ConfigService],
-});
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Db2Module } from '@mcereal/nestjsdb2';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    Db2Module.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        auth: {
+          authType: 'password',
+          username: configService.get<string>('DB_USER'),
+          password: configService.get<string>('DB_PASS'),
+        },
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        useTls: configService.get<boolean>('DB2_SSL_CONNECTION'),
+        database: configService.get<string>('DB_NAME'),
+        sslCertificatePath: configService.get<string>('DB_SSL_CERT_PATH'),
+        retry: {
+          maxReconnectAttempts: configService.get<number>('DB_RETRY_MAX') || 5,
+          reconnectInterval:
+            configService.get<number>('DB_RETRY_INTERVAL') || 3000,
+        },
+        queryTimeout: configService.get<number>('DB_QUERY_TIMEOUT') || 10000,
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
 ## Usage
 
-### Using Db2Module
+### Importing Db2Module
 
-Inject the Db2Service into your service or controller to interact with the DB2 database:
+Ensure that the Db2Module is imported and configured in your root module (AppModule).
 
 ```typescript
-import { Injectable } from '@nestjs/common';
-import { Db2Service } from '@mcereal/nestjsdb2';
+import { Module } from '@nestjs/common';
+import { Db2Module } from '@mcereal/nestjsdb2';
 
-@Injectable()
-export class UserService {
-  constructor(private readonly db2Service: Db2Service) {}
-
-  async getUserData(userId: string) {
-    return this.db2Service.query('SELECT * FROM users WHERE id = ?', [userId]);
-  }
-}
+@Module({
+  imports: [
+    Db2Module.forRoot({
+      auth: {
+        authType: 'password',
+        username: 'db2user',
+        password: 'password',
+      },
+      host: 'localhost',
+      port: 50000,
+      database: 'sampledb',
+      useTls: false,
+      cacheEnabled: true,
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-### Query Execution
+### Database Operations
+
+### Basic Query Execution
 
 The `query` method executes a SQL query and returns the result as an array of objects:
 
 ```typescript
 const result = await this.db2Service.query('SELECT * FROM users');
+```
+
+### Batch Operations
+
+The `batch` method executes multiple queries in a single batch operation:
+
+```typescript
+const queries = [
+  { sql: 'INSERT INTO users (name) VALUES (?)', params: ['Alice
+  { sql: 'INSERT INTO users (name) VALUES (?)', params: ['Bob'] },
+];
+
+const results = await this.db2Service.batch(queries);
 ```
 
 ### Transaction Management
@@ -153,27 +219,33 @@ await this.db2Service.query('INSERT INTO users (name) VALUES (?)', ['Alice']);
 await this.db2Service.commitTransaction();
 ```
 
-### Using Query Builder
+### Query Builder
 
-The `QueryBuilder` class provides a fluent API for building SQL queries:
+The `QueryBuilder` class provides a fluent API for building SQL queries with support for subqueries, parameterized queries, and more.
+
+Create a new Query builder by providing the table name and an instance of th Db2Client class.
 
 ```typescript
-const query = new QueryBuilder()
-  .select('name', 'email')
-  .from('users')
-  .where('id = ?', [userId])
-  .limit(1)
-  .build();
+import { QueryBuilder } from '@mcereal/nestjsdb2';
 
-const result = await this.db2Service.query(query);
+const queryBuilder = new QueryBuilder('users', this.db2Service);
+
+const result = await queryBuilder
+  .select(['id', 'name'])
+  .where('name', '=', 'Alice')
+  .orderBy('created_at', 'DESC')
+  .limit(10)
+  .execute();
+
+console.log(result);
 ```
 
 ### Decorators
 
-The `@Transaction`, `@Connection`, and `@Cache` decorators can be used to enforce connection state checks and cache results:
+The `@Transaction`, `@Connection`, and `` decorators can be used to enforce connection state checks and cache results:
 
 ```typescript
-import { Transaction, Connection, Cache } from '@mcereal/nestjsdb2';
+import { Transaction, Connection, Query, Param } from '@mcereal/nestjsdb2';
 
 @Injectable()
 export class UserService {
@@ -187,45 +259,111 @@ export class UserService {
     return this.db2Service.query('SELECT * FROM users WHERE id = ?', [userId]);
   }
 
-  @Cache({ ttl: 60 })
-  async getRecentUsers() {
-    return this.db2Service.query(
-      'SELECT * FROM users ORDER BY created_at DESC LIMIT 10',
-    );
-  }
+  @Query('SELECT * FROM users WHERE id = ?')
+  async getUserData(@Param('id') userId: string) {
+    return this.db2Service.query('SELECT * FROM users WHERE id = ?', [userId]);
+
 }
 ```
 
-## ORM Support
+#### ORM Support
 
-The `@mcereal/nestjsdb2` package provides a lightweight ORM-like inrerface for working with DB2. You can define schemas using the `Schema` class and model classes using the `Model` class:
+The `@mcereal/nestjsdb2` package provides a lightweight ORM-like inrerface for working with DB2. You can define schemas using the `Schema` class and model classes using the `Model` class.
+
+1. First, define an entity class using the `@Entity` decorator, and define the schema using the `Schema` class:
 
 ```typescript
 import { Schema, Model } from '@mcereal/nestjsdb2';
+import { Entity, Column, PrimaryKey } from '@mcereal/nestjsdb2';
 
-const UserSchema = new Schema({
-  name: String,
-  email: String,
-});
+@Entity({
+  entityType: 'table',
+  name: 'users',
+})
+export class User {
+  @PrimaryKey()
+  id!: string;
+
+  @Column()
+  name!: string;
+
+  @Column()
+  email!: string;
+}
+
+export const UserSchema = new Schema([User]);
 
 const UserModel = new Model('users', UserSchema);
+```
+
+2. Register the `Schema` and `Model` classes in the module configuration as providers:
+
+```typescript
+Db2Module.forRoot({
+  auth: {
+    authType: 'password',
+    host: 'localhost',
+    port: 50000,
+    database: 'sampledb',
+    useTls: false,
+  },
+  providers: [
+    {
+      provide: 'UserModel',
+      useValue: UserModel,
+    },
+  ],
+});
+```
+
+3. Use `Db2Module.forFeature` to register the `Schema` and `Model` classes in a feature module:
+
+```typescript
+
+@Module({
+  imports: [
+    Db2Module.forFeature({
+      auth: {
+        authType: 'password',
+        host: 'localhost',
+        port: 50000,
+        database: 'sampledb',
+        useTls: false,
+      },
+      providers: [
+        {
+          provide: 'UserModel',
+          useValue: UserModel,
+        },
+      ],
+    }),
+  ],
+})
+```
+
+4. Use the `UserModel` class to perform CRUD operations on the `users` table:
+
+```typescript
+import { Injectable, Inject } from '@nestjs/common';
 
 @Injectable()
 export class UserService {
+  constructor(@Inject('UserModel') private userModel: Model<UserModel>) {}
+
   async createUser(name: string, email: string) {
-    return UserModel.create({ name, email });
+    return this.userModel.insert({ name, email });
   }
 
-  async getUserData(userId: string) {
-    return UserModel.findOne({ id: userId });
+  async getUserById(id: string) {
+    return this.userModel.findOne({ id });
   }
 
-  async updateUser(userId: string, data: Record<string, any>) {
-    return UserModel.update({ id: userId }, data);
+  async updateUser(id: string, name: string, email: string) {
+    return this.userModel.update({ id }, { name, email });
   }
 
-  async deleteUser(userId: string) {
-    return UserModel.delete({ id: userId });
+  async deleteUser(id: string) {
+    return this.userModel.delete({ id });
   }
 }
 ```
@@ -278,37 +416,6 @@ import { Db2HealthIndicator } from '@mcereal/nestjsdb2';
   ],
 })
 export class HealthModule {}
-```
-
-## Cache Management
-
-The `@mcereal/nestjsdb2` package supports integrated caching with customizable TTL to improve performance for expensive queries. You can enable caching by setting the `cacheEnabled` option in the module configuration:
-
-```typescript
-Db2Module.forRoot({
-  host: 'localhost',
-  port: 50000,
-  username
-    password
-    database
-    cacheEnabled: true,
-});
-```
-
-You can use the `@Cache` decorator to cache the results of a query with a specific TTL:
-
-```typescript
-import { Cache } from '@mcereal/nestjsdb2';
-
-@Injectable()
-export class UserService {
-  @Cache({ ttl: 60 })
-  async getRecentUsers() {
-    return this.db2Service.query(
-      'SELECT * FROM users ORDER BY created_at DESC LIMIT 10',
-    );
-  }
-}
 ```
 
 ## Security

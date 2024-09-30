@@ -1,13 +1,24 @@
-import { IDb2ConfigManager } from '../interfaces/config-manager.interface';
+// src/db2-config.ts
+
 import {
+  IDb2ConfigManager,
   IDb2ConfigOptions,
   Db2RetryOptions,
   Db2LoggingOptions,
 } from '../interfaces';
 
-export class Db2ConfigManager implements IDb2ConfigManager {
-  constructor(public config: IDb2ConfigOptions) {
-    this.config = this.applyDefaults(config);
+export class Db2Config implements IDb2ConfigManager {
+  private _config: () => IDb2ConfigOptions;
+
+  constructor(options: IDb2ConfigOptions) {
+    this._config = () => this.applyDefaults(options);
+  }
+
+  /**
+   * Get the fully merged configuration with defaults.
+   */
+  get config(): IDb2ConfigOptions {
+    return this._config();
   }
 
   /**
@@ -43,6 +54,7 @@ export class Db2ConfigManager implements IDb2ConfigManager {
       retryInterval: retry.retryInterval ?? 1000, // Default retry interval
     };
   }
+
   /**
    * Applies default values to the logging options if missing.
    */
@@ -57,9 +69,15 @@ export class Db2ConfigManager implements IDb2ConfigManager {
   }
 
   /**
-   * Get the fully merged configuration with defaults.
+   * Static method to create a Db2Config instance asynchronously.
    */
-  public getConfig(): IDb2ConfigOptions {
-    return this.config;
+  public static async forRootAsync(options: {
+    useFactory: (
+      ...args: any[]
+    ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
+    inject?: any[];
+  }): Promise<Db2Config> {
+    const configOptions = await options.useFactory();
+    return new Db2Config(configOptions);
   }
 }

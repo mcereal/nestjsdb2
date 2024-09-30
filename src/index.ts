@@ -1,6 +1,5 @@
 // src/index.ts
 
-export * from './modules'; // Export the main module
 export * from './services'; // Export the services
 export * from './interfaces'; // Export all interfaces
 export * from './enums'; // Export enums used in the module

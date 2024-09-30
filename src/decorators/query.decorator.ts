@@ -2,7 +2,7 @@ import { Logger } from '../utils';
 import { IConnectionManager } from '../interfaces';
 
 /**
- * @function Db2Query
+ * @function Query
  * @description A method decorator that uses Db2ConnectionManager to acquire a connection,
  * execute the given query, and then release the connection back to the pool.
  *
@@ -22,10 +22,7 @@ import { IConnectionManager } from '../interfaces';
  *   }
  * }
  */
-export const Db2Query = (
-  query: string,
-  executeQuery = true,
-): MethodDecorator => {
+export const Query = (query: string, executeQuery = true): MethodDecorator => {
   const logger = new Logger('Db2QueryDecorator');
 
   return (

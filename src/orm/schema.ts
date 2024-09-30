@@ -46,6 +46,9 @@ export class Schema<T extends ClassConstructor<any>[]> {
 
   constructor(private entities: T) {
     try {
+      // Initialize MetadataManager
+      this.metadataManager = new MetadataManager();
+
       this.entities.forEach((entity) => {
         // Use MetadataManager to ensure metadata is initialized
         this.metadataManager.getEntityMetadata(entity);
@@ -60,7 +63,7 @@ export class Schema<T extends ClassConstructor<any>[]> {
       this.defaultValuesHandler = new DefaultValuesHandler(this);
       this.compositeKeysHandler = new CompositeKeysHandler(this);
       this.primaryKeysHandler = new PrimaryKeysHandler(this);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to initialize Schema: ${error.message}`);
     }
   }
@@ -72,8 +75,12 @@ export class Schema<T extends ClassConstructor<any>[]> {
    */
   public getMetadata<U>(entity: ClassConstructor<U>): EntityMetadata {
     try {
-      return this.metadataManager.getEntityMetadata(entity);
-    } catch (error) {
+      const metadata = this.metadataManager.getEntityMetadata(entity);
+      if (!metadata) {
+        throw new Error('Metadata is undefined or null');
+      }
+      return metadata;
+    } catch (error: any) {
       throw new Error(
         `Failed to get metadata for entity '${entity.name}': ${error.message}`,
       );
@@ -90,7 +97,7 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error('No entity is currently set in the schema.');
       }
       return this.metadataManager.getEntityMetadata(this.currentEntity);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get current metadata: ${error.message}`);
     }
   }
@@ -106,7 +113,7 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error(`Entity '${entity.name}' is not part of this schema.`);
       }
       this.currentEntity = entity;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(
         `Failed to set entity '${entity.name}': ${error.message}`,
       );
