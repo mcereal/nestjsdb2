@@ -35,6 +35,6 @@ export class CategoryService {
   }
 
   getAllCategories(): Promise<Category[]> {
-    return this.categoryModel.find();
+    return this.categoryModel.find({});
   }
 }

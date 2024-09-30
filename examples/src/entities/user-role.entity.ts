@@ -7,7 +7,7 @@ import { User } from './user.entity';
   name: 'UserRole',
   entityType: 'table',
 })
-export class UserRoleTable {
+export class UserRole {
   @PrimaryKey({ type: 'integer', autoIncrement: true })
   id!: number;
 

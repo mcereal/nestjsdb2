@@ -11,6 +11,6 @@ export class UserPostService {
   ) {}
 
   async getUserPosts(): Promise<UserPostView[]> {
-    return await this.userPostModel.find();
+    return await this.userPostModel.find({});
   }
 }

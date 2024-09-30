@@ -64,16 +64,8 @@ class ForeignKeyDecorator {
   ): ForeignKeyMetadata {
     return {
       propertyKey,
-      reference: options.reference,
-      onDelete: options.onDelete,
-      onUpdate: options.onUpdate,
-      name: options.name,
-      constraintName: options.constraintName,
-      comment: options.comment,
-      invisible: options.invisible,
-      functional: options.functional,
-      expression: options.expression,
-      include: options.include,
+      reference: options.reference!,
+      ...options,
     };
   }
 

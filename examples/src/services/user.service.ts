@@ -70,7 +70,7 @@ export class UserService {
 
   async deleteUser(id: number): Promise<void> {
     try {
-      const deleted = await this.userModel.delete({ id });
+      const deleted: boolean = await this.userModel.delete({ id });
       if (!deleted) {
         throw new HttpException('User not found.', HttpStatus.NOT_FOUND);
       }

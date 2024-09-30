@@ -11,11 +11,11 @@ export class UserRoleService {
   ) {}
 
   async getUserRoles(): Promise<UserRoleView[]> {
-    return await this.userRoleModel.find();
+    return await this.userRoleModel.find({});
   }
 
-  async getUserRole(userId: number): Promise<UserRoleView | null> {
-    return await this.userRoleModel.findOne({ userId });
+  async getUserRole(id: number): Promise<UserRoleView | null> {
+    return await this.userRoleModel.findOne({ id });
   }
 
   async createUserRole(data: Partial<UserRoleView>): Promise<UserRoleView> {
@@ -24,15 +24,16 @@ export class UserRoleService {
   }
 
   async updateUserRole(
-    userId: number,
+    id: number,
     data: Partial<UserRoleView>,
   ): Promise<UserRoleView | null> {
-    await this.userRoleModel.update({ userId }, data);
-    return await this.userRoleModel.findOne({ userId });
+    await this.userRoleModel.update({ id }, data);
+    return await this.userRoleModel.findOne({ id });
   }
 
-  async deleteUserRole(userId: number): Promise<boolean> {
-    const result = await this.userRoleModel.delete({ userId });
-    return result.affected > 0;
+  async deleteUserRole(id: number): Promise<boolean> {
+    await this.userRoleModel.delete({ id });
+    const deletedUserRole = await this.userRoleModel.findOne({ id });
+    return !deletedUserRole;
   }
 }

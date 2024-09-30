@@ -12,6 +12,6 @@ export class UserCommentsService {
   ) {}
 
   async getUserComments(): Promise<UserCommentsView[]> {
-    return await this.userCommentsModel.find();
+    return await this.userCommentsModel.find({});
   }
 }
