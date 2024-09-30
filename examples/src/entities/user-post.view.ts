@@ -1,5 +1,5 @@
 // src/entities/user-post.view.ts
-import { Entity, View, Column } from '@mcereal/nestjsdb2';
+import { Entity, View, Column, PrimaryKey } from '@mcereal/nestjsdb2';
 
 @Entity({
   name: 'UserPost',
@@ -23,21 +23,22 @@ import { Entity, View, Column } from '@mcereal/nestjsdb2';
   `,
 })
 export class UserPostView {
-  @Column({ type: 'integer', nullable: false })
+  @PrimaryKey({ type: 'integer', name: 'post_id', nullable: false })
+  @Column({ type: 'integer', name: 'post_id', nullable: false })
   post_id!: number;
 
-  @Column({ type: 'varchar', length: 150, nullable: false })
+  @Column({ type: 'varchar', name: 'title', length: 150, nullable: false })
   title!: string;
 
-  @Column({ type: 'text', nullable: false })
+  @Column({ type: 'text', name: 'content', nullable: false })
   content!: string;
 
-  @Column({ type: 'timestamp', nullable: false })
+  @Column({ type: 'timestamp', name: 'created_at', nullable: false })
   created_at!: Date;
 
-  @Column({ type: 'integer', nullable: false })
+  @Column({ type: 'integer', name: 'user_id', nullable: false })
   user_id!: number;
 
-  @Column({ type: 'varchar', length: 50, nullable: false })
+  @Column({ type: 'varchar', name: 'username', length: 50, nullable: false })
   username!: string;
 }

@@ -1,5 +1,5 @@
 // src/entities/recent-posts.view.ts
-import { Entity, View, Column } from '@mcereal/nestjsdb2';
+import { Entity, View, Column, PrimaryKey } from '@mcereal/nestjsdb2';
 
 @Entity({
   name: 'RecentPosts',
@@ -24,15 +24,21 @@ import { Entity, View, Column } from '@mcereal/nestjsdb2';
   `,
 })
 export class RecentPostsView {
-  @Column({ type: 'integer', nullable: false })
+  @PrimaryKey({ type: 'integer', name: 'post_id', length: 50, nullable: false })
+  @Column({ type: 'integer', name: 'post_id', length: 50, nullable: false })
   post_id!: number;
 
-  @Column({ type: 'varchar', length: 150, nullable: false })
+  @Column({ type: 'varchar', name: 'title', length: 150, nullable: false })
   title!: string;
 
-  @Column({ type: 'timestamp', nullable: false })
+  @Column({
+    type: 'timestamp',
+    name: 'created_at',
+    length: 150,
+    nullable: false,
+  })
   created_at!: Date;
 
-  @Column({ type: 'varchar', length: 50, nullable: false })
+  @Column({ type: 'varchar', name: 'author', length: 50, nullable: false })
   author!: string;
 }

@@ -8,17 +8,29 @@ import { Post } from './post.entity';
   entityType: 'table',
 })
 export class Category {
-  @PrimaryKey({ type: 'integer', autoIncrement: true })
+  @PrimaryKey({
+    type: 'integer',
+    name: 'id',
+    autoIncrement: true,
+    nullable: false,
+  })
   id!: number;
 
-  @Column({ type: 'varchar', length: 50, unique: true, nullable: false })
+  @Column({
+    type: 'varchar',
+    name: 'name',
+    length: 50,
+    unique: true,
+    nullable: false,
+  })
   name!: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', name: 'description', length: 255, nullable: true })
   description?: string;
 
   @Column({
     type: 'timestamp',
+    name: 'created_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })

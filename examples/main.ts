@@ -31,7 +31,7 @@ async function bootstrap() {
 
   try {
     logger.info('Starting the application...');
-    await app.listen(PORT, '0.0.0.0', () => {
+    await app.listen(PORT, () => {
       logger.info(`Application is listening on port: ${PORT}`);
     });
   } catch (error) {
