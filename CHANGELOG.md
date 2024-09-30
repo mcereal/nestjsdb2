@@ -1,3 +1,10 @@
+## [1.1.18](https://github.com/mcereal/nestjsdb2/compare/v1.1.17...v1.1.18) (2024-09-30)
+
+
+### Bug Fixes
+
+* foreign key handling ([63b8083](https://github.com/mcereal/nestjsdb2/commit/63b8083be29713514561063d2119c815aa26633a))
+
 ## [1.1.17](https://github.com/mcereal/nestjsdb2/compare/v1.1.16...v1.1.17) (2024-09-30)
 
 
