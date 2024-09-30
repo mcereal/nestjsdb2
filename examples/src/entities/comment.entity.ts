@@ -9,11 +9,17 @@ import { Post as BlogPost } from './post.entity';
   entityType: 'table',
 })
 export class Comment {
-  @PrimaryKey({ type: 'integer', autoIncrement: true })
+  @PrimaryKey({
+    type: 'integer',
+    name: 'id',
+    autoIncrement: true,
+    nullable: false,
+  })
   id!: number;
 
   @ForeignKey({
     target: BlogPost,
+    name: 'post_id',
     referencedTable: 'posts',
     referencedColumnNames: ['id'],
     onDelete: 'CASCADE',
@@ -23,6 +29,7 @@ export class Comment {
 
   @ForeignKey({
     target: User,
+    name: 'user_id',
     referencedTable: 'users',
     referencedColumnNames: ['id'],
     onDelete: 'CASCADE',
@@ -30,11 +37,12 @@ export class Comment {
   })
   user_id!: number;
 
-  @Column({ type: 'text', nullable: false })
+  @Column({ type: 'text', name: 'content', nullable: false })
   content!: string;
 
   @Column({
     type: 'timestamp',
+    name: 'created_at',
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })

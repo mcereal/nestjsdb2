@@ -10,7 +10,12 @@ import { UserRole } from './user-role.entity';
   entityType: 'view',
 })
 export class User {
-  @PrimaryKey({ type: 'integer', name: 'id', autoIncrement: true })
+  @PrimaryKey({
+    type: 'integer',
+    name: 'id',
+    autoIncrement: true,
+    nullable: false,
+  })
   id!: number;
 
   @Column({

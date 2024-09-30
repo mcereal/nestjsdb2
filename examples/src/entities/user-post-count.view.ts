@@ -1,6 +1,6 @@
 // examples/src/entities/user-post-count.view.ts
 
-import { Entity, View, Column } from '@mcereal/nestjsdb2';
+import { Entity, View, Column, PrimaryKey } from '@mcereal/nestjsdb2';
 
 @Entity({
   name: 'UserPostCount',
@@ -23,12 +23,13 @@ import { Entity, View, Column } from '@mcereal/nestjsdb2';
   `,
 })
 export class UserPostCountView {
-  @Column({ type: 'integer', nullable: false })
+  @PrimaryKey({ type: 'integer', name: 'user_id', nullable: false })
+  @Column({ type: 'integer', name: 'user_id', nullable: false })
   user_id!: number;
 
-  @Column({ type: 'varchar', length: 50, nullable: false })
+  @Column({ type: 'varchar', name: 'username', length: 50, nullable: false })
   username!: string;
 
-  @Column({ type: 'integer', nullable: false })
+  @Column({ type: 'integer', name: 'post_count', nullable: false })
   post_count!: number;
 }
