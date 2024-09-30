@@ -1,3 +1,11 @@
+## [1.1.14](https://github.com/mcereal/nestjsdb2/compare/v1.1.13...v1.1.14) (2024-09-30)
+
+
+### Bug Fixes
+
+* method name usage ([b5904ce](https://github.com/mcereal/nestjsdb2/commit/b5904ce53f3052c58953d2adf5696f117b8d1d6c))
+* schema and table handling ([ef19ce7](https://github.com/mcereal/nestjsdb2/commit/ef19ce7dc88108a3dbf19817947d24df0c815fab))
+
 ## [1.1.13](https://github.com/mcereal/nestjsdb2/compare/v1.1.12...v1.1.13) (2024-09-30)
 
 
