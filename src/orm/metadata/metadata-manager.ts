@@ -2,7 +2,7 @@
 
 import { ClassConstructor } from '../types';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
-import { EntityMetadata } from '../interfaces';
+import { ColumnMetadata, EntityMetadata } from '../interfaces';
 
 export type MetadataType =
   | 'columns'

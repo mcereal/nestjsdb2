@@ -20,6 +20,7 @@ class ColumnDecorator extends BasePropertyDecorator<Partial<ColumnMetadata>> {
       // Metadata Creator
       (propertyKey, options) => ({
         propertyKey: propertyKey.toString(),
+        name: options.name,
         type: options.type,
         length: options.length,
         nullable: options.nullable,
