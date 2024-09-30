@@ -1,12 +1,14 @@
-// src/service/category.service.ts
+// src/services/category.service.ts
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { Category } from '../entities/category.entity';
 import { Model } from '@mcereal/nestjsdb2';
 
 @Injectable()
 export class CategoryService {
-  constructor(private readonly categoryModel: Model<Category>) {}
+  constructor(
+    @Inject('CATEGORY_MODEL') private readonly categoryModel: Model<Category>,
+  ) {}
 
   async createCategory(data: Partial<Category>): Promise<Category> {
     const category = this.categoryModel.create(data);

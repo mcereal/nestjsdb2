@@ -7,7 +7,7 @@ import { Model } from '@mcereal/nestjsdb2';
 @Injectable()
 export class UserCommentsService {
   constructor(
-    @Inject('USER_COMMENTS_VIEW')
+    @Inject('USERCOMMENTSVIEW_MODEL')
     private readonly userCommentsModel: Model<UserCommentsView>,
   ) {}
 

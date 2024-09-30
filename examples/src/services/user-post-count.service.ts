@@ -6,7 +6,7 @@ import { Model } from '@mcereal/nestjsdb2';
 @Injectable()
 export class UserPostCountService {
   constructor(
-    @Inject('USER_POST_COUNT_VIEW')
+    @Inject('USERPOSTCOUNTVIEW_MODEL')
     private readonly userPostCountModel: Model<UserPostCountView>,
   ) {}
 
