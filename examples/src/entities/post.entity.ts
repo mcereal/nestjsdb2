@@ -21,7 +21,8 @@ export class Post {
   @ForeignKey({
     target: User,
     name: 'user_id',
-    reference: 'users(id)', // Added 'reference' property
+    referencedTable: 'users', // Updated
+    referencedColumnNames: ['id'], // Updated
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })

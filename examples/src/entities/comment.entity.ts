@@ -14,7 +14,8 @@ export class Comment {
 
   @ForeignKey({
     target: BlogPost,
-    reference: 'posts(id)',
+    referencedTable: 'posts',
+    referencedColumnNames: ['id'],
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
@@ -22,7 +23,8 @@ export class Comment {
 
   @ForeignKey({
     target: User,
-    reference: 'users(id)',
+    referencedTable: 'users',
+    referencedColumnNames: ['id'],
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })

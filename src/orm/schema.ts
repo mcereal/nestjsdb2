@@ -53,8 +53,8 @@ export class Schema<T extends ClassConstructor<any>[]> {
 
   constructor(private entities: T) {
     try {
-      // Initialize MetadataManager
-      this.metadataManager = new MetadataManager();
+      // Initialize MetadataManager using singleton
+      this.metadataManager = MetadataManager.getInstance();
 
       this.entities.forEach((entity) => {
         // Use MetadataManager to ensure metadata is initialized

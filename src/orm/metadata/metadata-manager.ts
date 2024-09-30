@@ -2,7 +2,8 @@
 
 import { ClassConstructor } from '../types';
 import { EntityMetadataStorage } from '../metadata/entity-metadata.storage';
-import { ColumnMetadata, EntityMetadata } from '../interfaces';
+import { EntityMetadata } from '../interfaces';
+import { Logger } from '../../utils/logger';
 
 export type MetadataType =
   | 'columns'
@@ -28,6 +29,7 @@ export class MetadataManager {
    * @returns The entity metadata.
    */
   private static instance: MetadataManager;
+  private readonly logger = new Logger(MetadataManager.name);
 
   private getOrCreateMetadata(constructor: ClassConstructor): EntityMetadata {
     let entityMetadata = EntityMetadataStorage.getEntityMetadata(constructor);
@@ -103,6 +105,43 @@ export class MetadataManager {
     }
 
     EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
+  }
+
+  public removeMetadata<T>(
+    constructor: ClassConstructor,
+    metadataType: MetadataType,
+    predicate: (metadata: T) => boolean,
+  ): void {
+    this.logger.info(
+      `Removing metadata for ${constructor.name} - Type: ${metadataType}`,
+    );
+
+    const entityMetadata = this.getOrCreateMetadata(constructor);
+
+    if (entityMetadata.entityType === 'table') {
+      const metadataArray = entityMetadata.tableMetadata[metadataType] as T[];
+      const index = metadataArray.findIndex(predicate);
+      if (index !== -1) {
+        metadataArray.splice(index, 1);
+        this.logger.info(`Removed metadata at index ${index}`);
+      } else {
+        this.logger.info('No matching metadata found to remove.');
+      }
+    } else if (
+      entityMetadata.entityType === 'view' &&
+      metadataType === 'columns'
+    ) {
+      const metadataArray = entityMetadata.viewMetadata?.columns as T[];
+      const index = metadataArray.findIndex(predicate);
+      if (index !== -1) {
+        metadataArray.splice(index, 1);
+        this.logger.info(`Removed metadata at index ${index}`);
+      } else {
+        this.logger.info('No matching metadata found to remove.');
+      }
+
+      EntityMetadataStorage.setEntityMetadata(constructor, entityMetadata);
+    }
   }
 
   /**
@@ -188,12 +227,18 @@ export class MetadataManager {
     ) as unknown as T;
   }
 
+  /**
+   * Retrieves the primary key metadata for an entity.
+   * @param constructor - The constructor of the entity class.
+   * @returns The primary key metadata.
+   */
   public static getInstance(): MetadataManager {
     if (!MetadataManager.instance) {
       MetadataManager.instance = new MetadataManager();
     }
     return MetadataManager.instance;
   }
+
   /**
    * Retrieves all registered entity classes.
    * @returns Array of entity class constructors.

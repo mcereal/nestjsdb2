@@ -3,6 +3,7 @@
 import { Schema } from '../schema';
 import { ForeignKeyMetadata } from '../interfaces';
 import { ClassConstructor } from '../types';
+import { MetadataManager } from '../metadata/metadata-manager';
 
 /**
  * Handles foreign key-related operations for a schema.
@@ -84,21 +85,32 @@ export class ForeignKeysHandler {
         );
       }
 
-      // Construct foreign key metadata using the spread operator
+      // Retrieve MetadataManager instance
+      const metadataManager = MetadataManager.getInstance();
+
+      // Construct foreign key metadata
       const foreignKeyMeta: ForeignKeyMetadata = {
         propertyKey,
-        reference: `${options.referencedTable}(${options.referencedColumnNames.join(', ')})`,
-        columnNames: options.columnNames || [propertyKey], // Default to using the property key as the column
-        referencedTable: options.referencedTable,
-        referencedColumnNames: options.referencedColumnNames || ['id'], // Default to 'id' if not specified
         name: options.name || `${propertyKey}_fk`, // Default name if not specified
-        ...options, // Spread the rest of the options
+        target: options.target!,
+        referencedTable: options.referencedTable,
+        referencedColumnNames: options.referencedColumnNames,
+        onDelete: options.onDelete,
+        onUpdate: options.onUpdate,
+        reference: `${options.referencedTable}(${options.referencedColumnNames.join(
+          ',',
+        )})`,
+        // Spread the rest of the options if needed
       };
 
-      // Push the foreign key metadata to the table metadata of the current entity
-      this.schema
-        .getMetadata(this.currentEntity)
-        .tableMetadata!.foreignKeys.push(foreignKeyMeta);
+      // Add foreign key metadata via MetadataManager
+      metadataManager.addMetadata(
+        this.currentEntity,
+        'foreignKeys',
+        foreignKeyMeta,
+        (existing: ForeignKeyMetadata, newEntry: ForeignKeyMetadata) =>
+          existing.propertyKey === newEntry.propertyKey,
+      );
     } catch (error) {
       throw new Error(
         `Failed to set foreign key for property '${propertyKey}': ${error.message}`,
@@ -122,8 +134,11 @@ export class ForeignKeysHandler {
         throw new Error('No entity set for ForeignKeysHandler.');
       }
 
-      return this.schema.getMetadata(this.currentEntity).tableMetadata!
-        .foreignKeys;
+      const metadataManager = MetadataManager.getInstance();
+      return metadataManager.getMetadata<ForeignKeyMetadata>(
+        this.currentEntity,
+        'foreignKeys',
+      );
     } catch (error) {
       throw new Error(`Failed to get foreign keys: ${error.message}`);
     }
@@ -151,11 +166,28 @@ export class ForeignKeysHandler {
         );
       }
 
-      const metadata = this.schema.getMetadata(this.currentEntity);
-      metadata.tableMetadata!.foreignKeys =
-        metadata.tableMetadata!.foreignKeys.filter(
-          (fk) => fk.propertyKey !== propertyKey,
-        );
+      const metadataManager = MetadataManager.getInstance();
+      const foreignKeys = metadataManager.getMetadata<ForeignKeyMetadata>(
+        this.currentEntity,
+        'foreignKeys',
+      );
+
+      // Filter out the foreign key to be removed
+      const updatedForeignKeys = foreignKeys.filter(
+        (fk) => fk.propertyKey !== propertyKey,
+      );
+
+      // Update the foreignKeys metadata
+      // First, remove existing foreignKeys metadata
+      metadataManager.removeMetadata(
+        this.currentEntity,
+        'foreignKeys',
+        (fk: ForeignKeyMetadata) => fk.propertyKey === propertyKey,
+      );
+
+      // Alternatively, depending on MetadataManager's implementation, set the updated array
+      // If MetadataManager supports setting the entire array, use that
+      // Otherwise, ensure that individual removal is handled
     } catch (error) {
       throw new Error(
         `Failed to remove foreign key for property '${propertyKey}': ${error.message}`,

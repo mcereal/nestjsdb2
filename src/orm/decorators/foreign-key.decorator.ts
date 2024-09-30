@@ -20,9 +20,17 @@ class ForeignKeyDecorator extends BasePropertyDecorator<
         if (!options.target) {
           throw new Error('Foreign key decorator requires a "target" option.');
         }
-        if (!options.reference) {
+        if (!options.referencedTable) {
           throw new Error(
-            'Foreign key decorator requires a "reference" option.',
+            'Foreign key decorator requires a "referencedTable" option.',
+          );
+        }
+        if (
+          !options.referencedColumnNames ||
+          options.referencedColumnNames.length === 0
+        ) {
+          throw new Error(
+            'Foreign key decorator requires "referencedColumnNames" option with at least one column.',
           );
         }
       },
@@ -31,7 +39,8 @@ class ForeignKeyDecorator extends BasePropertyDecorator<
         propertyKey: propertyKey.toString(),
         name: options.name,
         target: options.target,
-        reference: options.reference,
+        referencedTable: options.referencedTable,
+        referencedColumnNames: options.referencedColumnNames,
         onDelete: options.onDelete,
         onUpdate: options.onUpdate,
         // Include other properties as needed
@@ -58,7 +67,6 @@ class ForeignKeyDecorator extends BasePropertyDecorator<
         name: options.name || propertyKey.toString(),
         type: options.type || 'integer', // Default type if not provided
         nullable: options.nullable !== undefined ? options.nullable : true,
-
         // Include other relevant column options as needed
       };
 

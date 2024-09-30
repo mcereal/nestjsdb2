@@ -9,7 +9,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@mcereal/nestjsdb2": "^1.1.16",
+    "@mcereal/nestjsdb2": "^1.1.17",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.0.0",
