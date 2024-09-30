@@ -1,6 +1,7 @@
 // Purpose: Interfaces for keys metadata.
 
 import { EntityMetadata } from '../interfaces';
+import { ClassConstructor } from '../types';
 
 /**
  * Metadata for a primary key in a table.
@@ -177,7 +178,7 @@ export interface ForeignKeyMetadata {
   nullable?: boolean;
 
   /** The target entity for the foreign key reference. */
-  target?: Function;
+  target: ClassConstructor<any>;
 
   /** The reference in the format 'referenced_table(referenced_column)'. */
   reference: string;
