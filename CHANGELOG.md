@@ -1,3 +1,11 @@
+## [1.1.11](https://github.com/mcereal/nestjsdb2/compare/v1.1.10...v1.1.11) (2024-09-30)
+
+
+### Bug Fixes
+
+* add examples ([6acd304](https://github.com/mcereal/nestjsdb2/commit/6acd3040488e319579ddfbf7de99a52cb9b6dfb2))
+* package scripts point to examples ([8332f5f](https://github.com/mcereal/nestjsdb2/commit/8332f5fade3bf54e0d41872f1e36d2030e4b0b7a))
+
 ## [1.1.10](https://github.com/mcereal/nestjsdb2/compare/v1.1.9...v1.1.10) (2024-09-30)
 
 
