@@ -1,21 +1,19 @@
-// src/indicators/db2-health.indicator.ts
-
 import { Injectable } from '@nestjs/common';
-import { Db2Service } from '../services/db2.service';
+import { IConnectionManager } from '../interfaces';
 import { Db2ConnectionState } from '../enums';
 import { HealthCheckError } from '../errors/health-check.error';
 import { Logger } from '../utils';
 
 /**
  * @class Db2HealthIndicator
- * @classdesc This class provides health check functionality for the Db2 database service.
+ * @classdesc This class provides health check functionality for the Db2 database service using the ConnectionManager.
  * @public
  */
 @Injectable()
 export class Db2HealthIndicator {
   private readonly logger = new Logger(Db2HealthIndicator.name);
 
-  constructor(private readonly db2Service: Db2Service) {}
+  constructor(private readonly connectionManager: IConnectionManager) {}
 
   /**
    * Checks the health of the Db2 connection and returns detailed status.
@@ -27,25 +25,24 @@ export class Db2HealthIndicator {
     this.logger.info('Performing Db2 health check...');
 
     try {
-      // Check the current connection state
-      const { connectionState } = this.db2Service.getState();
+      // Check the current connection state using the ConnectionManager
+      const { connectionState } = this.connectionManager.getState();
       if (connectionState !== Db2ConnectionState.CONNECTED) {
         this.logger.warn(
           `Db2 connection state is not CONNECTED: ${connectionState}`,
         );
-        const healthStatus = this.getStatus(key, false, { connectionState });
+        const healthStatus = this.formatStatus(key, false, { connectionState });
         throw new HealthCheckError('Db2 connection state error', healthStatus);
       }
 
-      // Perform a health check using the db2Service
-      const { dbHealth, transactionActive } =
-        await this.db2Service.checkHealth();
+      // Perform a health check using the ConnectionManager
+      const { status: dbHealth, details: healthDetails } =
+        await this.connectionManager.checkHealth();
 
       const isHealthy =
         dbHealth && connectionState === Db2ConnectionState.CONNECTED;
-      const healthStatus = this.getStatus(key, isHealthy, {
-        dbHealth,
-        transactionActive,
+      const healthStatus = this.formatStatus(key, isHealthy, {
+        ...healthDetails,
         connectionState,
       });
 
@@ -57,7 +54,7 @@ export class Db2HealthIndicator {
       this.logger.info('Db2 is healthy.', healthStatus);
       return healthStatus;
     } catch (error) {
-      const healthStatus = this.getStatus(key, false, {
+      const healthStatus = this.formatStatus(key, false, {
         error: error.message,
       });
       this.logger.error('Db2 health check failed', error.message);
@@ -70,8 +67,12 @@ export class Db2HealthIndicator {
 
   /**
    * Utility method to format the health status.
+   * @param key The key name for the health indicator.
+   * @param isHealthy The health status.
+   * @param details Additional details about the health status.
+   * @returns A formatted health status object.
    */
-  private getStatus(
+  private formatStatus(
     key: string,
     isHealthy: boolean,
     details: Record<string, any>,

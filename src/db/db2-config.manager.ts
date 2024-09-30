@@ -4,20 +4,16 @@ import {
   Db2RetryOptions,
   Db2LoggingOptions,
 } from '../interfaces';
-import { Inject } from '@nestjs/common';
-import { I_DB2_CONFIG } from '../constants/injection-token.constant';
 
 export class Db2ConfigManager implements IDb2ConfigManager {
-  constructor(private config: IDb2ConfigOptions) {
+  constructor(public config: IDb2ConfigOptions) {
     this.config = this.applyDefaults(config);
   }
 
   /**
    * Applies default values to the provided configuration if missing.
    */
-  private applyDefaults(
-    @Inject(I_DB2_CONFIG) config: IDb2ConfigOptions,
-  ): IDb2ConfigOptions {
+  private applyDefaults(config: IDb2ConfigOptions): IDb2ConfigOptions {
     return {
       ...config,
       retry: this.applyRetryDefaults(config.retry),
@@ -47,7 +43,6 @@ export class Db2ConfigManager implements IDb2ConfigManager {
       retryInterval: retry.retryInterval ?? 1000, // Default retry interval
     };
   }
-
   /**
    * Applies default values to the logging options if missing.
    */

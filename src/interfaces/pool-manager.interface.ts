@@ -8,6 +8,7 @@ import { Connection } from 'ibm_db';
  */
 
 export interface IPoolManager {
+  setAuthStrategy: any;
   init(): Promise<void>;
   getPool: Pool<Connection>;
   isPoolInitialized: boolean;

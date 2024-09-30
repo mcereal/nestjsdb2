@@ -1,29 +1,27 @@
-import { Inject, OnModuleInit } from '@nestjs/common';
 import { Connection } from 'ibm_db';
 import { IDb2ConfigOptions, IPoolManager } from '../interfaces';
 import * as ibm_db from 'ibm_db';
 import { Pool, Factory, createPool } from 'generic-pool';
-import { I_DB2_CONFIG } from '../constants/injection-token.constant';
 import { Db2AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 
-export class Db2PoolManager implements IPoolManager, OnModuleInit {
+export class Db2PoolManager implements IPoolManager {
   private readonly logger = new Logger(Db2PoolManager.name);
   private pool: Pool<Connection>;
   private poolInitialized = false;
-  private ibm_db: ibm_db;
+  private ibm_db: typeof ibm_db;
+  private authStrategy: Db2AuthStrategy;
+  private config: IDb2ConfigOptions;
 
-  constructor(
-    @Inject(I_DB2_CONFIG) private config: IDb2ConfigOptions,
-    @Inject('DB2_AUTH_STRATEGY') private authStrategy: Db2AuthStrategy,
-  ) {
+  public constructor(config: IDb2ConfigOptions, authStrategy: Db2AuthStrategy) {
+    this.config = config;
+    this.authStrategy = authStrategy;
     this.ibm_db = ibm_db;
   }
 
-  async onModuleInit() {
-    await this.init();
-  }
-
+  /**
+   * Initialize the connection pool. Should be called manually after instantiation.
+   */
   public async init(): Promise<void> {
     if (this.poolInitialized) {
       this.logger.info('Connection pool is already initialized.');
@@ -69,9 +67,16 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
       this.poolInitialized = true;
       this.logger.info('Connection pool initialized successfully.');
     } catch (error) {
-      this.logger.error('Error during pool initialization:', error.message);
+      this.logger.error(
+        'Error during pool initialization:',
+        (error as Error).message,
+      );
       throw error;
     }
+  }
+
+  public setAuthStrategy(authStrategy: Db2AuthStrategy): void {
+    this.authStrategy = authStrategy;
   }
 
   private validateConfig(config: IDb2ConfigOptions): void {
@@ -105,7 +110,6 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
     ) {
       throw new Error('Kerberos authentication requires a service name.');
     }
-    // Add more validations as needed
   }
 
   public get getPool(): Pool<Connection> {
@@ -131,20 +135,19 @@ export class Db2PoolManager implements IPoolManager, OnModuleInit {
       this.logger.info('Acquiring connection from pool...');
       const connection = await Promise.race([
         this.pool.acquire(),
-        new Promise(
-          (_, reject) =>
-            setTimeout(
-              () => reject(new Error('Connection acquisition timeout')),
-              10000,
-            ), // 10 seconds
-        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Connection acquisition timeout')),
+            10000,
+          ),
+        ), // 10 seconds
       ]);
       this.logger.info('Connection acquired from pool.');
       return connection;
     } catch (error) {
       this.logger.error(
         'Failed to acquire connection from pool.',
-        error.message,
+        (error as Error).message,
       );
       throw error;
     }

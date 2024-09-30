@@ -1,6 +1,5 @@
 // src/auth/password-auth.strategy.ts
 
-import { Inject, Logger } from '@nestjs/common';
 import { Db2AuthStrategy } from './db2-auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import {
@@ -8,14 +7,14 @@ import {
   IConnectionManager,
   Db2PasswordAuthOptions,
 } from '../interfaces';
-import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
+import { Logger } from '../utils/logger';
 
 export class PasswordAuthStrategy extends Db2AuthStrategy {
   private readonly logger = new Logger(PasswordAuthStrategy.name);
 
   constructor(
     config: IDb2ConfigOptions,
-    @Inject(I_CONNECTION_MANAGER) connectionManager: IConnectionManager,
+    connectionManager: IConnectionManager,
   ) {
     super(config, connectionManager);
     if (!connectionManager) {
@@ -30,7 +29,7 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
       this.connectionManager.getState().connectionState ===
       Db2ConnectionState.CONNECTED
     ) {
-      this.logger.log('Already authenticated. Skipping...');
+      this.logger.info('Already authenticated. Skipping...');
       return;
     }
 
@@ -38,7 +37,7 @@ export class PasswordAuthStrategy extends Db2AuthStrategy {
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
 
-    this.logger.log('Starting authentication...');
+    this.logger.info('Starting authentication...');
   }
 
   public getConnectionString(): string {
