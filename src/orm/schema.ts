@@ -473,8 +473,11 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error(
           `Column '${column.name}' in entity '${entity.name}' has no type defined.`,
         );
+      } else if (!column.propertyKey) {
+        throw new Error(
+          `Column '${column.name}' in entity '${entity.name}' has no property key defined.`,
+        );
       }
-      // Additional column-specific validation logic can be added here
     });
   }
 
@@ -503,6 +506,10 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error(
           `Primary key '${pk.propertyKey}' in entity '${entity.name}' is not a valid column.`,
         );
+      } else if (pk.propertyKey && !pk.name) {
+        throw new Error(
+          `Primary key '${pk.propertyKey}' in entity '${entity.name}' has no name defined.`,
+        );
       }
     });
   }
@@ -527,8 +534,11 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error(
           `Foreign key '${fk.columnNames}' in entity '${entity.name}' has no referenced column defined.`,
         );
+      } else if (fk.columnNames.length !== fk.referencedColumnNames.length) {
+        throw new Error(
+          `Foreign key '${fk.columnNames}' in entity '${entity.name}' has a mismatch in column and referenced column length.`,
+        );
       }
-      // Additional foreign key validation logic can be added here
     });
   }
 
@@ -542,8 +552,11 @@ export class Schema<T extends ClassConstructor<any>[]> {
         throw new Error(
           `Constraint at index ${index} in entity '${entity.name}' has no name.`,
         );
+      } else if (!constraint.constraint.type) {
+        throw new Error(
+          `Constraint '${constraint.constraint.name}' in entity '${entity.name}' has no type defined.`,
+        );
       }
-      // Additional constraint-specific validation logic can be added here
     });
   }
 
