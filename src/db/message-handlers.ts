@@ -136,7 +136,7 @@ export class MessageHandlers {
         case DRDACodePoints.EXTNAM:
           // Handle External Name
           const extnam = chainedParam.data.toString('utf8');
-          this.connection.setExternalName(extnam);
+          this.connection.externalName = extnam;
           this.logger.info(`External Name set to: ${extnam}`);
           break;
 
