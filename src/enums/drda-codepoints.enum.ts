@@ -18,6 +18,7 @@ export enum DRDACodePoints {
   SECTKN = 0x11dc, // Security Token
   PRDID = 0x112e, // Product ID
   SRVRLSLV = 0x115a, // Server Release Level
+  // SRVRLSLV = 0x114A,
   // Managers and levels
   AGENT = 0x1403, // Agent Manager
   SQLAM = 0x2407, // SQLAM Manager

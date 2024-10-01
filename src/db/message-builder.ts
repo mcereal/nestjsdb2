@@ -89,22 +89,22 @@ export class MessageBuilder {
 
     // AGENT Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level 7
+    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level 7
     offset += 4;
 
     // SQLAM Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
-    mgrlvllsData.writeUInt16BE(0x04, offset + 2); // Level 4
+    mgrlvllsData.writeUInt16BE(0x0009, offset + 2); // Level 9 (for DB2 11.5)
     offset += 4;
 
     // RDB Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level 7
+    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level 7
     offset += 4;
 
     // SECMGR Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset);
-    mgrlvllsData.writeUInt16BE(0x03, offset + 2); // Level 3
+    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level 5
     offset += 4;
 
     return mgrlvllsData.slice(0, offset);
@@ -121,6 +121,10 @@ export class MessageBuilder {
     const srvnamData = Buffer.from(dbName, 'utf8');
     parameters.push(this.constructParameter(DRDACodePoints.SRVNAM, srvnamData));
 
+    // EXTNAM (External Name)
+    const extnamData = Buffer.from('MyApp', 'utf8'); // Use your application name
+    parameters.push(this.constructParameter(DRDACodePoints.EXTNAM, extnamData));
+
     // MGRLVLLS (Manager Level List)
     const mgrlvllsData = this.constructMgrlvlls();
     parameters.push(
@@ -128,7 +132,7 @@ export class MessageBuilder {
     );
 
     // PRDID (Product ID)
-    const prdidData = Buffer.from('JDB42', 'utf8');
+    const prdidData = Buffer.from('JCC05000', 'utf8'); // Use a valid PRDID
     parameters.push(this.constructParameter(DRDACodePoints.PRDID, prdidData));
 
     // SRVRLSLV (Server Release Level)
