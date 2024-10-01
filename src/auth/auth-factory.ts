@@ -1,17 +1,17 @@
 // src/auth/auth-factory.ts
 
-import { IDb2ConfigOptions } from '../interfaces';
+import { IConfigOptions } from '../interfaces';
 import { PasswordAuthStrategy } from './password-auth.strategy';
 import { Db2AuthType } from '../enums/db2.enums';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
-import { Db2AuthStrategy } from '../';
+import { AuthStrategy } from '../';
 import { Logger } from '../utils/logger';
 const logger = new Logger('AuthFactory');
 
 export const createAuthStrategy = (
-  config: IDb2ConfigOptions,
+  config: IConfigOptions,
   connectionManager: IConnectionManager,
-): Db2AuthStrategy => {
+): AuthStrategy => {
   switch (config.auth?.authType) {
     case Db2AuthType.PASSWORD:
       logger.info('Auth Factory: Creating PasswordAuthStrategy.');

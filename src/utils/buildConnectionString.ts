@@ -5,10 +5,10 @@ import {
   Db2KerberosAuthOptions,
   Db2LdapAuthOptions,
   Db2PasswordAuthOptions,
-  IDb2ConfigOptions,
+  IConfigOptions,
 } from '../interfaces';
 
-export function buildConnectionString(config: IDb2ConfigOptions): string {
+export function buildConnectionString(config: IConfigOptions): string {
   const {
     host,
     port,

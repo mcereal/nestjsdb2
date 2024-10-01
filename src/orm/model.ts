@@ -15,7 +15,7 @@ import {
 } from './interfaces/relations.interfaces';
 import { MetadataManager } from './metadata';
 import { ClassConstructor } from './types';
-import { Db2Client } from '../db';
+import { Client } from '../db';
 
 @Injectable()
 export class Model<T> {
@@ -25,7 +25,7 @@ export class Model<T> {
   private metadataManager: MetadataManager;
 
   constructor(
-    private client: Db2Client,
+    private client: Client,
     schema: Schema<ClassConstructor<any>[]>,
     private modelRegistry: ModelRegistry,
   ) {

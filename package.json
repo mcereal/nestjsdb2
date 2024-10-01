@@ -63,7 +63,6 @@
     "doc": "typedoc"
   },
   "dependencies": {
-    "generic-pool": "^3.9.0",
     "ibm_db": "^3.2.4"
   },
   "peerDependencies": {

@@ -1,6 +1,6 @@
 // src/modules/db2/query-builder.ts
 
-import { Db2Client } from '../db';
+import { Client } from '../db';
 import { IQueryBuilder } from '../interfaces';
 
 export class QueryBuilder<T> implements IQueryBuilder {
@@ -24,7 +24,7 @@ export class QueryBuilder<T> implements IQueryBuilder {
 
   constructor(
     private table: string,
-    private client: Db2Client,
+    private client: Client,
   ) {
     this.tableName = table;
   }

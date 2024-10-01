@@ -1,8 +1,4 @@
-import {
-  IDb2Client,
-  IDb2ConfigOptions,
-  ITransactionManager,
-} from '../interfaces';
+import { IClient, IConfigOptions, ITransactionManager } from '../interfaces';
 import { Db2Error } from '../errors';
 import { Db2IsolationLevel } from '../enums';
 import { Logger } from '../utils';
@@ -13,8 +9,8 @@ export class TransactionManager implements ITransactionManager {
   private isolationLevel: Db2IsolationLevel | null = null;
 
   public constructor(
-    private readonly client: IDb2Client,
-    private readonly config: IDb2ConfigOptions,
+    private readonly client: IClient,
+    private readonly config: IConfigOptions,
   ) {}
 
   /**

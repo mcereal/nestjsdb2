@@ -1,9 +1,9 @@
 // src/db2.module.ts
 
-import { Db2Client } from './db2-client';
+import { Client } from './client';
 import { MigrationService } from '../services/migration.service';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   IPoolManager,
   ITransactionManager,
@@ -15,11 +15,11 @@ import { Schema } from '../orm/schema';
 import { Model } from '../orm/model';
 import { ModelRegistry } from '../orm/model-registry';
 import { Logger } from '../utils/logger';
-import { Db2Config } from './db2-config.module';
-import { Db2PoolManager } from './db2-pool.manager';
+import { PoolManager } from './pool.manager';
 import { ConnectionManager } from './connection-manager';
 import { createAuthStrategy } from '../auth';
 import { TransactionManager } from './transaction-manager';
+import { ConfigManager } from './config.manager';
 
 export class Db2Module implements IDb2ConfigManager {
   private static instance: Db2Module | null = null;
@@ -27,32 +27,34 @@ export class Db2Module implements IDb2ConfigManager {
 
   private readonly logger = new Logger(Db2Module.name);
 
-  private db2ConfigOptions: IDb2ConfigOptions;
+  private db2ConfigOptions: IConfigOptions;
   private connectionManager: IConnectionManager;
   private poolManager: IPoolManager;
-  private db2Client: Db2Client;
+  private db2Client: Client;
   private transactionManager: ITransactionManager;
   private migrationService: MigrationService;
   private modelRegistryInstance: ModelRegistry;
   private metadataManager: MetadataManager;
 
-  private constructor(config: IDb2ConfigOptions) {
-    const db2Config = new Db2Config(config);
-    this.db2ConfigOptions = db2Config.config;
+  private constructor(configManager: ConfigManager) {
+    this.db2ConfigOptions = configManager.config;
 
-    this.poolManager = new Db2PoolManager(this.db2ConfigOptions, null); // Pass null initially
+    this.poolManager = new PoolManager(this.db2ConfigOptions, null); // Pass null initially
     this.connectionManager = new ConnectionManager(this.poolManager);
+
     const authStrategy = createAuthStrategy(
       this.db2ConfigOptions,
       this.connectionManager,
     );
     this.poolManager.setAuthStrategy(authStrategy);
 
-    this.db2Client = new Db2Client(
-      db2Config,
+    // Pass the `configManager` instance to the Client
+    this.db2Client = new Client(
+      configManager,
       this.connectionManager,
       this.poolManager,
     );
+
     this.transactionManager = new TransactionManager(
       this.db2Client,
       this.db2ConfigOptions,
@@ -62,7 +64,7 @@ export class Db2Module implements IDb2ConfigManager {
     this.metadataManager = new MetadataManager();
   }
 
-  get config(): IDb2ConfigOptions {
+  get config(): IConfigOptions {
     return this.db2ConfigOptions;
   }
 
@@ -71,33 +73,38 @@ export class Db2Module implements IDb2ConfigManager {
    * @param config Configuration options.
    * @returns The initialized Db2Module instance.
    */
-  public static forRoot(config: IDb2ConfigOptions): Db2Module {
+  public static forRoot(config: IConfigOptions): Db2Module {
     if (this.instance) {
       throw new Error('Db2Module is already initialized.');
     }
-    this.instance = new Db2Module(config);
+
+    const configManager = new ConfigManager(config);
+    this.instance = new Db2Module(configManager);
     this.modelRegistry = this.instance.modelRegistryInstance;
+
     return this.instance;
   }
-
   /**
    * Initializes the Db2Module instance asynchronously.
    * @param configFactory A factory function to provide configuration options.
    * @returns A promise that resolves to the initialized Db2Module instance.
    */
   public static async forRootAsync(
-    configFactory: () => Promise<IDb2ConfigOptions> | IDb2ConfigOptions,
+    configFactory: () => Promise<IConfigOptions> | IConfigOptions,
   ): Promise<Db2Module> {
     if (this.instance) {
       throw new Error('Db2Module is already initialized.');
     }
-    const configOptions = await configFactory();
-    this.instance = new Db2Module(configOptions);
+
+    const configManager = await ConfigManager.forRootAsync({
+      useFactory: configFactory,
+    });
+    this.instance = new Db2Module(configManager);
     this.modelRegistry = this.instance.modelRegistryInstance;
+
     await this.instance.init();
     return this.instance;
   }
-
   /**
    * Registers entity models.
    * @param entities Array of entity classes to register.
@@ -207,8 +214,8 @@ export class Db2Module implements IDb2ConfigManager {
 
     return {
       provide: `${entity.name}Model`,
-      useFactory: (client: Db2Client, modelRegistry: ModelRegistry) => {
-        const model = new Model(client, schema, modelRegistry);
+      useFactory: (db2Client: Client, modelRegistry: ModelRegistry) => {
+        const model = new Model(db2Client, schema, modelRegistry);
         model.setEntity(entity);
         modelRegistry.registerModel(`${entity.name}Model`, model);
         return model;

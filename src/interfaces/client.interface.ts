@@ -1,7 +1,7 @@
 import { Db2ConnectionState } from '../enums';
 import { Connection } from 'ibm_db';
 
-export interface IDb2Client {
+export interface IClient {
   // Lifecycle methods
   init(): Promise<void>;
 

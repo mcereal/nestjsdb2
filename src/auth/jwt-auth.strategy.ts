@@ -1,11 +1,11 @@
 // src/auth/jwt-auth.strategy.ts
 
 import { createHmac } from 'crypto';
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2JwtAuthOptions,
 } from '../interfaces';
@@ -40,13 +40,10 @@ function base64urlEncode(buffer: Buffer): string {
     .replace(/\//g, '_');
 }
 
-export class JwtAuthStrategy extends Db2AuthStrategy {
+export class JwtAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(JwtAuthStrategy.name);
 
-  constructor(
-    config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error('ConnectionManager is not defined in JwtAuthStrategy');

@@ -1,24 +1,21 @@
 // src/auth/ldap-auth.strategy.ts
 
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
 import { Logger } from '../utils/logger';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2LdapAuthOptions,
 } from '../interfaces';
 import { LdapClient, LdapConfig } from './ldap.client';
 
-export class LdapAuthStrategy extends Db2AuthStrategy {
+export class LdapAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
   private ldapClient: LdapClient | null = null;
 
-  constructor(
-    config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error('ConnectionManager is not defined in LdapAuthStrategy');

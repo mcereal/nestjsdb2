@@ -7,8 +7,9 @@ import {
   Db2MigrationOptions,
   Db2RetryOptions,
 } from './db2.interface';
+import { IPoolOptions } from './pool-options.interface';
 
-export interface IDb2ConfigOptions extends Db2ConnectionOptions {
+export interface IConfigOptions extends Db2ConnectionOptions {
   useTls?: boolean;
   sslCertificatePath?: string;
 
@@ -20,14 +21,7 @@ export interface IDb2ConfigOptions extends Db2ConnectionOptions {
 
   defaultIsolationLevel?: Db2IsolationLevel;
 
-  connectionTimeout?: number;
-  idleTimeout?: number;
-  maxPoolSize?: number;
-  minPoolSize?: number;
-  acquireTimeoutMillis?: number;
-  maxLifetime?: number;
-  connectionTestQuery?: string;
-  maxIdleConnections?: number;
+  poolOptions?: IPoolOptions;
 
   fetchSize?: number;
   queryTimeout?: number;
