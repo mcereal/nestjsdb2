@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/mcereal/nestjsdb2/compare/v1.1.20...v1.2.0) (2024-10-01)
+
+
+### Bug Fixes
+
+* remove duplication in config management ([ddea109](https://github.com/mcereal/nestjsdb2/commit/ddea109406b8169913b035d08cca74536a85b8ec))
+
+
+### Features
+
+* implement custom pooling ([0a3b332](https://github.com/mcereal/nestjsdb2/commit/0a3b332e354142761f4ec84afeed677f1886b34e))
+
 ## [1.1.20](https://github.com/mcereal/nestjsdb2/compare/v1.1.19...v1.1.20) (2024-09-30)
 
 
