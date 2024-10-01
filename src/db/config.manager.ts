@@ -1,44 +1,43 @@
-// src/db2-config.ts
-
+import { IDb2ConfigManager } from '../interfaces/config-manager.interface';
 import {
-  IDb2ConfigManager,
-  IDb2ConfigOptions,
+  IConfigOptions,
   Db2RetryOptions,
   Db2LoggingOptions,
 } from '../interfaces';
 
-export class Db2Config implements IDb2ConfigManager {
-  private _config: () => IDb2ConfigOptions;
-
-  constructor(options: IDb2ConfigOptions) {
-    this._config = () => this.applyDefaults(options);
-  }
-
-  /**
-   * Get the fully merged configuration with defaults.
-   */
-  get config(): IDb2ConfigOptions {
-    return this._config();
+export class ConfigManager implements IDb2ConfigManager {
+  constructor(public config: IConfigOptions) {
+    this.config = this.applyDefaults(config);
   }
 
   /**
    * Applies default values to the provided configuration if missing.
    */
-  private applyDefaults(config: IDb2ConfigOptions): IDb2ConfigOptions {
+  private applyDefaults(config: IConfigOptions): IConfigOptions {
     return {
       ...config,
       retry: this.applyRetryDefaults(config.retry),
       logging: this.applyLoggingDefaults(config.logging),
       connectionTimeout: config.connectionTimeout ?? 30000, // Default to 30 seconds
-      minPoolSize: config.minPoolSize ?? 1, // Default to 1 connection
-      maxPoolSize: config.maxPoolSize ?? 10, // Default to 10 connections
-      idleTimeout: config.idleTimeout ?? 60000, // Default to 1 minute
-      maxLifetime: config.maxLifetime ?? 1800000, // Default to 30 minutes
+      poolOptions: this.applyPoolDefaults(config.poolOptions),
       autoCommit: config.autoCommit ?? true, // Default to auto-commit
       fetchSize: config.fetchSize ?? 100, // Default to 100 rows
       queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
       prefetchSize: config.prefetchSize ?? 10, // Default to 10 rows
       characterEncoding: config.characterEncoding ?? 'UTF-8', // Default to UTF-8
+    };
+  }
+
+  /**
+   * Applies default values to the pool options if missing.
+   */
+  private applyPoolDefaults(poolOptions: any = {}): any {
+    return {
+      maxPoolSize: poolOptions.maxPoolSize ?? 10, // Default to 10 connections
+      minPoolSize: poolOptions.minPoolSize ?? 2, // Default to 2 connections
+      acquireTimeoutMillis: poolOptions.acquireTimeoutMillis ?? 30000, // Default to 30 seconds
+      idleTimeoutMillis: poolOptions.idleTimeoutMillis ?? 30000, // Default to 30 seconds
+      maxWaitingClients: poolOptions.maxWaitingClients ?? 20, // Default to 20 clients
     };
   }
 
@@ -54,7 +53,6 @@ export class Db2Config implements IDb2ConfigManager {
       retryInterval: retry.retryInterval ?? 1000, // Default retry interval
     };
   }
-
   /**
    * Applies default values to the logging options if missing.
    */
@@ -69,15 +67,9 @@ export class Db2Config implements IDb2ConfigManager {
   }
 
   /**
-   * Static method to create a Db2Config instance asynchronously.
+   * Get the fully merged configuration with defaults.
    */
-  public static async forRootAsync(options: {
-    useFactory: (
-      ...args: any[]
-    ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
-    inject?: any[];
-  }): Promise<Db2Config> {
-    const configOptions = await options.useFactory();
-    return new Db2Config(configOptions);
+  public getConfig(): IConfigOptions {
+    return this.config;
   }
 }

@@ -9,10 +9,6 @@ export interface Db2ConnectionOptions {
   database: string;
   schema?: string;
   connectionTimeout?: number;
-  minPoolSize?: number;
-  maxPoolSize?: number;
-  idleTimeout?: number;
-  maxLifetime?: number;
   autoCommit?: boolean;
   fetchSize?: number;
   queryTimeout?: number;

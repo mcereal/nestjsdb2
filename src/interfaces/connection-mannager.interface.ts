@@ -1,4 +1,4 @@
-import { Db2ClientState } from './db2-client.interface';
+import { Db2ClientState } from './client.interface';
 
 import { Connection } from 'ibm_db';
 

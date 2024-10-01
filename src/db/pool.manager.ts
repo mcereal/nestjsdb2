@@ -1,24 +1,26 @@
 import { Connection } from 'ibm_db';
-import { IDb2ConfigOptions, IPoolManager } from '../interfaces';
+import { IConfigOptions, IPoolManager } from '../interfaces';
 import * as ibm_db from 'ibm_db';
-import { Pool, Factory, createPool } from 'generic-pool';
-import { Db2AuthStrategy } from '../auth';
+import { Pool } from './pool';
+import { IFactory } from '../interfaces/factory.interface';
+import { Factory } from './factory';
+import { IPoolOptions } from '../interfaces/pool-options.interface';
+import { AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 
-export class Db2PoolManager implements IPoolManager {
-  private readonly logger = new Logger(Db2PoolManager.name);
+export class PoolManager implements IPoolManager {
+  private readonly logger = new Logger(PoolManager.name);
   private pool: Pool<Connection>;
   private poolInitialized = false;
   private ibm_db: typeof ibm_db;
-  private authStrategy: Db2AuthStrategy;
-  private config: IDb2ConfigOptions;
+  private authStrategy: AuthStrategy;
+  private config: IConfigOptions;
 
-  public constructor(config: IDb2ConfigOptions, authStrategy: Db2AuthStrategy) {
+  public constructor(config: IConfigOptions, authStrategy: AuthStrategy) {
     this.config = config;
     this.authStrategy = authStrategy;
     this.ibm_db = ibm_db;
   }
-
   /**
    * Initialize the connection pool. Should be called manually after instantiation.
    */
@@ -34,52 +36,53 @@ export class Db2PoolManager implements IPoolManager {
     // Authenticate before creating the pool
     await this.authStrategy.authenticate();
 
-    const factory: Factory<Connection> = {
-      create: async () => {
-        const connectionString = this.authStrategy.getConnectionString();
-        this.logger.debug(
-          `Attempting to connect with connection string: ${connectionString}`,
-        );
-        return new Promise<Connection>((resolve, reject) => {
-          this.ibm_db.open(connectionString, (err, connection) => {
-            if (err) {
-              this.logger.error('Error opening connection', err.message);
-              reject(err);
-            } else {
-              this.logger.info('Connection successfully established');
-              resolve(connection);
-            }
-          });
-        });
-      },
-      destroy: async (connection: Connection) => {
-        await connection.close();
-        this.logger.info('Connection closed.');
-      },
+    const factory: IFactory<Connection> = new Factory(
+      this.ibm_db,
+      this.authStrategy,
+    );
+
+    const poolOptions: IPoolOptions = {
+      maxPoolSize: this.config.poolOptions.maxPoolSize || 10,
+      minPoolSize: this.config.poolOptions.minPoolSize || 2,
+      acquireTimeoutMillis:
+        this.config.poolOptions.acquireTimeoutMillis || 30000,
+      idleTimeoutMillis: this.config.poolOptions.idleTimeoutMillis || 30000,
+      maxWaitingClients: this.config.poolOptions.maxPoolSize
+        ? this.config.poolOptions.maxPoolSize * 2
+        : 20,
     };
 
-    try {
-      this.pool = createPool(factory, {
-        max: this.config.maxPoolSize || 10,
-        min: this.config.minPoolSize || 2,
-        acquireTimeoutMillis: this.config.acquireTimeoutMillis || 30000,
-      });
-      this.poolInitialized = true;
-      this.logger.info('Connection pool initialized successfully.');
-    } catch (error) {
-      this.logger.error(
-        'Error during pool initialization:',
-        (error as Error).message,
-      );
-      throw error;
-    }
+    this.pool = new Pool<Connection>(factory, poolOptions);
+
+    // Optional: Add event listeners for logging
+    this.pool.on('createSuccess', (resource) =>
+      this.logger.debug('Resource created successfully.'),
+    );
+    this.pool.on('createError', (error) =>
+      this.logger.error('Error creating resource:', error),
+    );
+    this.pool.on('acquire', (resource) =>
+      this.logger.debug('Resource acquired.'),
+    );
+    this.pool.on('release', (resource) =>
+      this.logger.debug('Resource released.'),
+    );
+    this.pool.on('destroy', (resource) =>
+      this.logger.debug('Resource destroyed.'),
+    );
+    this.pool.on('destroyError', (error) =>
+      this.logger.error('Error destroying resource:', error),
+    );
+
+    this.poolInitialized = true;
+    this.logger.info('Connection pool initialized successfully.');
   }
 
-  public setAuthStrategy(authStrategy: Db2AuthStrategy): void {
+  public setAuthStrategy(authStrategy: AuthStrategy): void {
     this.authStrategy = authStrategy;
   }
 
-  private validateConfig(config: IDb2ConfigOptions): void {
+  private validateConfig(config: IConfigOptions): void {
     if (!config) {
       this.logger.error('Configuration is null or undefined.');
       throw new Error('Invalid configuration: Config object is missing.');

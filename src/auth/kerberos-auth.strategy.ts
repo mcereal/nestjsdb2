@@ -1,24 +1,21 @@
 // src/auth/kerberos-auth.strategy.ts
 
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
 import { Logger } from '../utils';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2KerberosAuthOptions,
 } from '../interfaces';
 import { KerberosClient } from './kerberos.client';
 
-export class KerberosAuthStrategy extends Db2AuthStrategy {
+export class KerberosAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(KerberosAuthStrategy.name);
   private kerberosClient: KerberosClient | null = null;
 
-  constructor(
-    config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error(

@@ -1,21 +1,18 @@
 // src/auth/password-auth.strategy.ts
 
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2PasswordAuthOptions,
 } from '../interfaces';
 import { Logger } from '../utils/logger';
 
-export class PasswordAuthStrategy extends Db2AuthStrategy {
+export class PasswordAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(PasswordAuthStrategy.name);
 
-  constructor(
-    config: IDb2ConfigOptions,
-    connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error(

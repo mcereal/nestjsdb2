@@ -1,6 +1,7 @@
 // src/interfaces/pool-manager.interface.ts
 
-import { Pool } from 'generic-pool';
+import { AuthStrategy } from '../auth';
+import { IPool } from './pool.interface';
 import { Connection } from 'ibm_db';
 
 /**
@@ -8,9 +9,9 @@ import { Connection } from 'ibm_db';
  */
 
 export interface IPoolManager {
-  setAuthStrategy: any;
+  setAuthStrategy(authStrategy: AuthStrategy): void;
   init(): Promise<void>;
-  getPool: Pool<Connection>;
+  getPool: IPool<Connection>;
   isPoolInitialized: boolean;
   getConnection(): Promise<Connection>;
   closeConnection(connection: Connection): Promise<void>;

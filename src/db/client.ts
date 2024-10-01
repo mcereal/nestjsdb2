@@ -1,8 +1,8 @@
 import { Pool, Connection } from 'ibm_db';
 import {
   Db2AuthOptions,
-  IDb2Client,
-  IDb2ConfigOptions,
+  IClient,
+  IConfigOptions,
   Db2ConnectionDetails,
   Db2ConnectionStats,
   Db2HealthDetails,
@@ -16,18 +16,18 @@ import {
   Db2TransactionError,
   formatDb2Error,
 } from '../errors';
-import { Db2AuthStrategy } from '../auth/db2-auth.strategy';
-import { Db2Config } from './';
+import { AuthStrategy } from '../auth/auth.strategy';
+import { Config } from './config.module';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
 import { Logger } from '../utils';
 import { MigrationService } from '../services/migration.service';
 import { MetadataManager } from '../orm/metadata';
 
-export class Db2Client implements IDb2Client {
-  protected readonly config: IDb2ConfigOptions;
+export class Client implements IClient {
+  protected readonly config: IConfigOptions;
   protected readonly authConfig: Db2AuthOptions;
-  protected readonly authStrategy: Db2AuthStrategy;
-  readonly logger = new Logger(Db2Client.name);
+  protected readonly authStrategy: AuthStrategy;
+  readonly logger = new Logger(Client.name);
   private pool: Pool;
   protected connection?: Connection;
   private idleTimeoutInterval: NodeJS.Timeout;
@@ -43,7 +43,7 @@ export class Db2Client implements IDb2Client {
   private metadataManager: MetadataManager;
 
   public constructor(
-    config: Db2Config,
+    config: Config,
     private readonly connectionManager: IConnectionManager,
     private readonly poolManager: IPoolManager,
   ) {
@@ -201,12 +201,12 @@ export class Db2Client implements IDb2Client {
   }
 
   private async checkIdleTimeout(): Promise<void> {
-    const { idleTimeout } = this.config;
+    const { idleTimeoutMillis } = this.config.poolOptions;
     const now = Date.now();
 
-    if (this.connection && now - this.lastUsed > idleTimeout) {
+    if (this.connection && now - this.lastUsed > idleTimeoutMillis) {
       this.logger.warn(
-        `Idle timeout reached (${idleTimeout} ms), closing connection...`,
+        `Idle timeout reached (${idleTimeoutMillis} ms), closing connection...`,
       );
 
       try {
@@ -220,7 +220,7 @@ export class Db2Client implements IDb2Client {
         const errorMessage = formatDb2Error(error, 'Idle Timeout Check', {
           host: this.config.host,
           database: this.config.database,
-          idleTimeout,
+          idleTimeoutMillis,
         });
         this.logger.error(
           `Failed to handle idle timeout properly: ${errorMessage}`,
@@ -549,8 +549,8 @@ export class Db2Client implements IDb2Client {
     return {
       activeConnections: this.activeConnectionsList.length,
       totalConnections: this.totalConnections,
-      minPoolSize: this.config.minPoolSize,
-      maxPoolSize: this.config.maxPoolSize,
+      minPoolSize: this.config.poolOptions.minPoolSize,
+      maxPoolSize: this.config.poolOptions.maxPoolSize,
     };
   }
 
