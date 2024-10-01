@@ -2,12 +2,12 @@
 
 import { registerAs } from '@nestjs/config';
 import * as Joi from 'joi'; // This import is not needed here
-import { IDb2ConfigOptions } from '@mcereal/nestjsdb2';
+import { IConfigOptions } from '@mcereal/nestjsdb2';
 import { Db2AuthType } from '@mcereal/nestjsdb2';
 
 export default registerAs(
   'db2',
-  (): IDb2ConfigOptions => ({
+  (): IConfigOptions => ({
     host: process.env.DB2_HOSTNAME || 'default_hostname',
     port: parseInt(process.env.DB2_PORT || '30376', 10),
     database: process.env.DB2_DATABASE || 'default_database',
