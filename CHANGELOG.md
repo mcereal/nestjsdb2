@@ -1,3 +1,10 @@
+# [1.3.0-drda.4](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.3...v1.3.0-drda.4) (2024-10-01)
+
+
+### Bug Fixes
+
+* comment securtiy for now ([4931fc9](https://github.com/mcereal/nestjsdb2/commit/4931fc9094637195d48b155f9a007af468ccc341))
+
 # [1.3.0-drda.3](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.2...v1.3.0-drda.3) (2024-10-01)
 
 
