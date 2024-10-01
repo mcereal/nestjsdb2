@@ -20,6 +20,8 @@ import { Row } from '../interfaces/row.interface';
 import { ColumnMetadata } from '../interfaces/column-metadata.interface';
 import { MessageBuilder } from './message-builder';
 import { DRDAParser } from './drda-parser';
+import { BigInteger } from './BigInteger';
+import { RSAKey } from './RSAKey';
 
 /**
  * Connection class responsible for managing DRDA protocol communication with DB2.
@@ -46,6 +48,8 @@ export class Connection extends EventEmitter {
   private logger: Logger;
   private messageBuilder: MessageBuilder;
   private parser: DRDAParser;
+
+  private rsaKey: RSAKey;
 
   private _externalName: string = '';
   private _serverVersion: string = '';
@@ -627,15 +631,75 @@ export class Connection extends EventEmitter {
     });
   }
 
-  /**
-   * Extracts the server's public key from the EXCSATRD response.
-   * @param data The data buffer containing the public key.
-   * @returns The server's public key buffer.
-   */
-  extractServerPublicKey(data: Buffer): Buffer {
-    // Implement extraction logic based on DRDA specifications
-    // Placeholder implementation:
-    return data; // Modify as per actual data structure
+  extractServerPublicKey(data: Buffer): string {
+    try {
+      let offset = 0;
+
+      // Parse Modulus Length (2 bytes)
+      if (data.length < offset + 2) {
+        throw new Error('Data buffer too short to contain modulus length.');
+      }
+      const modulusLength = data.readUInt16BE(offset);
+      offset += 2;
+      this.logger.debug(`Modulus Length: ${modulusLength} bytes`);
+
+      // Parse Modulus
+      if (data.length < offset + modulusLength) {
+        throw new Error('Data buffer too short to contain modulus.');
+      }
+      const modulusBuffer = data.slice(offset, offset + modulusLength);
+      offset += modulusLength;
+      this.logger.debug(`Modulus: ${modulusBuffer.toString('hex')}`);
+
+      // Parse Exponent Length (2 bytes)
+      if (data.length < offset + 2) {
+        throw new Error('Data buffer too short to contain exponent length.');
+      }
+      const exponentLength = data.readUInt16BE(offset);
+      offset += 2;
+      this.logger.debug(`Exponent Length: ${exponentLength} bytes`);
+
+      // Parse Exponent
+      if (data.length < offset + exponentLength) {
+        throw new Error('Data buffer too short to contain exponent.');
+      }
+      const exponentBuffer = data.slice(offset, offset + exponentLength);
+      offset += exponentLength;
+      this.logger.debug(`Exponent: ${exponentBuffer.toString('hex')}`);
+
+      // Convert modulus and exponent to number[] arrays
+      const modulusArray = Array.from(modulusBuffer);
+      const exponentArray = Array.from(exponentBuffer);
+
+      // Convert to BigInteger instances
+      const modulus = new BigInteger(modulusArray);
+      const exponent = new BigInteger(exponentArray);
+
+      // Encode modulus and exponent as ASN.1 DER integers
+      const encodedModulus = this.rsaKey.encodeASN1Integer(modulus);
+      const encodedExponent = this.rsaKey.encodeASN1Integer(exponent);
+
+      // Combine them into a sequence
+      const rsaPublicKeySequence = this.rsaKey.encodeASN1Sequence([
+        encodedModulus,
+        encodedExponent,
+      ]);
+
+      // Base64 encode the sequence
+      const base64Key = rsaPublicKeySequence.toString('base64');
+
+      // Wrap with PEM headers
+      const pemKey = this.rsaKey.formatPEM(base64Key, 'RSA PUBLIC KEY');
+      this.logger.debug(`Constructed PEM Public Key:\n${pemKey}`);
+
+      // Update the serverPublicKey with the PEM-formatted key
+      this.setServerPublicKey(Buffer.from(pemKey, 'utf8'));
+
+      return pemKey;
+    } catch (error) {
+      this.logger.error('Failed to extract server public key:', error);
+      throw new Error('Invalid server public key format.');
+    }
   }
 
   /**
