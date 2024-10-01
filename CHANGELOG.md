@@ -1,3 +1,25 @@
+# [1.3.0-drda.1](https://github.com/mcereal/nestjsdb2/compare/v1.2.1...v1.3.0-drda.1) (2024-10-01)
+
+
+### Bug Fixes
+
+* add drda prerelease ([c7f3fc1](https://github.com/mcereal/nestjsdb2/commit/c7f3fc127bfe1fe6937631563cbd1b90de2ccd32))
+* merge conflicts ([8e5eca6](https://github.com/mcereal/nestjsdb2/commit/8e5eca60ce5c90eefbc05e16a1137423310347a3))
+* merge main ([5004931](https://github.com/mcereal/nestjsdb2/commit/50049311e85cd7fad5d00bc74a76d27e52fdc75f))
+* merge main ([9952717](https://github.com/mcereal/nestjsdb2/commit/9952717b543ae09460ba3e039adaaeff21666465))
+* merge main ([b7c5048](https://github.com/mcereal/nestjsdb2/commit/b7c504838516d9e9fb08aa8fb5461c8bbe3d7030))
+* module respolution ([08e4043](https://github.com/mcereal/nestjsdb2/commit/08e4043d8ff765b643eefd6dc45853418959daac))
+* pool and connection imports ([404fc7d](https://github.com/mcereal/nestjsdb2/commit/404fc7da39055b1f6f317ee2acd8c7a217442960))
+* pool conflict ([ec192f0](https://github.com/mcereal/nestjsdb2/commit/ec192f0bfbf7633194dc66d4204de660f8ea2453))
+* pool conflict ([9a23ca4](https://github.com/mcereal/nestjsdb2/commit/9a23ca49efaf5c1ec129736ae3f9c429826f5f77))
+* pool factories and connection ([aaa9d99](https://github.com/mcereal/nestjsdb2/commit/aaa9d9959d660ae48d5069378f47e7d5e265ca7c))
+* remove testconnection ([12fb6d9](https://github.com/mcereal/nestjsdb2/commit/12fb6d989fd59a24eebdd44d04ac43576860eac0))
+
+
+### Features
+
+* drda implementation ([973a005](https://github.com/mcereal/nestjsdb2/commit/973a005b2811329f1d2ea0ce5baa6bd1be7a8e97))
+
 ## [1.2.1](https://github.com/mcereal/nestjsdb2/compare/v1.2.0...v1.2.1) (2024-10-01)
 
 
