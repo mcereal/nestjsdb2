@@ -1,3 +1,10 @@
+# [1.3.0-drda.5](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.4...v1.3.0-drda.5) (2024-10-01)
+
+
+### Bug Fixes
+
+* disable security for now ([b375edd](https://github.com/mcereal/nestjsdb2/commit/b375eddaa9bc4605964e51678d2e427888a3fa20))
+
 # [1.3.0-drda.4](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.3...v1.3.0-drda.4) (2024-10-01)
 
 
