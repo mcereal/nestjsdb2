@@ -12,3 +12,4 @@
 
 export * from './db2.enums';
 export * from './log-level.enum';
+export * from './drda-codepoints.enum';

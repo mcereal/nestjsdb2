@@ -15,7 +15,6 @@ import {
   DRDAMessageTypes,
 } from '../enums/drda-codepoints.enum';
 import { DRDAParser } from './drda-parser';
-import { DRDAResponseType } from '../interfaces/drda-response.interface';
 
 /**
  * Class for handling parsed DRDA message responses.

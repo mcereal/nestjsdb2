@@ -1,4 +1,4 @@
-import { DRDACodePoints } from 'src/enums/drda-codepoints.enum';
+import { DRDACodePoints } from '../enums/drda-codepoints.enum';
 import { constants, publicEncrypt } from 'crypto';
 import { Logger } from '../utils';
 
