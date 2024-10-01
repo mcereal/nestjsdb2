@@ -7,6 +7,37 @@ import {
 import { Connection } from './Connection';
 import { Logger } from '../utils';
 
+/**
+ * ConnectionManager class to manage the DB2 connection.
+ * This class is responsible for initializing the connection pool, acquiring and releasing connections.
+ * It also provides methods to close the connection pool and release all resources.
+ * @implements IConnectionManager
+ * @class
+ * @public
+ * @property {Db2ClientState} state - The current state of the DB2 connection.
+ * @property {Connection[]} activeConnections - List of active connections.
+ * @property {Logger} logger - Logger instance.
+ * @method {init} - Initialize the connection pool.
+ * @method {setState} - Set the current state of the DB2 connection.
+ * @method {getState} - Get the current state of the DB2 connection.
+ * @method {getConnection} - Acquire a connection from the pool.
+ * @method {getConnectionFromPool} - Get a connection from the pool based on the provided connection string.
+ * @method {closeConnection} - Close the connection and remove it from the active connections list.
+ * @method {disconnect} - Disconnect from the DB2 pool by draining the pool manager.
+ * @method {drainPool} - Drain the connection pool and release all resources.
+ * @method {getActiveConnectionsCount} - Get the number of active connections.
+ * @method {logPoolStatus} - Log the current pool status, including active connections.
+ * @method {checkHealth} - Check the health of the connection pool.
+ * @constructor
+ * @param {IPoolManager} poolManager - Pool manager instance.
+ * @returns {ConnectionManager} - ConnectionManager instance.
+ * @example
+ * ```typescript
+ * const poolManager = new PoolManager(config, authStrategy);
+ * const connectionManager = new ConnectionManager(poolManager);
+ * connectionManager.init();
+ * ```
+ */
 export class ConnectionManager implements IConnectionManager {
   protected readonly logger = new Logger(ConnectionManager.name);
 
@@ -26,6 +57,17 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Initialize the connection pool.
+   * Sets the connection state to INITIALIZING upon initialization.
+   * Handles and logs any errors that occur during the initialization process.
+   * @returns {Promise<void>} - A Promise that resolves if the connection pool is initialized successfully.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If the connection pool is not initialized.
+   * @example
+   * ```typescript
+   * await connectionManager.init();
+   * ```
    */
   public async init(): Promise<void> {
     this.logger.info('Initializing Db2ConnectionManager...');
@@ -48,6 +90,15 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Set the current state of the DB2 connection.
+   * @returns {void}
+   * @param {Partial<Db2ClientState>} newState - The new state of the DB2 connection.
+   * @throws {Error} - If the state transition is invalid.
+   * @public
+   * @method
+   * @example
+   * ```typescript
+   * connectionManager.setState({ connectionState: Db2ConnectionState.CONNECTED });
+   * ```
    */
   public setState(newState: Partial<Db2ClientState>): void {
     const currentState = this.state.connectionState;
@@ -69,6 +120,14 @@ export class ConnectionManager implements IConnectionManager {
     }
   }
 
+  /**
+   * Check if the state transition is valid.
+   * @returns {boolean} - A boolean indicating if the state transition is valid.
+   * @param {Db2ConnectionState} currentState - The current state of the DB2 connection.
+   * @param {Db2ConnectionState} newState - The new state of the DB2 connection.
+   * @private
+   * @method
+   */
   private isValidStateTransition(
     currentState: Db2ConnectionState,
     newState?: Db2ConnectionState,
@@ -110,6 +169,13 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Get the current state of the DB2 connection.
+   * @returns {Db2ClientState} - The current state of the DB2 connection.
+   * @public
+   * @method
+   * @example
+   * ```typescript
+   * const state = connectionManager.getState();
+   * ```
    */
   public getState(): Db2ClientState {
     return {
@@ -120,6 +186,17 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Acquire a connection from the pool.
+   * Sets the connection state to CONNECTING upon acquiring a connection.
+   * Handles and logs any errors that occur during the connection acquisition process.
+   * @returns {Promise<Connection>} - A Promise that resolves with the acquired connection.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If the connection pool is not initialized or an error occurs during connection acquisition.
+   * @example
+   * ```typescript
+   * const connection = await connectionManager.getConnection();
+   * ```
    */
 
   public async getConnection(): Promise<Connection> {
@@ -154,6 +231,16 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Get a connection from the pool based on the provided connection string.
+   * @returns {Promise<Connection>} - A Promise that resolves with the acquired connection.
+   * @param {string} connectionString - The connection string to use for acquiring a connection.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If the connection pool is not initialized or an error occurs during connection acquisition.
+   * @example
+   * ```typescript
+   * const connection = await connectionManager.getConnectionFromPool(connectionString);
+   * ```
    */
   public async getConnectionFromPool(
     connectionString: string,
@@ -196,6 +283,18 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Close the connection and remove it from the active connections list.
+   * Sets the connection state to DISCONNECTED upon successful disconnection.
+   * Handles and logs any errors that occur during the disconnection process.
+   * @returns {Promise<void>} - A Promise that resolves when the connection is closed and removed from the active connections list.
+   * @param {Connection} connection - The connection to close.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If the connection is not valid or an error occurs during the disconnection process.
+   * @example
+   * ```typescript
+   * await connectionManager.closeConnection(connection);
+   * ```
    */
   public async closeConnection(connection: Connection): Promise<void> {
     if (connection) {
@@ -228,6 +327,15 @@ export class ConnectionManager implements IConnectionManager {
    * Disconnects from the DB2 pool by draining the pool manager.
    * Sets the connection state to DISCONNECTED upon successful disconnection.
    * Handles and logs any errors that occur during the disconnection process.
+   * @returns {Promise<void>} - A Promise that resolves when the connection is disconnected.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If an error occurs during the disconnection process.
+   * @example
+   * ```typescript
+   * await connectionManager.disconnect();
+   * ```
    */
   public async disconnect(): Promise<void> {
     if (this.state.connectionState === Db2ConnectionState.DISCONNECTED) {
@@ -250,6 +358,17 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Drain the connection pool and release all resources.
+   * Sets the connection state to DISCONNECTED upon successful draining.
+   * Handles and logs any errors that occur during the draining process.
+   * @returns {Promise<void>} - A Promise that resolves when the connection pool is drained.
+   * @public
+   * @async
+   * @method
+   * @throws {Error} - If an error occurs during the draining process.
+   * @example
+   * ```typescript
+   * await connectionManager.drainPool();
+   * ```
    */
   public async drainPool(): Promise<void> {
     if (this.state.connectionState === Db2ConnectionState.DISCONNECTED) {
@@ -276,6 +395,13 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Get the number of active connections.
+   * @returns {number} - The number of active connections.
+   * @public
+   * @method
+   * @example
+   * ```typescript
+   * const activeConnections = connectionManager.getActiveConnectionsCount();
+   * ```
    */
   public getActiveConnectionsCount(): number {
     const activeConnections = this.activeConnections.length;
@@ -285,6 +411,13 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Log the current pool status, including active connections.
+   * @returns {void}
+   * @public
+   * @method
+   * @example
+   * ```typescript
+   * connectionManager.logPoolStatus();
+   * ```
    */
   public logPoolStatus(): void {
     const activeConnections = this.getActiveConnectionsCount();
@@ -297,6 +430,14 @@ export class ConnectionManager implements IConnectionManager {
 
   /**
    * Check the health of the connection pool.
+   * @returns {Promise<{ status: boolean; details?: any }>} - A Promise that resolves with the health status of the connection pool.
+   * @public
+   * @async
+   * @method
+   * @example
+   * ```typescript
+   * const health = await connectionManager.checkHealth();
+   * ```
    */
   public async checkHealth(): Promise<{ status: boolean; details?: any }> {
     this.logger.info('Checking DB2 connection pool health...');

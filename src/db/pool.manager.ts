@@ -10,6 +10,48 @@ import { AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 import { Factory } from './factory';
 
+/**
+ * PoolManager class to manage the connection pool.
+ * This class is responsible for initializing the connection pool, acquiring and releasing connections.
+ * It also provides methods to close the connection pool and release all resources.
+ * @implements IPoolManager
+ * @class
+ * @public
+ * @property {Pool<Connection>} pool - The connection pool.
+ * @property {boolean} poolInitialized - Flag to indicate if the connection pool is initialized.
+ * @property {Logger} logger - Logger instance.
+ * @property {IConfigOptions} config - Configuration options.
+ * @property {AuthStrategy} authStrategy - Authentication strategy.
+ * @method {init} - Initialize the connection pool.
+ * @method {setAuthStrategy} - Set the authentication strategy.
+ * @method {validateConfig} - Validate the configuration options.
+ * @method {getPool} - Get the connection pool.
+ * @method {isPoolInitialized} - Check if the connection pool is initialized.
+ * @method {getConnection} - Acquire a connection from the pool.
+ * @method {closeConnection} - Close a connection and release it back to the pool.
+ * @method {drainPool} - Drain the connection pool and release all resources.
+ * @method {releaseConnection} - Release a connection back to the pool.
+ * @constructor
+ * @param {IConfigOptions} config - Configuration options.
+ * @param {AuthStrategy} authStrategy - Authentication strategy.
+ * @returns {PoolManager} - PoolManager instance.
+ * @example
+ * ```typescript
+ * const config: IConfigOptions = {
+ *  host: 'localhost',
+ *  port: 50000,
+ *  database: 'sample',
+ *  auth: {
+ *   authType: 'user',
+ *   user: 'db
+ *   password: 'password'
+ *  }
+ * };
+ *
+ * const authStrategy = new UserAuthStrategy(config);
+ * const poolManager = new PoolManager(config, authStrategy);
+ * poolManager.init();
+ */
 export class PoolManager implements IPoolManager {
   private readonly logger = new Logger(PoolManager.name);
   private pool: Pool<Connection>;
@@ -22,6 +64,15 @@ export class PoolManager implements IPoolManager {
 
   /**
    * Initialize the connection pool. Should be called manually after instantiation.
+   * @public
+   * @async
+   * @method
+   * @returns {Promise<void>} - A Promise that resolves when the connection pool is initialized.
+   * @throws {Error} - Throws an error if the connection pool is already initialized.
+   * @example
+   * ```typescript
+   * await poolManager.init();
+   * ```
    */
   public async init(): Promise<void> {
     if (this.poolInitialized) {
@@ -74,10 +125,33 @@ export class PoolManager implements IPoolManager {
     this.logger.info('Connection pool initialized successfully.');
   }
 
+  /**
+   * Set the authentication strategy.
+   * @public
+   * @method
+   * @param {AuthStrategy} authStrategy - The authentication strategy.
+   * @returns {void}
+   * @example
+   * ```typescript
+   * poolManager.setAuthStrategy(authStrategy);
+   * ```
+   */
   public setAuthStrategy(authStrategy: AuthStrategy): void {
     this.authStrategy = authStrategy;
   }
 
+  /**
+   * Validate the configuration options.
+   * @private
+   * @method
+   * @param {IConfigOptions} config - Configuration options.
+   * @returns {void}
+   * @throws {Error} - Throws an error if the configuration is invalid.
+   * @example
+   * ```typescript
+   * this.validateConfig(config);
+   * ```
+   */
   private validateConfig(config: IConfigOptions): void {
     if (!config) {
       this.logger.error('Configuration is null or undefined.');
@@ -110,6 +184,18 @@ export class PoolManager implements IPoolManager {
       throw new Error('Kerberos authentication requires a service name.');
     }
   }
+
+  /**
+   * Get the connection pool.
+   * @public
+   * @method
+   * @returns {Pool<Connection>} - The connection pool.
+   * @throws {Error} - Throws an error if the connection pool is not initialized.
+   * @example
+   * ```typescript
+   * const pool = poolManager.getPool;
+   * ```
+   */
   public get getPool(): Pool<Connection> {
     if (!this.poolInitialized || !this.pool) {
       this.logger.error('DB2 connection pool is not initialized.');
@@ -119,10 +205,32 @@ export class PoolManager implements IPoolManager {
     return this.pool;
   }
 
+  /**
+   * Check if the connection pool is initialized.
+   * @public
+   * @method
+   * @returns {boolean} - A boolean indicating if the connection pool is initialized.
+   * @example
+   * ```typescript
+   * const isInitialized = poolManager.isPoolInitialized;
+   * ```
+   */
   public get isPoolInitialized(): boolean {
     return this.poolInitialized;
   }
 
+  /**
+   * Acquire a connection from the pool.
+   * @public
+   * @async
+   * @method
+   * @returns {Promise<Connection>} - A Promise that resolves with the acquired connection.
+   * @throws {Error} - Throws an error if the connection pool is not initialized.
+   * @example
+   * ```typescript
+   * const connection = await poolManager.getConnection();
+   * ```
+   */
   public async getConnection(): Promise<Connection> {
     if (!this.poolInitialized || !this.pool) {
       this.logger.error('DB2 connection pool is not initialized.');
@@ -151,6 +259,19 @@ export class PoolManager implements IPoolManager {
     }
   }
 
+  /**
+   * Close a connection and release it back to the pool.
+   * @public
+   * @async
+   * @method
+   * @param {Connection} connection - The connection to close.
+   * @returns {Promise<void>} - A Promise that resolves when the connection is closed.
+   * @throws {Error} - Throws an error if the connection pool is not initialized.
+   * @example
+   * ```typescript
+   * await poolManager.closeConnection(connection);
+   * ```
+   */
   public async closeConnection(connection: Connection): Promise<void> {
     if (this.poolInitialized) {
       await this.pool.release(connection);
@@ -158,6 +279,18 @@ export class PoolManager implements IPoolManager {
     }
   }
 
+  /**
+   * Drain the connection pool and release all resources.
+   * @public
+   * @async
+   * @method
+   * @returns {Promise<void>} - A Promise that resolves when the connection pool is drained.
+   * @throws {Error} - Throws an error if the connection pool is not initialized.
+   * @example
+   * ```typescript
+   * await poolManager.drainPool();
+   * ```
+   */
   public async drainPool(): Promise<void> {
     try {
       await this.pool.drain();

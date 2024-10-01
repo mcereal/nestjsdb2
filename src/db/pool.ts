@@ -3,6 +3,30 @@ import { IFactory } from '../interfaces/factory.interface';
 import { IPoolOptions } from '../interfaces/pool-options.interface';
 import { IPool, IPoolResource } from '../interfaces/pool.interface';
 
+/**
+ * A connection pool that manages a set of resources.
+ * @template T The type of the resource.
+ * @implements IPool
+ * @extends EventEmitter
+ * @class
+ * @export
+ * @public
+ * @final
+ * @since 1.2.0
+ * @version 1.0.0
+ * @example
+ * ```typescript
+ * import { Pool } from './Pool';
+ * import { Factory } from './Factory';
+ * import { AuthStrategy } from '../auth';
+ *
+ * const authStrategy = new AuthStrategy();
+ * const factory = new Factory(authStrategy);
+ * const pool = new Pool(factory, {
+ * minPoolSize: 5,
+ * maxPoolSize: 10,
+ * });
+ */
 export class Pool<T> extends EventEmitter implements IPool<T> {
   private factory: IFactory<T>;
   private options: IPoolOptions;
@@ -29,12 +53,33 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     }
   }
 
+  /**
+   * Initialize the pool by creating the minimum number of resources.
+   * @private
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * initialize();
+   * ```
+   */
   private async initialize() {
     for (let i = 0; i < this.options.minPoolSize; i++) {
       await this.createResource();
     }
   }
 
+  /**
+   * Check for idle resources and destroy them if they exceed the idle timeout or max lifetime.
+   * @private
+   * @since 1.2.0
+   * @version 1.0.0
+   * @returns {void}
+   * @example
+   * ```typescript
+   * checkIdleResources();
+   * ```
+   */
   private checkIdleResources(): void {
     const now = Date.now();
     for (const res of this.resources) {
@@ -52,6 +97,18 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     }
   }
 
+  /**
+   * Destroy a resource and remove it from the pool.
+   * @param {T} resource The resource to destroy.
+   * @private
+   * @since 1.2.0
+   * @version 1.0.0
+   * @returns {Promise<void>}
+   * @example
+   * ```typescript
+   * destroyResource(resource);
+   * ```
+   */
   private async destroyResource(resource: T): Promise<void> {
     try {
       // Remove from pool before destroying
@@ -66,6 +123,17 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     }
   }
 
+  /**
+   * Create a new resource and add it to the pool.
+   * @private
+   * @since 1.2.0
+   * @version 1.0.0
+   * @returns {Promise<void>}
+   * @example
+   * ```typescript
+   * createResource();
+   * ```
+   */
   private async createResource(): Promise<void> {
     try {
       if (this.resources.length >= this.options.maxPoolSize) {
@@ -86,6 +154,17 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     }
   }
 
+  /**
+   * Check for waiting clients and assign them a resource if available.
+   * @private
+   * @since 1.2.0
+   * @version 1.0.0
+   * @returns {void}
+   * @example
+   * ```typescript
+   * checkWaitingClients();
+   * ```
+   */
   private checkWaitingClients(): void {
     if (this.waitingClients.length === 0) return;
 
@@ -109,6 +188,19 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     }
   }
 
+  /**
+   * Acquire a resource from the pool.
+   * @returns {Promise<T>} A promise that resolves with the acquired resource.
+   * @public
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * pool.acquire().then((resource) => {
+   *  console.log('Acquired resource:', resource);
+   * });
+   * ```
+   */
   public acquire(): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (this.draining) {
@@ -160,6 +252,20 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     });
   }
 
+  /**
+   * Release a resource back to the pool.
+   * @param {T} resource The resource to release.
+   * @returns {Promise<void>}
+   * @public
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * pool.release(resource).then(() => {
+   *  console.log('Resource released.');
+   * });
+   * ```
+   */
   public async release(resource: T): Promise<void> {
     if (this.draining) {
       this.destroy(resource).catch((err) => this.emit('destroyError', err));
@@ -192,6 +298,19 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     this.checkWaitingClients();
   }
 
+  /**
+   * Drains the pool and destroys all resources.
+   * @returns {Promise<void>}
+   * @public
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * pool.drain().then(() => {
+   *  console.log('Pool drained.');
+   * });
+   * ```
+   */
   public async drain(): Promise<void> {
     this.draining = true;
     await this.clear();
@@ -202,6 +321,19 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     this.emit('drain');
   }
 
+  /**
+   * Clears the pool and destroys all resources.
+   * @returns {Promise<void>}
+   * @public
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * pool.clear().then(() => {
+   *  console.log('Pool cleared.');
+   * });
+   * ```
+   */
   public async clear(): Promise<void> {
     const destroyPromises = this.resources.map((res) =>
       this.factory.destroy(res.resource),
@@ -216,6 +348,20 @@ export class Pool<T> extends EventEmitter implements IPool<T> {
     this.emit('clear');
   }
 
+  /**
+   * Destroy a resource and remove it from the pool.
+   * @param {T} resource The resource to destroy.
+   * @returns {Promise<void>}
+   * @public
+   * @since 1.2.0
+   * @version 1.0.0
+   * @example
+   * ```typescript
+   * pool.destroy(resource).then(() => {
+   *  console.log('Resource destroyed.');
+   * });
+   * ```
+   */
   private async destroy(resource: T): Promise<void> {
     try {
       await this.factory.destroy(resource);
