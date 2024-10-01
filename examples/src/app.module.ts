@@ -31,7 +31,7 @@ import { RecentPostsService } from './services/recent-posts.service';
 import { UserCommentsService } from './services/user-comments.service';
 import { db2ValidationSchema } from './config/db2.config';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   Db2Module as UnderlyingDb2Module,
 } from '@mcereal/nestjsdb2';
 
@@ -46,7 +46,7 @@ import {
     Db2NestModule.forRootAsync({
       imports: [ConfigModule], // Import ConfigModule for the factory
       useFactory: async (configService: ConfigService) => {
-        const db2Config = configService.get<IDb2ConfigOptions>('db2');
+        const db2Config = configService.get<IConfigOptions>('db2');
         if (!db2Config) {
           throw new Error('DB2 configuration not found');
         }

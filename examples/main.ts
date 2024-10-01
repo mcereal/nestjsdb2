@@ -2,7 +2,7 @@
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
-import { Logger } from '@mcereal/nestjsdb2';
+import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
@@ -30,9 +30,9 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, document);
 
   try {
-    logger.info('Starting the application...');
+    logger.log('Starting the application...');
     await app.listen(PORT, () => {
-      logger.info(`Application is listening on port: ${PORT}`);
+      logger.log(`Application is listening on port: ${PORT}`);
     });
   } catch (error) {
     logger.error('Failed to start the application', error);

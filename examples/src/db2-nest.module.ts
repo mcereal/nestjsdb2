@@ -1,7 +1,7 @@
 // src/db2-nest.module.ts
 
 import { Module, DynamicModule, Provider, Global } from '@nestjs/common';
-import { Db2Module, IDb2ConfigOptions } from '@mcereal/nestjsdb2';
+import { Db2Module, IConfigOptions } from '@mcereal/nestjsdb2';
 import { Schema } from '@mcereal/nestjsdb2';
 
 @Global() // Makes the module global
@@ -14,9 +14,7 @@ export class Db2NestModule {
    */
   static forRootAsync(options: {
     imports?: any[]; // Modules required by the factory
-    useFactory: (
-      ...args: any[]
-    ) => Promise<IDb2ConfigOptions> | IDb2ConfigOptions;
+    useFactory: (...args: any[]) => Promise<IConfigOptions> | IConfigOptions;
     inject?: any[]; // Providers to inject into the factory
   }): DynamicModule {
     const db2ModuleProvider: Provider = {
