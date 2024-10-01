@@ -84,9 +84,9 @@ export class Connection extends EventEmitter {
         case 'PWD':
           this.password = value;
           break;
-        case 'SECURITY':
-          this.useSSL = value.toLowerCase() === 'ssl';
-          break;
+        // case 'SECURITY':
+        //   this.useSSL = value.toLowerCase() === 'ssl';
+        // break;
         default:
           this.logger.warn(`Unknown connection parameter: ${key}`);
           break;
@@ -221,19 +221,6 @@ export class Connection extends EventEmitter {
   }
 
   /**
-   * Handles socket errors by logging and closing the connection.
-   * @param err The encountered error.
-   */
-  private handleSocketError(err: Error): void {
-    this.logger.error('Socket error:', err);
-    this.close().catch((closeErr) =>
-      this.logger.error('Error closing socket:', closeErr),
-    );
-    // Emit an error event for external handling
-    this.emit('error', err);
-  }
-
-  /**
    * Initiates the authentication process using DRDA protocol.
    */
   private async authenticate(): Promise<void> {
@@ -295,7 +282,6 @@ export class Connection extends EventEmitter {
       const extnamStr = this.parseEXTNAM(extnam.data);
       this.externalName = extnamStr;
       this.logger.info(`Received EXTNAM: ${extnamStr}`);
-      // Handle EXTNAM as needed
     }
   }
 
