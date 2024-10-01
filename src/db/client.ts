@@ -17,11 +17,11 @@ import {
   formatDb2Error,
 } from '../errors';
 import { AuthStrategy } from '../auth/auth.strategy';
-import { Config } from './config.module';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
 import { Logger } from '../utils';
 import { MigrationService } from '../services/migration.service';
 import { MetadataManager } from '../orm/metadata';
+import { ConfigManager } from './config.manager';
 
 export class Client implements IClient {
   protected readonly config: IConfigOptions;
@@ -43,11 +43,11 @@ export class Client implements IClient {
   private metadataManager: MetadataManager;
 
   public constructor(
-    config: Config,
+    private readonly configManager: ConfigManager,
     private readonly connectionManager: IConnectionManager,
     private readonly poolManager: IPoolManager,
   ) {
-    this.config = config.config;
+    this.config = configManager.config;
 
     // Initialize MigrationService within Db2Client
     this.migrationService = new MigrationService();

@@ -1,13 +1,17 @@
-import { IDb2ConfigManager } from '../interfaces/config-manager.interface';
-import {
-  IConfigOptions,
-  Db2RetryOptions,
-  Db2LoggingOptions,
-} from '../interfaces';
+import { IDb2ConfigManager, IConfigOptions } from '../interfaces';
 
 export class ConfigManager implements IDb2ConfigManager {
-  constructor(public config: IConfigOptions) {
-    this.config = this.applyDefaults(config);
+  private _config: () => IConfigOptions;
+
+  constructor(options: IConfigOptions) {
+    this._config = () => this.applyDefaults(options);
+  }
+
+  /**
+   * Generic method to apply default values.
+   */
+  setDefaults<T>(provided: T, defaults: Partial<T>): T {
+    return { ...defaults, ...provided };
   }
 
   /**
@@ -16,10 +20,26 @@ export class ConfigManager implements IDb2ConfigManager {
   private applyDefaults(config: IConfigOptions): IConfigOptions {
     return {
       ...config,
-      retry: this.applyRetryDefaults(config.retry),
-      logging: this.applyLoggingDefaults(config.logging),
+      retry: this.setDefaults(config.retry, {
+        maxReconnectAttempts: 3,
+        reconnectInterval: 5000,
+        retryPolicy: 'simple',
+        retryAttempts: 3,
+        retryInterval: 1000,
+      }),
+      logging: this.setDefaults(config.logging, {
+        logQueries: false,
+        logErrors: true,
+        profileSql: false,
+      }),
       connectionTimeout: config.connectionTimeout ?? 30000, // Default to 30 seconds
-      poolOptions: this.applyPoolDefaults(config.poolOptions),
+      poolOptions: this.setDefaults(config.poolOptions, {
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        acquireTimeoutMillis: 30000,
+        idleTimeoutMillis: 30000,
+        maxWaitingClients: 20,
+      }),
       autoCommit: config.autoCommit ?? true, // Default to auto-commit
       fetchSize: config.fetchSize ?? 100, // Default to 100 rows
       queryTimeout: config.queryTimeout ?? 15000, // Default to 15 seconds
@@ -29,47 +49,20 @@ export class ConfigManager implements IDb2ConfigManager {
   }
 
   /**
-   * Applies default values to the pool options if missing.
-   */
-  private applyPoolDefaults(poolOptions: any = {}): any {
-    return {
-      maxPoolSize: poolOptions.maxPoolSize ?? 10, // Default to 10 connections
-      minPoolSize: poolOptions.minPoolSize ?? 2, // Default to 2 connections
-      acquireTimeoutMillis: poolOptions.acquireTimeoutMillis ?? 30000, // Default to 30 seconds
-      idleTimeoutMillis: poolOptions.idleTimeoutMillis ?? 30000, // Default to 30 seconds
-      maxWaitingClients: poolOptions.maxWaitingClients ?? 20, // Default to 20 clients
-    };
-  }
-
-  /**
-   * Applies default values to the retry options if missing.
-   */
-  private applyRetryDefaults(retry: Db2RetryOptions = {}): Db2RetryOptions {
-    return {
-      maxReconnectAttempts: retry.maxReconnectAttempts ?? 3, // Default to 3 attempts
-      reconnectInterval: retry.reconnectInterval ?? 5000, // Default to 5 seconds
-      retryPolicy: retry.retryPolicy ?? 'simple',
-      retryAttempts: retry.retryAttempts ?? 3,
-      retryInterval: retry.retryInterval ?? 1000, // Default retry interval
-    };
-  }
-  /**
-   * Applies default values to the logging options if missing.
-   */
-  private applyLoggingDefaults(
-    logging: Db2LoggingOptions = {},
-  ): Db2LoggingOptions {
-    return {
-      logQueries: logging.logQueries ?? false, // Default to false
-      logErrors: logging.logErrors ?? true, // Default to true
-      profileSql: logging.profileSql ?? false, // Default to false
-    };
-  }
-
-  /**
    * Get the fully merged configuration with defaults.
    */
-  public getConfig(): IConfigOptions {
-    return this.config;
+  get config(): IConfigOptions {
+    return this._config();
+  }
+
+  /**
+   * Static method to create a ConfigManager instance asynchronously.
+   */
+  public static async forRootAsync(options: {
+    useFactory: (...args: any[]) => Promise<IConfigOptions> | IConfigOptions;
+    inject?: any[];
+  }): Promise<ConfigManager> {
+    const configOptions = await options.useFactory();
+    return new ConfigManager(configOptions);
   }
 }
