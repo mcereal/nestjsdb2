@@ -1,25 +1,21 @@
 // src/auth/ldap-auth.strategy.ts
 
-import { Inject, Logger } from '@nestjs/common';
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
+import { Logger } from '../utils/logger';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2LdapAuthOptions,
 } from '../interfaces';
-import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
 import { LdapClient, LdapConfig } from './ldap.client';
 
-export class LdapAuthStrategy extends Db2AuthStrategy {
+export class LdapAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(LdapAuthStrategy.name);
   private ldapClient: LdapClient | null = null;
 
-  constructor(
-    config: IDb2ConfigOptions,
-    @Inject(I_CONNECTION_MANAGER) connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error('ConnectionManager is not defined in LdapAuthStrategy');
@@ -35,14 +31,14 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
       this.connectionManager.getState().connectionState ===
       Db2ConnectionState.CONNECTED
     ) {
-      this.logger.log('Already authenticated. Skipping...');
+      this.logger.info('Already authenticated. Skipping...');
       return;
     }
 
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
-    this.logger.log('Starting LDAP authentication...');
+    this.logger.info('Starting LDAP authentication...');
 
     const authOptions = this.config.auth as Db2LdapAuthOptions;
     const { username, password, ldapUrl } = authOptions;
@@ -77,7 +73,7 @@ export class LdapAuthStrategy extends Db2AuthStrategy {
     try {
       await this.ldapClient.connect();
       await this.ldapClient.bind();
-      this.logger.log('LDAP authentication successful.');
+      this.logger.info('LDAP authentication successful.');
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.CONNECTED,
       });

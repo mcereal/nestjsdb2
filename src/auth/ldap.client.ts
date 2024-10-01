@@ -2,7 +2,7 @@
 
 import { Socket, connect as netConnect } from 'net';
 import { TLSSocket, connect as tlsConnect, ConnectionOptions } from 'tls';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils/logger';
 import { BerEncoder } from './ber-encoder';
 import { URL } from 'url';
 
@@ -42,7 +42,7 @@ export class LdapClient {
         // Establish a secure TLS connection
         this.socket = tlsConnect(port, hostname, tlsOptions || {}, () => {
           if ((this.socket as TLSSocket).authorized) {
-            this.logger.log(
+            this.logger.info(
               `Securely connected to LDAPS server at ${hostname}:${port}`,
             );
             resolve();
@@ -60,7 +60,7 @@ export class LdapClient {
       } else {
         // Establish a plain TCP connection
         this.socket = netConnect(port, hostname, () => {
-          this.logger.log(`Connected to LDAP server at ${hostname}:${port}`);
+          this.logger.info(`Connected to LDAP server at ${hostname}:${port}`);
           resolve();
         });
       }
@@ -90,7 +90,7 @@ export class LdapClient {
         BerEncoder.encodeSimpleAuthentication(this.config.password),
       );
 
-      this.logger.log('Sending LDAP Bind request');
+      this.logger.info('Sending LDAP Bind request');
       this.socket.write(bindRequest);
     });
   }
@@ -102,7 +102,7 @@ export class LdapClient {
     if (this.socket) {
       this.socket.end();
       this.socket.destroy();
-      this.logger.log('LDAP connection closed');
+      this.logger.info('LDAP connection closed');
     }
   }
 
@@ -147,7 +147,7 @@ export class LdapClient {
 
     const resultCode = response[resultCodeIndex + 2];
     if (resultCode === 0) {
-      this.logger.log('LDAP Bind successful');
+      this.logger.info('LDAP Bind successful');
       this.resolveBind();
     } else {
       this.logger.error(`LDAP Bind failed with resultCode: ${resultCode}`);

@@ -3,10 +3,20 @@ import { Db2AuthType } from '../enums';
 /**
  * Basic connection properties required for establishing a connection to a Db2 database.
  */
-export interface Db2BasicConnectionOptions {
+export interface Db2ConnectionOptions {
   host: string;
   port: number;
   database: string;
+  schema?: string;
+  connectionTimeout?: number;
+  autoCommit?: boolean;
+  fetchSize?: number;
+  queryTimeout?: number;
+  prefetchSize?: number;
+  characterEncoding?: string;
+  useTls?: boolean;
+  sslCertificatePath?: string;
+  migration?: Db2MigrationOptions;
 }
 
 /**
@@ -22,6 +32,8 @@ interface Db2BaseAuthOptions {
 export interface Db2PasswordAuthOptions extends Db2BaseAuthOptions {
   username: string;
   password: string;
+  useTls?: boolean;
+  sslCertificatePath?: string;
 }
 
 /**
@@ -98,18 +110,16 @@ export interface Db2RetryOptions {
  */
 export interface Db2MigrationOptions {
   enabled: boolean;
-  migrationDir: string;
   tableName?: string;
-  fileExtension: string;
-  runOnStart: boolean;
-  logQueries: boolean;
-  logErrors: boolean;
-  dryRun: boolean;
-  skipOnFail: boolean;
-  ignoreMissing: boolean;
-  ignoreExecuted: boolean;
-  ignoreErrors: boolean;
-  markAsExecuted: boolean;
+  runOnStart?: boolean;
+  logQueries?: boolean;
+  logErrors?: boolean;
+  dryRun?: boolean;
+  skipOnFail?: boolean;
+  ignoreMissing?: boolean;
+  ignoreExecuted?: boolean;
+  ignoreErrors?: boolean;
+  markAsExecuted?: boolean;
 }
 
 /**

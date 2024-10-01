@@ -1,15 +1,6 @@
-import { Inject } from '@nestjs/common';
-import {
-  IDb2Client,
-  IDb2ConfigOptions,
-  ITransactionManager,
-} from '../interfaces';
+import { IClient, IConfigOptions, ITransactionManager } from '../interfaces';
 import { Db2Error } from '../errors';
 import { Db2IsolationLevel } from '../enums';
-import {
-  I_DB2_CLIENT,
-  I_DB2_CONFIG,
-} from '../constants/injection-token.constant';
 import { Logger } from '../utils';
 
 export class TransactionManager implements ITransactionManager {
@@ -18,10 +9,8 @@ export class TransactionManager implements ITransactionManager {
   private isolationLevel: Db2IsolationLevel | null = null;
 
   public constructor(
-    @Inject(I_DB2_CLIENT)
-    private readonly client: IDb2Client,
-    @Inject(I_DB2_CONFIG) // Inject the config
-    private readonly config: IDb2ConfigOptions,
+    private readonly client: IClient,
+    private readonly config: IConfigOptions,
   ) {}
 
   /**

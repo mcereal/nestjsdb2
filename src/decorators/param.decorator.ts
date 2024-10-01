@@ -1,4 +1,4 @@
-// src/decorators/db2-param.decorator.ts
+// src/decorators/param.decorator.ts
 
 import {
   createParamDecorator,
@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 
 /**
- * @function Db2Param
+ * @function Param
  * @description A custom parameter decorator for use in NestJS that extracts specific parameters
  * from the execution context. This decorator allows for flexible parameter extraction by providing
  * an optional key or index to target specific arguments, such as parts of the request object.
@@ -34,7 +34,7 @@ import {
  *   }
  * }
  */
-export const Db2Param = createParamDecorator(
+export const Param = createParamDecorator(
   (data: string | number | undefined, ctx: ExecutionContext) => {
     const args = ctx.getArgs();
 

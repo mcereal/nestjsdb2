@@ -1,7 +1,7 @@
 // src/auth/kerberos-client.ts
 
 import { spawn } from 'child_process';
-import { Logger } from '@nestjs/common';
+import { Logger } from '../utils/logger';
 import { IKrbClient } from '../interfaces/kerberos-client.interface';
 import { Db2AuthenticationError } from '../errors';
 import { Db2Error } from '../errors/db2.error';
@@ -57,7 +57,7 @@ export class KerberosClient implements IKrbClient {
       this.logger.error('kinit is not available on the system.');
       throw new Db2Error('kinit is not available on the system.');
     }
-    this.logger.log(`kinit is available at ${kinitPath}.`);
+    this.logger.info(`kinit is available at ${kinitPath}.`);
   }
 
   /**
@@ -74,7 +74,7 @@ export class KerberosClient implements IKrbClient {
               new Db2Error(`Keytab file not accessible: ${krbKeytab}`),
             );
           }
-          this.logger.log('Keytab file is accessible.');
+          this.logger.info('Keytab file is accessible.');
           resolve();
         });
       });
@@ -105,10 +105,10 @@ export class KerberosClient implements IKrbClient {
       args.push('-kdc', krbKdc);
     }
 
-    this.logger.log(`Executing kinit with keytab: kinit ${args.join(' ')}`);
+    this.logger.info(`Executing kinit with keytab: kinit ${args.join(' ')}`);
 
     await this.executeCommand('kinit', args);
-    this.logger.log('Kerberos ticket acquired successfully using keytab.');
+    this.logger.info('Kerberos ticket acquired successfully using keytab.');
   }
 
   /**
@@ -148,7 +148,7 @@ export class KerberosClient implements IKrbClient {
             ),
           );
         }
-        this.logger.log('Kerberos ticket acquired successfully via password.');
+        this.logger.info('Kerberos ticket acquired successfully via password.');
         resolve();
       });
 
@@ -164,7 +164,7 @@ export class KerberosClient implements IKrbClient {
   private async validateTicket(): Promise<void> {
     try {
       await this.executeCommand('klist', ['-s']);
-      this.logger.log('Kerberos ticket is valid.');
+      this.logger.info('Kerberos ticket is valid.');
     } catch (error: any) {
       this.logger.error('No valid Kerberos ticket found.');
       throw new Db2AuthenticationError('No valid Kerberos ticket found.');

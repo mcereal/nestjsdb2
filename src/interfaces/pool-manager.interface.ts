@@ -1,15 +1,17 @@
 // src/interfaces/pool-manager.interface.ts
 
-import { Pool } from '../db/Pool';
+import { AuthStrategy } from '../auth';
 import { Connection } from '../db/Connection';
+import { IPool } from './pool.interface';
 
 /**
  * PoolManager interface
  */
 
 export interface IPoolManager {
+  setAuthStrategy(authStrategy: AuthStrategy): void;
   init(): Promise<void>;
-  getPool: Pool;
+  getPool: IPool<Connection>;
   isPoolInitialized: boolean;
   getConnection(): Promise<Connection>;
   closeConnection(connection: Connection): Promise<void>;

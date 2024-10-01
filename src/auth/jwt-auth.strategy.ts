@@ -1,16 +1,15 @@
 // src/auth/jwt-auth.strategy.ts
 
-import { Inject, Logger } from '@nestjs/common';
 import { createHmac } from 'crypto';
-import { Db2AuthStrategy } from './db2-auth.strategy';
+import { AuthStrategy } from './auth.strategy';
 import { Db2ConnectionState } from '../enums';
 import { Db2AuthenticationError, Db2Error } from '../errors';
 import {
-  IDb2ConfigOptions,
+  IConfigOptions,
   IConnectionManager,
   Db2JwtAuthOptions,
 } from '../interfaces';
-import { I_CONNECTION_MANAGER } from '../constants/injection-token.constant';
+import { Logger } from '../utils/logger';
 
 // Define the JWT payload interface
 interface IJwtPayload {
@@ -41,13 +40,10 @@ function base64urlEncode(buffer: Buffer): string {
     .replace(/\//g, '_');
 }
 
-export class JwtAuthStrategy extends Db2AuthStrategy {
+export class JwtAuthStrategy extends AuthStrategy {
   private readonly logger = new Logger(JwtAuthStrategy.name);
 
-  constructor(
-    config: IDb2ConfigOptions,
-    @Inject(I_CONNECTION_MANAGER) connectionManager: IConnectionManager,
-  ) {
+  constructor(config: IConfigOptions, connectionManager: IConnectionManager) {
     super(config, connectionManager);
     if (!connectionManager) {
       throw new Error('ConnectionManager is not defined in JwtAuthStrategy');
@@ -63,14 +59,14 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
       this.connectionManager.getState().connectionState ===
       Db2ConnectionState.CONNECTED
     ) {
-      this.logger.log('Already authenticated. Skipping...');
+      this.logger.info('Already authenticated. Skipping...');
       return;
     }
 
     this.connectionManager.setState({
       connectionState: Db2ConnectionState.AUTHENTICATING,
     });
-    this.logger.log('Starting JWT authentication...');
+    this.logger.info('Starting JWT authentication...');
 
     try {
       // Simulate authentication process (e.g., establish DB2 connection)
@@ -78,7 +74,7 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
       // const connectionString = this.getConnectionString();
       // await this.connectionManager.connect(connectionString);
 
-      this.logger.log('Authentication successful using JWT strategy.');
+      this.logger.info('Authentication successful using JWT strategy.');
       this.connectionManager.setState({
         connectionState: Db2ConnectionState.CONNECTED,
       });
@@ -109,7 +105,7 @@ export class JwtAuthStrategy extends Db2AuthStrategy {
 
     try {
       decoded = this.verifyJwtToken(jwtToken, jwtSecret);
-      this.logger.log('JWT token successfully verified.');
+      this.logger.info('JWT token successfully verified.');
     } catch (error: any) {
       this.logger.error('JWT verification failed:', error.message);
       throw new Db2AuthenticationError('Invalid or expired JWT token.');

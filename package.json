@@ -1,6 +1,6 @@
 {
   "name": "@mcereal/nestjsdb2",
-  "version": "1.1.9",
+  "version": "1.2.1",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "author": "Michael Curtis <mpbcurtis@gmail.com>",
   "readme": "README.md",
@@ -47,8 +47,9 @@
   ],
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
-    "install:dev": "cd testconnection && npm install",
-    "build:dev": "cd testconnection && npm run build",
+    "build:examples": "cd examples && npm run build",
+    "install:examples": "cd testconnection && npm install",
+    "start:dev:examples": "cd examples && npm run start:dev",
     "test": "jest --detectOpenHandles --forceExit --config jest.config.ts",
     "test:watch": "jest --watch --config jest.config.ts",
     "test:coverage": "jest --detectOpenHandles --forceExit --config jest.config.ts --coverage",
@@ -59,25 +60,16 @@
     "prepublishOnly": "npm run lint && npm run test && npm run build",
     "prepare": "npm run build",
     "clean": "rimraf dist",
-    "doc": "typedoc",
-    "postinstall": "node scripts/check-rossetta.mjs"
-  },
-  "dependencies": {
-    "@nestjs/cache-manager": "^2.2.2",
-    "@nestjs/common": "^10.0.0",
-    "cache-manager": "^5.7.6",
-    "generic-pool": "^3.9.0",
-    "ibm_db": "^3.2.4"
+    "doc": "typedoc"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0",
     "typescript": ">=4.0.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^10.3.4",
+    "@semantic-release/github": "^11.0.0",
     "@semantic-release/npm": "^12.0.1",
     "@types/cache-manager": "^4.0.6",
     "@types/jest": "^29.5.12",
