@@ -22,6 +22,7 @@ import { MessageBuilder } from './message-builder';
 import { DRDAParser } from './drda-parser';
 import { BigInteger } from './BigInteger';
 import { RSAKey } from './RSAKey';
+import { readFileSync } from 'fs';
 
 /**
  * Connection class responsible for managing DRDA protocol communication with DB2.
@@ -41,6 +42,7 @@ export class Connection extends EventEmitter {
   private useSSL: boolean = false;
   private correlationId: number = 1;
   private receiveBuffer: Buffer = Buffer.alloc(0);
+  private sslCertificatePath: string | null = null;
 
   private responseResolvers: Array<(response: DRDAResponseType) => void> = [];
   private responseRejectors: Array<(error: Error) => void> = [];
@@ -88,9 +90,12 @@ export class Connection extends EventEmitter {
         case 'PWD':
           this.password = value;
           break;
-        // case 'SECURITY':
-        //   this.useSSL = value.toLowerCase() === 'ssl';
-        // break;
+        case 'SECURITY':
+          this.useSSL = value.toLowerCase() === 'ssl';
+          break;
+        case 'SSLCERTIFICATE':
+          this.sslCertificatePath = value;
+          break;
         default:
           this.logger.warn(`Unknown connection parameter: ${key}`);
           break;
@@ -103,6 +108,7 @@ export class Connection extends EventEmitter {
       port: this.port,
       userId: this.userId,
       useSSL: this.useSSL,
+      sslCertificatePath: this.sslCertificatePath,
     });
   }
 
@@ -488,43 +494,47 @@ export class Connection extends EventEmitter {
 
           if (this.useSSL) {
             this.logger.info('Using SSL for connection');
-            this.socket = tlsConnect(
-              {
-                port: this.port,
-                host: this.hostName,
-                rejectUnauthorized: false,
-                timeout: this.connectionTimeout,
-              },
-              async () => {
-                clearTimeout(connectionTimeout);
-                if (
-                  this.socket instanceof TLSSocket &&
-                  this.socket.authorized
-                ) {
-                  this.setConnected(true);
-                  this.logger.info(
-                    `Socket connected securely at ${this.hostName}:${this.port}`,
-                  );
-                  try {
-                    await this.authenticate();
-                    resolve();
-                  } catch (authErr) {
-                    this.logger.error('Authentication failed:', authErr);
-                    reject(authErr);
-                  }
-                } else {
-                  const authError =
-                    this.socket instanceof TLSSocket
-                      ? this.socket.authorizationError
-                      : 'Unknown';
-                  reject(
-                    new Error(
-                      `TLS connection failed: ${authError || 'Unknown authorization error'}`,
-                    ),
-                  );
+            const tlsOptions = {
+              port: this.port,
+              host: this.hostName,
+              rejectUnauthorized: false,
+              timeout: this.connectionTimeout,
+            };
+
+            // Use the SSL certificate if provided
+            if (this.sslCertificatePath) {
+              tlsOptions['ca'] = [readFileSync(this.sslCertificatePath)];
+              this.logger.info(
+                `Using SSL certificate at: ${this.sslCertificatePath}`,
+              );
+            }
+
+            this.socket = tlsConnect(tlsOptions, async () => {
+              clearTimeout(connectionTimeout);
+              if (this.socket instanceof TLSSocket && this.socket.authorized) {
+                this.setConnected(true);
+                this.logger.info(
+                  `Socket connected securely at ${this.hostName}:${this.port}`,
+                );
+                try {
+                  await this.authenticate();
+                  resolve();
+                } catch (authErr) {
+                  this.logger.error('Authentication failed:', authErr);
+                  reject(authErr);
                 }
-              },
-            );
+              } else {
+                const authError =
+                  this.socket instanceof TLSSocket
+                    ? this.socket.authorizationError
+                    : 'Unknown';
+                reject(
+                  new Error(
+                    `TLS connection failed: ${authError || 'Unknown authorization error'}`,
+                  ),
+                );
+              }
+            });
           } else {
             this.logger.info('Using plain TCP for connection');
             this.socket = new Socket();

@@ -39,7 +39,20 @@ export class PasswordAuthStrategy extends AuthStrategy {
 
   public getConnectionString(): string {
     const { host, port, database } = this.config;
-    const { username, password } = this.config.auth as Db2PasswordAuthOptions;
-    return `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};security=ssl`;
+    const { username, password, useTls, sslCertificatePath } = this.config
+      .auth as Db2PasswordAuthOptions;
+
+    // Base connection string
+    let connectionString = `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};`;
+
+    // Append TLS settings if useTls is true
+    if (useTls) {
+      connectionString += 'SECURITY=ssl;';
+      if (sslCertificatePath) {
+        connectionString += `sslCertificate=${sslCertificatePath};`;
+      }
+    }
+
+    return connectionString;
   }
 }
