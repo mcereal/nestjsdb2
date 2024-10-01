@@ -1,7 +1,7 @@
 // src/factories/db2-factory.ts
 
 import { IFactory } from '../interfaces/factory.interface';
-import { Connection } from './Connection';
+import { Connection } from './connection';
 import { AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 import { Pool } from './pool';

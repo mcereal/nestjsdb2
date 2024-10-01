@@ -76,6 +76,8 @@ export enum DRDACodePoints {
   LENGTH = 0x2406, // Length
   SCALE = 0x2407, // Scale
   NULLS = 0x2408, // Nulls
+  PARAMETER = 0x241a, // Parameter
+  EXCSQLEXP = 0x2419, // Execute SQL Statement Request
 }
 
 export enum DRDAMessageTypes {

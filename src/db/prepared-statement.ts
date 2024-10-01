@@ -1,6 +1,10 @@
-import { Connection } from './Connection'; // Adjust the import path accordingly
+import { Connection } from './connection';
+import { Logger } from '../utils';
+import { DRDAMessageTypes } from '../enums/drda-codepoints.enum';
+import { Row } from '../interfaces/row.interface';
 
 export class PreparedStatement {
+  private logger = new Logger(PreparedStatement.name);
   private connection: Connection;
   private sql: string;
   private statementHandle: string;
@@ -16,8 +20,8 @@ export class PreparedStatement {
    * @param params - An array of parameters to bind to the SQL statement.
    * @returns The result of the query execution.
    */
-  public async execute(params: any[] = []): Promise<any> {
-    console.log(
+  public async execute(params: any[] = []): Promise<Row[]> {
+    this.logger.info(
       `Executing prepared statement for SQL: ${this.sql} with params: ${JSON.stringify(params)}`,
     );
     try {
@@ -27,7 +31,7 @@ export class PreparedStatement {
       // Receive and parse the response
       const response = await this.connection.receiveResponse();
 
-      if (response.type !== 'EXCSQLEXPRM') {
+      if (response.type !== DRDAMessageTypes.EXCSQLSET) {
         throw new Error(`Unexpected response type: ${response.type}`);
       }
 
@@ -35,7 +39,7 @@ export class PreparedStatement {
       const result = this.connection.processExecuteResponse(response.payload);
       return result;
     } catch (error) {
-      console.error(`Error executing prepared statement: ${error.message}`);
+      this.logger.error(`Error executing prepared statement: ${error.message}`);
       throw error;
     }
   }
@@ -44,13 +48,13 @@ export class PreparedStatement {
    * Closes the prepared statement, freeing up server resources.
    */
   public async close(): Promise<void> {
-    console.log(`Closing prepared statement for SQL: ${this.sql}`);
+    this.logger.info(`Closing prepared statement for SQL: ${this.sql}`);
     try {
       // Send Close Statement request
       await this.connection.sendCloseStatementRequest(this.statementHandle);
-      console.log('Prepared statement closed successfully.');
+      this.logger.info('Prepared statement closed successfully.');
     } catch (error) {
-      console.error(`Error closing prepared statement: ${error.message}`);
+      this.logger.error(`Error closing prepared statement: ${error.message}`);
       throw error;
     }
   }

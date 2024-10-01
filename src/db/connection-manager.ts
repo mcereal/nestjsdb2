@@ -4,7 +4,7 @@ import {
   IConnectionManager,
   IPoolManager,
 } from '../interfaces';
-import { Connection } from './Connection';
+import { Connection } from './connection';
 import { Logger } from '../utils';
 
 /**

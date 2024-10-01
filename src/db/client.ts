@@ -18,11 +18,12 @@ import {
 import { AuthStrategy } from '../auth/auth.strategy';
 import { IConnectionManager } from '../interfaces/connection-mannager.interface';
 import { Logger } from '../utils';
-import { Connection } from './Connection';
+import { Connection } from './connection';
 import { MigrationService } from '../services/migration.service';
 import { MetadataManager } from '../orm/metadata';
 import { ConfigManager } from './config.manager';
 import { Pool } from './pool';
+import { Row } from '../interfaces/row.interface';
 
 export class Client implements IClient {
   protected readonly config: IConfigOptions;
@@ -312,13 +313,13 @@ export class Client implements IClient {
         connection.query(
           sql,
           Object.values(params),
-          (err: Error, result: T) => {
+          (err: Error, result: Row[]) => {
             clearTimeout(queryTimeout); // Clear the timeout once the query resolves
             if (err) {
               this.logger.error('Error executing query', err.message);
               reject(new Db2ConnectionError('Failed to execute query'));
             } else {
-              resolve(result);
+              resolve(result as unknown as T);
             }
           },
         );
@@ -383,7 +384,7 @@ export class Client implements IClient {
       const stmt = await connection.prepare(sql);
       const result = await stmt.execute(params);
       await stmt.close();
-      return result;
+      return result as unknown as T;
     } catch (error: any) {
       this.logger.error('Error executing prepared statement:', error.message);
       throw new Db2Error('Prepared statement execution failed');

@@ -1,7 +1,7 @@
 // src/interfaces/pool-manager.interface.ts
 
 import { AuthStrategy } from '../auth';
-import { Connection } from '../db/Connection';
+import { Connection } from '../db/connection';
 import { IPool } from './pool.interface';
 
 /**

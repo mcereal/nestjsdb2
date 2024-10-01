@@ -2,15 +2,13 @@
 import { Socket } from 'net';
 import { connect as tlsConnect, TLSSocket } from 'tls';
 import {
-  DB2DataTypes,
   DRDACodePoints,
   DRDAMessageTypes,
 } from '../enums/drda-codepoints.enum';
 import { constants, publicEncrypt } from 'crypto';
-import { PreparedStatement } from './PreparedStatement';
+import { PreparedStatement } from './prepared-statement';
 import { Logger } from '../utils';
 import { EventEmitter } from 'events';
-import { DRDAHeader } from '../interfaces/drda-header.interface';
 import {
   ACCRDBResponse,
   ACCSECRMResponse,
@@ -163,8 +161,8 @@ export class Connection extends EventEmitter {
 
         if (this.responseResolvers.length > 0) {
           const resolve = this.responseResolvers.shift()!;
+          const reject = this.responseRejectors.shift()!;
           resolve(parsedResponse);
-          this.responseRejectors.shift();
         } else {
           this.logger.warn(
             'No pending response resolver to handle the response.',
@@ -175,7 +173,6 @@ export class Connection extends EventEmitter {
         if (this.responseRejectors.length > 0) {
           const reject = this.responseRejectors.shift()!;
           reject(err);
-          this.responseResolvers.shift();
         }
       }
     }
@@ -841,8 +838,10 @@ export class Connection extends EventEmitter {
   /**
    * Receives a response from the DB2 server.
    * @returns A promise that resolves with the DRDA response.
+   *
    */
-  private receiveResponse(): Promise<DRDAResponseType> {
+
+  public receiveResponse(): Promise<DRDAResponseType> {
     if (!this.isConnected || !this.socket) {
       return Promise.reject(new Error('Connection is not open.'));
     }
@@ -857,19 +856,13 @@ export class Connection extends EventEmitter {
           'No response received from DB2 server in a timely manner.';
         this.logger.error(errorMessage);
         reject(new Error(errorMessage));
+        // Remove the resolver and rejector to prevent memory leaks
+        this.responseResolvers.pop();
+        this.responseRejectors.pop();
       }, 40000); // 40 seconds timeout
 
+      // Cleanup on resolve or reject
       const cleanup = () => clearTimeout(responseTimeout);
-
-      this.once('response', (response: DRDAResponseType) => {
-        cleanup();
-        resolve(response);
-      });
-
-      this.once('error', (err: Error) => {
-        cleanup();
-        reject(err);
-      });
     });
   }
 
@@ -991,7 +984,11 @@ export class Connection extends EventEmitter {
    * @param params An array of parameters for the SQL query.
    * @returns A promise that resolves with the query result rows.
    */
-  public async query(query: string, params: any[] = []): Promise<Row[]> {
+  public async query(
+    query: string,
+    params: any[] = [],
+    callback?: (err: Error, result: Row[]) => void,
+  ): Promise<Row[]> {
     try {
       if (!this.isConnected) {
         this.logger.info('Connection lost. Attempting to reconnect...');
@@ -1015,6 +1012,11 @@ export class Connection extends EventEmitter {
       return sqlSetResponse.result;
     } catch (err) {
       this.logger.error('Error executing query:', err);
+      this.logger.error('Error executing query:', err);
+
+      if (callback) {
+        callback(err, null);
+      }
       throw err;
     }
   }
@@ -1108,6 +1110,114 @@ export class Connection extends EventEmitter {
     return message;
   }
 
+  /**
+   * Sends an EXCSQLEXP (Execute SQL Statement) request.
+   * @param statementHandle The handle of the prepared statement.
+   * @param params The parameters to bind to the SQL statement.
+   */
+  public async sendExecuteRequest(
+    statementHandle: string,
+    params: any[],
+  ): Promise<void> {
+    const executeMessage = this.constructEXCSQLEXPMessage(
+      statementHandle,
+      params,
+    );
+    this.logger.info('Sending EXCSQLEXP message...');
+    await this.send(executeMessage);
+  }
+
+  /**
+   * Constructs the EXCSQLEXP (Execute SQL Statement) message.
+   * @param statementHandle The handle of the prepared statement.
+   * @param params The parameters to bind to the SQL statement.
+   * @returns The constructed EXCSQLEXP message buffer.
+   */
+  private constructEXCSQLEXPMessage(
+    statementHandle: string,
+    params: any[],
+  ): Buffer {
+    const parameters: Buffer[] = [];
+
+    // STMTHDL (Statement Handle)
+    parameters.push(
+      this.messageBuilder.constructParameter(
+        DRDACodePoints.STMTHDL,
+        Buffer.from(statementHandle, 'utf8'),
+      ),
+    );
+
+    // Parameters Binding
+    params.forEach((param) => {
+      const paramBuffer = Buffer.from(this.serializeParam(param), 'utf8');
+      parameters.push(
+        this.messageBuilder.constructParameter(
+          DRDACodePoints.PARAMETER,
+          paramBuffer,
+        ),
+      );
+    });
+
+    const parametersBuffer = Buffer.concat(parameters);
+
+    // EXCSQLEXP Object
+    const excsqlexpLength = 4 + parametersBuffer.length;
+    const excsqlexpBuffer = Buffer.alloc(4);
+    excsqlexpBuffer.writeUInt16BE(excsqlexpLength, 0);
+    excsqlexpBuffer.writeUInt16BE(DRDACodePoints.EXCSQLEXP, 2);
+
+    const excsqlexpObject = Buffer.concat([excsqlexpBuffer, parametersBuffer]);
+
+    // DSS Header
+    const totalLength = 6 + excsqlexpObject.length;
+    const dssHeader = this.messageBuilder.constructDSSHeader(totalLength);
+
+    // Final EXCSQLEXP message with DSS header
+    const message = Buffer.concat([dssHeader, excsqlexpObject]);
+    this.logger.info(
+      `Constructed EXCSQLEXP message: ${message.toString('hex')}`,
+    );
+    return message;
+  }
+
+  /**
+   * Serializes a parameter for binding.
+   * @param param The parameter to serialize.
+   * @returns The serialized parameter as a string.
+   */
+  private serializeParam(param: any): string {
+    if (typeof param === 'string') {
+      return param.replace(/'/g, "''"); // Simple escaping
+    } else if (typeof param === 'number') {
+      return param.toString();
+    } else if (param === null) {
+      return 'NULL';
+    }
+    // Handle other types as needed
+    return param.toString();
+  }
+
+  /**
+   * Processes the EXCSQLSET (Execute SQL Statement Set) response.
+   * @param payload The response payload buffer.
+   * @returns The parsed result set.
+   */
+  public processExecuteResponse(payload: Buffer): Row[] {
+    // Implement the parsing logic based on your DRDAParser implementation
+    // Assuming your DRDAParser can parse the payload into a structured response
+    const parsedResponse = this.parser.parsePayload(
+      payload,
+      DRDAMessageTypes.EXCSQLSET,
+    ) as EXCSQLSETResponse;
+
+    if (!parsedResponse.success) {
+      throw new Error(
+        `Execute statement failed with SVRCOD: ${parsedResponse.parameters.svrcod}`,
+      );
+    }
+
+    return parsedResponse.result; // Assuming 'result' contains the rows
+  }
   /**
    * Extracts the statement handle from the prepare response payload.
    * @param payload The response payload buffer.

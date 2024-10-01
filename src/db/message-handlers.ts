@@ -8,7 +8,7 @@ import {
   SECCHKRMResponse,
   EXCSQLSETResponse,
 } from '../interfaces/drda-specific-responses.interface';
-import { Connection } from './Connection';
+import { Connection } from './connection';
 import { Logger } from '../utils/logger';
 import {
   DRDACodePoints,

@@ -1,5 +1,5 @@
 import { Db2ConnectionState } from '../enums';
-import { Connection } from '../db/Connection';
+import { Connection } from '../db/connection';
 
 export interface IClient {
   // Lifecycle methods
