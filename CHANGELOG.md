@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/mcereal/nestjsdb2/compare/v1.2.0...v1.2.1) (2024-10-01)
+
+
+### Bug Fixes
+
+* config interface imports ([df07f08](https://github.com/mcereal/nestjsdb2/commit/df07f08910b20c8b2ffb03cc9a45b74429dc0d01))
+
 # [1.2.0](https://github.com/mcereal/nestjsdb2/compare/v1.1.20...v1.2.0) (2024-10-01)
 
 
