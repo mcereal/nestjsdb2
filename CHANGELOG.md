@@ -1,3 +1,10 @@
+# [1.3.0-drda.6](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.5...v1.3.0-drda.6) (2024-10-01)
+
+
+### Bug Fixes
+
+* add tls options ([99bcb73](https://github.com/mcereal/nestjsdb2/commit/99bcb739bb08d65843cbc31775559bba9087113e))
+
 # [1.3.0-drda.5](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.4...v1.3.0-drda.5) (2024-10-01)
 
 
