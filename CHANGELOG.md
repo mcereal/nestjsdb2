@@ -1,3 +1,15 @@
+# [1.3.0-drda.2](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.1...v1.3.0-drda.2) (2024-10-01)
+
+
+### Bug Fixes
+
+* export Connection as different name ([13a0c7e](https://github.com/mcereal/nestjsdb2/commit/13a0c7e11d180761435a11c98fa8bbc4018ca0a4))
+* export new classes ([774a7ca](https://github.com/mcereal/nestjsdb2/commit/774a7cac3bb01f467d0b71fed2d7d70e8d697c29))
+* move message creation to message builder ([d9a1241](https://github.com/mcereal/nestjsdb2/commit/d9a1241fd9df717c3d6350072ebcf0b9100ba025))
+* prepared statement integration ([a3c3930](https://github.com/mcereal/nestjsdb2/commit/a3c3930e475733018267264de506120041973048))
+* separate out message handling ([357668f](https://github.com/mcereal/nestjsdb2/commit/357668f2213380b4affe0c5594e61ae2805b4ef2))
+* separate out message handling logic ([0acc5b8](https://github.com/mcereal/nestjsdb2/commit/0acc5b8099ce9036b422129362d30acb8b79ee0d))
+
 # [1.3.0-drda.1](https://github.com/mcereal/nestjsdb2/compare/v1.2.1...v1.3.0-drda.1) (2024-10-01)
 
 
