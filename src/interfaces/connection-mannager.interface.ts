@@ -1,5 +1,5 @@
 import { Db2ClientState } from './client.interface';
-import { Connection } from '../db/connection';
+import { Connection } from '../db/Connection';
 
 export interface IConnectionManager {
   setState(newState: Partial<Db2ClientState>): void;

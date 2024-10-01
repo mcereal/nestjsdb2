@@ -1,4 +1,4 @@
-import { Connection } from './connection';
+import { Connection } from './Connection';
 import { Logger } from '../utils';
 import { DRDAMessageTypes } from '../enums/drda-codepoints.enum';
 import { Row } from '../interfaces/row.interface';

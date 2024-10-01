@@ -1,4 +1,4 @@
-import { Connection } from './connection';
+import { Connection } from './Connection';
 import {
   IConfigOptions,
   IFactory,

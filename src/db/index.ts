@@ -6,7 +6,7 @@ export * from './pool.manager';
 export * from './connection-manager';
 export * from './db2.module';
 export * from './config.manager';
-export * from './connection';
+export * from './Connection';
 export * from './message-builder';
 export * from './message-handlers';
 export * from './pool';
