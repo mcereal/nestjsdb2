@@ -22,7 +22,7 @@ import { Connection } from './Connection';
 import { MigrationService } from '../services/migration.service';
 import { MetadataManager } from '../orm/metadata';
 import { ConfigManager } from './config.manager';
-import { Pool } from './Pool';
+import { Pool } from './pool';
 
 export class Client implements IClient {
   protected readonly config: IConfigOptions;

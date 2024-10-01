@@ -4,7 +4,7 @@ import { IFactory } from '../interfaces/factory.interface';
 import { Connection } from './Connection';
 import { AuthStrategy } from '../auth';
 import { Logger } from '../utils';
-import { Pool } from './Pool';
+import { Pool } from './pool';
 
 /**
  * Factory class to create and destroy connections.

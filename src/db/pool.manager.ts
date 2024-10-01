@@ -5,7 +5,7 @@ import {
   IPoolManager,
   IPoolOptions,
 } from '../interfaces';
-import { Pool } from './Pool';
+import { Pool } from './pool';
 import { AuthStrategy } from '../auth';
 import { Logger } from '../utils';
 import { Factory } from './factory';
