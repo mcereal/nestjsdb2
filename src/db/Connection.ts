@@ -201,6 +201,13 @@ export class Connection extends EventEmitter {
             pendingResponse.reject(err);
             this.pendingResponses.delete(correlationId);
           }
+        } else {
+          // If correlationId is not available, reject all pending responses (use with caution)
+          this.pendingResponses.forEach((pendingResponse, cid) => {
+            clearTimeout(pendingResponse.timeout);
+            pendingResponse.reject(err);
+            this.pendingResponses.delete(cid);
+          });
         }
       }
     }
@@ -284,43 +291,16 @@ export class Connection extends EventEmitter {
     );
     this.logger.info('Sending EXCSAT message...');
     await this.send(excsatMessage);
+
+    // Wait for the response
     const response = await this.receiveResponse(this.correlationId);
 
-    if (response.type !== DRDAMessageTypes.CHRNRQSDSS) {
-      throw new Error(
-        `Unexpected response type during EXCSAT: ${response.type}`,
-      );
+    // Since MessageHandlers have already processed the response, we can proceed
+    if (!response.success) {
+      throw new Error(`EXCSAT failed with response type: ${response.type}`);
     }
 
-    const chainedResponse = response as CHNRQSDSSResponse;
-    if (
-      chainedResponse.parameters.svrcod &&
-      chainedResponse.parameters.svrcod !== 0
-    ) {
-      throw new Error(
-        `Server returned error code: ${chainedResponse.parameters.svrcod}`,
-      );
-    }
-
-    const excsatrd = chainedResponse.chainedData.find(
-      (param) => param.codePoint === DRDACodePoints.EXCSATRD,
-    );
-    if (excsatrd) {
-      const pemKey = this.extractServerPublicKey(excsatrd.data);
-      this.setServerPublicKey(Buffer.from(pemKey, 'utf8'));
-      this.logger.info('Server public key acquired and formatted.');
-    } else {
-      this.logger.warn('EXCSATRD not found in CHNRQSDSS response.');
-    }
-
-    const extnam = chainedResponse.chainedData.find(
-      (param) => param.codePoint === DRDACodePoints.EXTNAM,
-    );
-    if (extnam) {
-      const extnamStr = this.parseEXTNAM(extnam.data);
-      this.externalName = extnamStr;
-      this.logger.info(`Received EXTNAM: ${extnamStr}`);
-    }
+    this.logger.info('EXCSAT message processed successfully.');
   }
 
   /**
@@ -336,19 +316,11 @@ export class Connection extends EventEmitter {
     await this.send(accsecMessage);
     const response = await this.receiveResponse(this.correlationId);
 
-    if (response.type !== DRDAMessageTypes.ACCSECRM) {
-      throw new Error(
-        `Unexpected response type during ACCSEC: ${response.type}`,
-      );
+    if (!response.success) {
+      throw new Error(`ACCSEC failed with response type: ${response.type}`);
     }
 
-    const accsecResponse = response as ACCSECRMResponse;
-    const svrcod = accsecResponse.parameters.svrcod;
-    this.logger.info(`ACCSECRM SVRCOD received: ${svrcod}`);
-
-    if (svrcod !== 0) {
-      throw new Error(`Server returned error code during ACCSEC: ${svrcod}`);
-    }
+    this.logger.info('ACCSEC message processed successfully.');
   }
 
   /**
@@ -366,18 +338,10 @@ export class Connection extends EventEmitter {
     await this.send(secchkMessage);
     const response = await this.receiveResponse(this.correlationId);
 
-    if (response.type !== DRDAMessageTypes.SECCHKRM) {
+    if (!response.success) {
       throw new Error(
         `Unexpected response type during SECCHK: ${response.type}`,
       );
-    }
-
-    const secchkResponse = response as SECCHKRMResponse;
-    const svrcod = secchkResponse.parameters.svrcod;
-    this.logger.info(`SECCHKRM SVRCOD received: ${svrcod}`);
-
-    if (svrcod !== 0) {
-      throw new Error(`Security check failed with code: ${svrcod}`);
     }
 
     this.setSecurityChecked(true);
@@ -397,18 +361,10 @@ export class Connection extends EventEmitter {
     await this.send(accrdbMessage);
     const response = await this.receiveResponse(this.correlationId);
 
-    if (response.type !== DRDAMessageTypes.ACCRDBRM) {
+    if (!response.success) {
       throw new Error(
         `Unexpected response type during ACCRDB: ${response.type}`,
       );
-    }
-
-    const accrdbResponse = response as ACCRDBResponse;
-    const svrcod = accrdbResponse.parameters.svrcod;
-    this.logger.info(`ACCRDBRM SVRCOD received: ${svrcod}`);
-
-    if (svrcod !== 0) {
-      throw new Error(`Access RDB failed with code: ${svrcod}`);
     }
 
     this.setConnected(true);

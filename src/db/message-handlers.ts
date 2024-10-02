@@ -107,33 +107,24 @@ export class MessageHandlers {
    */
   private handleCHNRQSDSS(response: CHNRQSDSSResponse): void {
     this.logger.info('Handling CHNRQSDSS response.');
-    const chnrqdssResponse = response as CHNRQSDSSResponse;
 
     // Iterate over chained data and handle accordingly
-    chnrqdssResponse.chainedData.forEach((chainedParam) => {
+    response.chainedData.forEach((chainedParam) => {
       switch (chainedParam.codePoint) {
         case DRDACodePoints.EXCSATRD:
           // Handle Exchange Server Attributes Response Data Structure
-          this.connection.setServerPublicKey(chainedParam.data);
-          this.logger.info('Server public key updated.');
+          const pemKey = this.connection.extractServerPublicKey(
+            chainedParam.data,
+          );
+          this.connection.setServerPublicKey(Buffer.from(pemKey, 'utf8'));
+          this.logger.info('Server public key acquired and formatted.');
           break;
 
         case DRDACodePoints.EXTNAM:
           // Handle External Name
-          const extnam = chainedParam.data.toString('utf8');
-          this.connection.externalName = extnam;
-          this.logger.info(`External Name set to: ${extnam}`);
-          break;
-
-        case DRDACodePoints.ODBC_ERROR:
-          // Handle ODBC Error
-          const svrcod = parseInt(chainedParam.data.toString(), 10);
-          if (svrcod !== 0) {
-            this.logger.error(`ODBC Error with SVRCOD: ${svrcod}`);
-            this.connection.handleError(svrcod);
-          } else {
-            this.logger.info('ODBC Error indicates success.');
-          }
+          const extnamStr = this.connection.parseEXTNAM(chainedParam.data);
+          this.connection.externalName = extnamStr;
+          this.logger.info(`Received EXTNAM: ${extnamStr}`);
           break;
 
         // Handle other chained code points as needed
@@ -144,14 +135,11 @@ export class MessageHandlers {
       }
     });
 
-    // Handle overall success status
-    if (response.success) {
-      this.logger.info('CHNRQSDSS indicates success.');
-      // Implement success handling logic, e.g., proceed with next steps
-    } else {
-      this.logger.error('CHNRQSDSS indicates failure.');
-      // Implement failure handling logic, e.g., terminate connection
-      this.connection.handleError(-1); // Example error code
+    // Check for success or errors
+    if (!response.success) {
+      throw new Error(
+        `CHNRQSDSS response indicates failure with code: ${response.parameters.svrcod}`,
+      );
     }
   }
 
