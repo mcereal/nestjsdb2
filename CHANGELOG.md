@@ -1,3 +1,10 @@
+# [1.3.0-drda.8](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.7...v1.3.0-drda.8) (2024-10-02)
+
+
+### Bug Fixes
+
+* cert path ([a837b70](https://github.com/mcereal/nestjsdb2/commit/a837b70d22a28570874ef5b28c46da4596799444))
+
 # [1.3.0-drda.7](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.6...v1.3.0-drda.7) (2024-10-02)
 
 
