@@ -1103,16 +1103,11 @@ export class DRDAParser {
   }
 
   private managerLevelMap: { [key: number]: string } = {
-    0x000c0000: 'SQLAM Level 0',
-    0x000c0001: 'SQLAM Level 1',
-    0x000c0002: 'SQLAM Level 2',
-    0x000c0003: 'SQLAM Level 3',
-    0x000c0004: 'SQLAM Level 4',
-    0x000c0005: 'SQLAM Level 5',
-    0x000c0006: 'SQLAM Level 6',
-    0x000c0007: 'SQLAM Level 7',
-    0x000c0008: 'SQLAM Level 8',
-    0x000c0009: 'SQLAM Level 9',
+    [DRDACodePoints.SQLAM << 16]: 'SQLAM Level', // Shift left to match the format
+    [DRDACodePoints.AGENT << 16]: 'AGENT Level',
+    [DRDACodePoints.RDB << 16]: 'RDB Level',
+    [DRDACodePoints.SECMGR << 16]: 'SECMGR Level',
+    // Add other manager levels as needed
   };
 
   private parseMGRLVLLS(data: Buffer): string[] {
@@ -1121,10 +1116,14 @@ export class DRDAParser {
     let offset = 0;
 
     while (offset + 4 <= data.length) {
-      const mgrLevel = data.readUInt32BE(offset);
+      const codePoint = data.readUInt16BE(offset);
+      const level = data.readUInt16BE(offset + 2);
+      const key = (codePoint << 16) | level;
       const mgrName =
-        this.managerLevelMap[mgrLevel] ||
-        `Unknown Manager Level 0x${mgrLevel.toString(16)}`;
+        this.managerLevelMap[key] ||
+        `Unknown Manager Level 0x${codePoint.toString(16)}${level
+          .toString(16)
+          .padStart(4, '0')}`;
       managerLevels.push(mgrName);
       offset += 4;
     }

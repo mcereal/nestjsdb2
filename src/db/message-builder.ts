@@ -85,9 +85,9 @@ export class MessageBuilder {
     let offset = 0;
 
     // AGENT Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
-    offset += 4;
+    // mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
+    // mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
+    // offset += 4;
 
     // SQLAM Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
@@ -95,14 +95,14 @@ export class MessageBuilder {
     offset += 4;
 
     // RDB Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for RDB Manager (Version 7)
-    offset += 4;
+    // mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
+    // mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for RDB Manager (Version 7)
+    // offset += 4;
 
-    // SECMGR Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset);
-    mgrlvllsData.writeUInt16BE(0x03, offset + 2); // Level for Security Manager (Version 3)
-    offset += 4;
+    // // SECMGR Manager
+    // mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset);
+    // mgrlvllsData.writeUInt16BE(0x03, offset + 2); // Level for Security Manager (Version 3)
+    // offset += 4;
 
     const mgrlvllsParameter = this.constructParameter(
       DRDACodePoints.MGRLVLLS,
