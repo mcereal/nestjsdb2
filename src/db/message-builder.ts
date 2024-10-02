@@ -119,48 +119,93 @@ export class MessageBuilder {
    * @returns The constructed EXCSAT message buffer.
    */
   public constructEXCSATMessage(dbName: string): Buffer {
-    const parameters: Buffer[] = [];
+    const buffers: Buffer[] = [];
+
+    // EXTNAM (External Name)
+    const extnamData = Buffer.from('MyApp', 'utf8');
+    const extnamParameter = this.constructParameter(
+      DRDACodePoints.EXTNAM,
+      extnamData,
+    );
+    buffers.push(extnamParameter);
 
     // SRVNAM (Server Name)
     const srvnamData = Buffer.from(dbName, 'utf8');
-    parameters.push(this.constructParameter(DRDACodePoints.SRVNAM, srvnamData));
-
-    // **Remove EXTNAM if not needed**
-    const extnamData = Buffer.from('MyApp', 'utf8');
-    parameters.push(this.constructParameter(DRDACodePoints.EXTNAM, extnamData));
+    const srvnamParameter = this.constructParameter(
+      DRDACodePoints.SRVNAM,
+      srvnamData,
+    );
+    buffers.push(srvnamParameter);
 
     // MGRLVLLS (Manager Level List)
-    const mgrlvllsParameter = this.constructMgrlvlls();
-    parameters.push(mgrlvllsParameter);
+    const mgrlvllsData = this.constructMgrlvlls();
+    buffers.push(mgrlvllsData);
 
     // PRDID (Product ID)
     const prdidData = Buffer.from('JDB42', 'utf8');
-    parameters.push(this.constructParameter(DRDACodePoints.PRDID, prdidData));
+    const prdidParameter = this.constructParameter(
+      DRDACodePoints.PRDID,
+      prdidData,
+    );
+    buffers.push(prdidParameter);
 
     // SRVRLSLV (Server Release Level)
     const srvrlslvData = Buffer.from('11.5', 'utf8');
-    parameters.push(
-      this.constructParameter(DRDACodePoints.SRVRLSLV, srvrlslvData),
+    const srvrlslvParameter = this.constructParameter(
+      DRDACodePoints.SRVRLSLV,
+      srvrlslvData,
     );
+    buffers.push(srvrlslvParameter);
 
-    const parametersBuffer = Buffer.concat(parameters);
+    // Combine all parameters
+    const parametersBuffer = Buffer.concat(buffers);
 
     // EXCSAT Object
     const excsatLength = 4 + parametersBuffer.length;
     const excsatBuffer = Buffer.alloc(4);
-    excsatBuffer.writeUInt16BE(excsatLength, 0);
-    excsatBuffer.writeUInt16BE(DRDACodePoints.EXCSAT, 2);
+    excsatBuffer.writeUInt16BE(excsatLength, 0); // Length
+    excsatBuffer.writeUInt16BE(DRDACodePoints.EXCSAT, 2); // Code Point (0x1041)
 
     const excsatObject = Buffer.concat([excsatBuffer, parametersBuffer]);
 
     // DSS Header
     const totalLength = 6 + excsatObject.length;
-    const dssHeader = this.constructDSSHeader(totalLength);
+    const dssHeader = Buffer.alloc(6);
+    dssHeader.writeUInt16BE(totalLength, 0); // Total Length including DSS Header
+    dssHeader.writeUInt8(0xd0, 2); // DSS Flags (0xD0 indicates request)
+    dssHeader.writeUInt8(0x01, 3); // DSS Type (0x01 for RQSDSS)
+    dssHeader.writeUInt16BE(this.nextCorrelationId(), 4); // Correlation ID
 
     // Final EXCSAT message with DSS header
     const message = Buffer.concat([dssHeader, excsatObject]);
     this.logger.info(`Constructed EXCSAT message: ${message.toString('hex')}`);
+
+    // **Corrected Debugging Check**
+    if (message.slice(8, 10).toString('hex') !== '1041') {
+      this.logger.error(
+        `EXCSAT code point mismatch: Expected 1041, Found ${message
+          .slice(8, 10)
+          .toString('hex')}`,
+      );
+    } else {
+      this.logger.info('EXCSAT message constructed correctly.');
+    }
+
+    this.logger.info(`EXCSAT Message Breakdown:
+      Total Length: ${totalLength} (0x${totalLength.toString(16)})
+      DSS Flags: 0x${dssHeader[2].toString(16)}
+      DSS Type: 0x${dssHeader[3].toString(16)}
+      Correlation ID: ${this.nextCorrelationId()}
+      EXCSAT Length: ${excsatLength} (0x${excsatLength.toString(16)})
+      EXCSAT Code Point: 0x${excsatBuffer.readUInt16BE(2).toString(16)}
+      Parameters: ${parametersBuffer.toString('hex')}
+    `);
+
     return message;
+  }
+
+  private nextCorrelationId(): number {
+    return this.correlationId++;
   }
 
   /**
