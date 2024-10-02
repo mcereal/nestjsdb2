@@ -1,3 +1,10 @@
+# [1.3.0-drda.42](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.41...v1.3.0-drda.42) (2024-10-02)
+
+
+### Bug Fixes
+
+* fix ACCES message ([d054e7d](https://github.com/mcereal/nestjsdb2/commit/d054e7da1af974141cd9d92f8560569bddd59118))
+
 # [1.3.0-drda.41](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.40...v1.3.0-drda.41) (2024-10-02)
 
 
