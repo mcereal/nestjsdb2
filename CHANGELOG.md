@@ -1,3 +1,10 @@
+# [1.3.0-drda.28](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.27...v1.3.0-drda.28) (2024-10-02)
+
+
+### Bug Fixes
+
+* check for response success in sndPrepareRequest ([faa9de2](https://github.com/mcereal/nestjsdb2/commit/faa9de20de5d05f6bedd8f831be38be289e81a39))
+
 # [1.3.0-drda.27](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.26...v1.3.0-drda.27) (2024-10-02)
 
 
