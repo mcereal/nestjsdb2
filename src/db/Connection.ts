@@ -508,7 +508,7 @@ export class Connection extends EventEmitter {
               try {
                 const certPath = path.resolve(
                   __dirname,
-                  '../../',
+                  '../',
                   this.sslCertificatePath,
                 );
                 tlsOptions['ca'] = [readFileSync(certPath)];
