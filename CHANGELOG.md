@@ -1,3 +1,10 @@
+# [1.3.0-drda.44](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.43...v1.3.0-drda.44) (2024-10-02)
+
+
+### Bug Fixes
+
+* send ([f26b5df](https://github.com/mcereal/nestjsdb2/commit/f26b5df573ac0c73ad24194cdf926d603815daef))
+
 # [1.3.0-drda.43](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.42...v1.3.0-drda.43) (2024-10-02)
 
 
