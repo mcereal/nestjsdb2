@@ -1,3 +1,10 @@
+# [1.3.0-drda.13](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.12...v1.3.0-drda.13) (2024-10-02)
+
+
+### Bug Fixes
+
+* correlation id only in connection ([57ad4c8](https://github.com/mcereal/nestjsdb2/commit/57ad4c8040d1ca8cb382cc538e6ad6065f193f86))
+
 # [1.3.0-drda.12](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.11...v1.3.0-drda.12) (2024-10-02)
 
 
