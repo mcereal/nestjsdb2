@@ -1,3 +1,10 @@
+# [1.3.0-drda.34](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.33...v1.3.0-drda.34) (2024-10-02)
+
+
+### Bug Fixes
+
+* create parseMessages ([c1a5059](https://github.com/mcereal/nestjsdb2/commit/c1a50592e891427dab6e4039dd7872ed9b6dc3bd))
+
 # [1.3.0-drda.33](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.32...v1.3.0-drda.33) (2024-10-02)
 
 
