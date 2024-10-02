@@ -6,13 +6,10 @@ export class MessageBuilder {
   // private correlationId: number;
   private logger: Logger;
 
-  constructor(correlationId: number, logger: Logger) {
-    // this.correlationId = correlationId;
-    this.logger = logger;
-  }
+  constructor() {}
 
   constructParameter(codePoint: number, dataBuffer: Buffer): Buffer {
-    const length = 4 + dataBuffer.length; // Length includes itself and code point
+    const length = 4 + dataBuffer.length; // 2 bytes for length, 2 bytes for code point
     const parameterBuffer = Buffer.alloc(length);
     parameterBuffer.writeUInt16BE(length, 0); // Length
     parameterBuffer.writeUInt16BE(codePoint, 2); // Code Point

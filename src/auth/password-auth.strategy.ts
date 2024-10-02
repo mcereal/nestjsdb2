@@ -43,7 +43,7 @@ export class PasswordAuthStrategy extends AuthStrategy {
       .auth as Db2PasswordAuthOptions;
 
     // Base connection string
-    let connectionString = `DATABASE=${database};HOSTNAME=${host};PORT=${port};PROTOCOL=TCPIP;UID=${username};PWD=${password};`;
+    let connectionString = `DATABASE=${database};HOSTNAME=${host};PORT=${port};UID=${username};PWD=${password};`;
 
     // Append TLS settings if useTls is true
     if (useTls) {

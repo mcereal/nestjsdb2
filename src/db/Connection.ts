@@ -45,8 +45,10 @@ export class Connection extends EventEmitter {
   private receiveBuffer: Buffer = Buffer.alloc(0);
   private sslCertificatePath: string | null = null;
 
-  private responseResolvers: Array<(response: DRDAResponseType) => void> = [];
-  private responseRejectors: Array<(error: Error) => void> = [];
+  // Inside your Connection class
+  private responseResolvers: Map<number, (response: DRDAResponseType) => void> =
+    new Map();
+  private responseRejectors: Map<number, (error: Error) => void> = new Map();
 
   private logger: Logger;
   private messageBuilder: MessageBuilder;
@@ -63,7 +65,7 @@ export class Connection extends EventEmitter {
     this.connectionString = connectionString;
     this.connectionTimeout = timeout || 10000;
     this.logger = new Logger(Connection.name);
-    this.messageBuilder = new MessageBuilder(this.correlationId, this.logger);
+    this.messageBuilder = new MessageBuilder();
     this.parser = new DRDAParser(this.logger);
     this.parseConnectionString();
   }
@@ -153,20 +155,25 @@ export class Connection extends EventEmitter {
 
       try {
         const header = this.parser.parseHeader(messageBuffer);
+        const correlationId = header.correlationId;
         const responsePayload = header.payload;
-        const responseType = this.parser.identifyResponseType(responsePayload);
 
+        // Identify and parse the response type
+        const responseType = this.parser.identifyResponseType(responsePayload);
         const parsedResponse = this.parser.parsePayload(
           responsePayload,
           responseType,
         );
 
-        this.logger.info('Received DRDA payload:', parsedResponse);
+        this.logger.info(
+          `Received DRDA response with correlationId: ${correlationId}`,
+        );
 
-        if (this.responseResolvers.length > 0) {
-          const resolve = this.responseResolvers.shift()!;
-          const reject = this.responseRejectors.shift()!;
+        const resolve = this.responseResolvers.get(correlationId);
+        if (resolve) {
           resolve(parsedResponse);
+          this.responseResolvers.delete(correlationId);
+          this.responseRejectors.delete(correlationId);
         } else {
           this.logger.warn(
             'No pending response resolver to handle the response.',
@@ -174,10 +181,6 @@ export class Connection extends EventEmitter {
         }
       } catch (err) {
         this.logger.error('Error decoding DRDA response:', err);
-        if (this.responseRejectors.length > 0) {
-          const reject = this.responseRejectors.shift()!;
-          reject(err);
-        }
       }
     }
   }
@@ -260,7 +263,7 @@ export class Connection extends EventEmitter {
     );
     this.logger.info('Sending EXCSAT message...');
     await this.send(excsatMessage);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.CHRNRQSDSS) {
       throw new Error(
@@ -310,7 +313,7 @@ export class Connection extends EventEmitter {
     );
     this.logger.info('Sending ACCSEC message...');
     await this.send(accsecMessage);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.ACCSECRM) {
       throw new Error(
@@ -340,7 +343,7 @@ export class Connection extends EventEmitter {
     );
     this.logger.info('Sending SECCHK message...');
     await this.send(secchkMessage);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.SECCHKRM) {
       throw new Error(
@@ -371,7 +374,7 @@ export class Connection extends EventEmitter {
     );
     this.logger.info('Sending ACCRDB message...');
     await this.send(accrdbMessage);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.ACCRDBRM) {
       throw new Error(
@@ -640,14 +643,14 @@ export class Connection extends EventEmitter {
    *
    */
 
-  public receiveResponse(): Promise<DRDAResponseType> {
+  public receiveResponse(correlationId: number): Promise<DRDAResponseType> {
     if (!this.isConnected || !this.socket) {
       return Promise.reject(new Error('Connection is not open.'));
     }
 
     return new Promise((resolve, reject) => {
-      this.responseResolvers.push(resolve);
-      this.responseRejectors.push(reject);
+      this.responseResolvers.set(correlationId, resolve);
+      this.responseRejectors.set(correlationId, reject);
       this.logger.info('Awaiting response from DB2 server...');
 
       const responseTimeout = setTimeout(() => {
@@ -656,8 +659,8 @@ export class Connection extends EventEmitter {
         this.logger.error(errorMessage);
         reject(new Error(errorMessage));
         // Remove the resolver and rejector to prevent memory leaks
-        this.responseResolvers.shift();
-        this.responseRejectors.shift();
+        this.responseResolvers.delete(correlationId);
+        this.responseRejectors.delete(correlationId);
       }, 40000); // 40 seconds timeout
 
       // Cleanup on resolve or reject
@@ -758,7 +761,7 @@ export class Connection extends EventEmitter {
       this.correlationId,
     );
     await this.send(message);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.CLOSESTM_RM) {
       throw new Error(
@@ -822,7 +825,7 @@ export class Connection extends EventEmitter {
       }
 
       await this.sendSQL(query, params);
-      const response = await this.receiveResponse();
+      const response = await this.receiveResponse(this.correlationId);
 
       if (response.type !== DRDAMessageTypes.EXCSQLSET) {
         throw new Error(
@@ -875,7 +878,7 @@ export class Connection extends EventEmitter {
   private async sendPrepareRequest(sql: string): Promise<string> {
     const prepareMessage = this.constructEXCSQLPREPMessage(sql);
     await this.send(prepareMessage);
-    const response = await this.receiveResponse();
+    const response = await this.receiveResponse(this.correlationId);
 
     if (response.type !== DRDAMessageTypes.EXCSQLPREPRM) {
       throw new Error(
