@@ -178,7 +178,7 @@ export class Connection extends EventEmitter {
         this.messageHandlers.handleMessage(parsedResponse);
 
         const pendingResponse = this.pendingResponses.get(correlationId);
-        if (pendingResponse) {
+        if (pendingResponse && parsedResponse.success) {
           clearTimeout(pendingResponse.timeout);
           pendingResponse.resolve(parsedResponse);
           this.pendingResponses.delete(correlationId);
@@ -1069,7 +1069,7 @@ export class Connection extends EventEmitter {
       const paramLength = payload.readUInt16BE(offset);
       const paramCodePoint = payload.readUInt16BE(offset + 2);
       const data = payload.slice(offset + 4, offset + paramLength);
-
+      this.logger.info(`Parameter ${paramCodePoint}: ${data.toString('utf8')}`);
       if (paramCodePoint === DRDACodePoints.STMTHDL) {
         return data.toString('utf8').trim();
       }

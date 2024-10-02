@@ -162,7 +162,7 @@ export class DRDAParser {
           return excsqlsetResponse;
 
         case DRDAMessageTypes.EXTNAM:
-          const extnamResponse = this.parseEXTNAM(payload);
+          const extnamResponse = this.handleEXTNAM(payload);
           return extnamResponse;
 
         case DRDAMessageTypes.SVRCOD:
@@ -250,12 +250,13 @@ export class DRDAParser {
           throw new Error('Invalid SVRCOD parameter data length');
         }
         const svrcod = paramData.readUInt16BE(0);
+        const success = svrcod === 0;
         return {
           parameters: { svrcod },
           type: DRDAMessageTypes.SVRCOD,
           length: paramData.length,
           payload: paramData,
-          success: true,
+          success,
         };
       }
 
@@ -294,7 +295,7 @@ export class DRDAParser {
           });
           break;
         case DRDACodePoints.EXTNAM:
-          const extnam = this.parseEXTNAM(paramData);
+          const extnam = this.handleEXTNAM(paramData);
           chrnqsdssResponse.chainedData.push({
             codePoint: DRDACodePoints.EXTNAM,
             data: Buffer.from(extnam.parameters.extnam, 'utf8'),
@@ -654,17 +655,61 @@ export class DRDAParser {
    * @returns The parsed external name as a string.
    * @throws Error if the EXTNAM parameter is not valid.
    */
-  private parseEXTNAM(data: Buffer): EXTNAMResponse {
-    // Implement parsing logic for EXTNAM parameter
-    // Example: Assume EXTNAM is a null-terminated UTF-8 string
-    const extnam = data.toString('utf8').split('\0')[0];
+  private handleEXTNAM(data: Buffer): EXTNAMResponse {
+    let offset = 0;
+    const parameters = {
+      svrcod: 0,
+      message: [] as string[],
+      extnam: '',
+    };
+
+    while (offset + 4 <= data.length) {
+      const paramLength = data.readUInt16BE(offset);
+      const paramCodePoint = data.readUInt16BE(offset + 2);
+      const paramData = data.slice(offset + 4, offset + paramLength);
+      offset += paramLength;
+
+      switch (paramCodePoint) {
+        case DRDACodePoints.EXTNAM:
+          // Parse EXTNAM parameter
+          const extnam = paramData.toString('utf8').replace(/\x00/g, '');
+          parameters.extnam = extnam;
+          break;
+
+        case DRDACodePoints.SVRCOD:
+          // Parse SVRCOD parameter
+          if (paramData.length >= 2) {
+            const svrcod = paramData.readUInt16BE(0);
+            parameters.svrcod = svrcod;
+          } else {
+            this.logger.warn(
+              'Invalid SVRCOD parameter length in EXTNAM response.',
+            );
+          }
+          break;
+
+        case DRDACodePoints.MSG_TEXT:
+          // Parse MSG_TEXT parameter
+          const message = paramData.toString('utf8').replace(/\x00/g, '');
+          parameters.message.push(message);
+          break;
+
+        default:
+          this.logger.warn(
+            `Unknown parameter code point in EXTNAM response: 0x${paramCodePoint.toString(16)}`,
+          );
+          break;
+      }
+    }
+
+    const success = parameters.svrcod === 0;
 
     return {
       type: DRDAMessageTypes.EXTNAM,
       length: data.length,
       payload: data,
-      success: true,
-      parameters: { svrcod: 0, message: [], extnam },
+      success,
+      parameters,
     };
   }
 
