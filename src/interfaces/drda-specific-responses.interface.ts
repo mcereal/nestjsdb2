@@ -15,7 +15,7 @@ export interface EXCSATRDResponse extends BaseDRDAResponse {
   parameters: {
     serverPublicKey: Buffer;
     serverVersion: string;
-    managerLevels: number[];
+    managerLevels: string[];
     serverClassName: string;
     serverName: string;
     serverReleaseLevel: string;

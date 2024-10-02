@@ -82,7 +82,15 @@ export class DRDAParser {
       return 'UNKNOWN';
     }
 
-    const messageCodePoint = payload.readUInt16BE(2); // Assuming codePoint starts at offset 2
+    const ddmLength = payload.readUInt16BE(0);
+    const messageCodePoint = payload.readUInt16BE(2);
+
+    // Validate that the payload contains at least the DDM length
+    if (payload.length < ddmLength) {
+      this.logger.warn('Incomplete DDM object received.');
+      return 'UNKNOWN';
+    }
+
     this.logger.info(
       `Identifying response type for code point: 0x${messageCodePoint.toString(16)}`,
     );
@@ -339,40 +347,53 @@ export class DRDAParser {
     const parameters = {
       serverPublicKey: Buffer.alloc(0),
       serverVersion: '',
-      managerLevels: [] as number[],
+      managerLevels: [] as string[],
       serverClassName: '',
       serverName: '',
       serverReleaseLevel: '',
+      extnam: '',
     };
 
-    while (offset + 4 <= data.length) {
+    // Skip the top-level DDM object's length and code point
+    const ddmLength = data.readUInt16BE(offset);
+    const ddmCodePoint = data.readUInt16BE(offset + 2);
+    offset += 4;
+
+    if (ddmCodePoint !== DRDACodePoints.EXCSATRD) {
+      throw new Error(
+        `Expected EXCSATRD code point, but found 0x${ddmCodePoint.toString(16)}`,
+      );
+    }
+    const ddmEnd = offset + ddmLength - 4;
+
+    while (offset + 4 <= ddmEnd) {
       const paramLength = data.readUInt16BE(offset);
       const paramCodePoint = data.readUInt16BE(offset + 2);
+      if (offset + paramLength > data.length) {
+        this.logger.warn('Parameter length exceeds data length.');
+        break;
+      }
+
       const paramData = data.slice(offset + 4, offset + paramLength);
+
       offset += paramLength;
-
       switch (paramCodePoint) {
-        case DRDACodePoints.SERVER_KEY:
-          // Handle SERVER_KEY as before
+        case DRDACodePoints.EXTNAM:
+          parameters.extnam = paramData.toString('utf8').replace(/\x00/g, '');
           break;
-
         case DRDACodePoints.MGRLVLLS:
-          parameters.managerLevels = this.parseMGRLVLLS(paramData).map(Number);
+          parameters.managerLevels = this.parseMGRLVLLS(paramData);
           break;
-
         case DRDACodePoints.SRVCLSNM:
           parameters.serverClassName = this.parseSRVCLSNM(paramData);
           break;
-
         case DRDACodePoints.SRVNAM:
           parameters.serverName = this.parseSRVNAM(paramData);
           break;
-
         case DRDACodePoints.SRVRLSLV:
           parameters.serverReleaseLevel = this.parseSRVRLSLV(paramData);
           break;
-
-        // Handle other code points as needed
+        // Handle other parameters...
         default:
           this.logger.warn(
             `Unknown EXCSATRD parameter code point: 0x${paramCodePoint.toString(16)}`,
@@ -380,6 +401,8 @@ export class DRDAParser {
           break;
       }
     }
+    parameters.serverPublicKey = this.extractServerPublicKey(data);
+    parameters.serverVersion = this.parseServerVersion(data);
 
     return {
       type: DRDAMessageTypes.EXCSATRD,
