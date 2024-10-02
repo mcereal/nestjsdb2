@@ -36,9 +36,9 @@ export class MessageBuilder {
   public constructACCSECMessage(dbName: string, correlationId: number): Buffer {
     const parameters: Buffer[] = [];
 
-    // SECMEC (Security Mechanism)
+    // SECMEC (Security Mechanism) with correct code point
     const secmecData = Buffer.alloc(2);
-    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
+    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0); // 0x0003
     const secmecParam = this.constructParameter(
       DRDACodePoints.SECMEC,
       secmecData,
@@ -154,9 +154,9 @@ export class MessageBuilder {
   public constructEXCSATMessage(dbName: string, correlationId: number): Buffer {
     const parameters: Buffer[] = [];
 
-    // SECMEC (Security Mechanism)
+    // SECMEC (Security Mechanism) with correct code point
     const secmecData = Buffer.alloc(2);
-    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
+    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0); // 0x0003
     const secmecParam = this.constructParameter(
       DRDACodePoints.SECMEC,
       secmecData,
@@ -189,6 +189,9 @@ export class MessageBuilder {
     parameters.push(extnamParam);
 
     const parametersBuffer = Buffer.concat(parameters);
+    this.logger.debug(
+      `Total EXCSAT Parameters Length: ${parametersBuffer.length}`,
+    );
 
     // EXCSAT Object
     const excsatLength = 4 + parametersBuffer.length;
@@ -197,6 +200,7 @@ export class MessageBuilder {
     excsatBuffer.writeUInt16BE(DRDACodePoints.EXCSAT, 2);
 
     const excsatObject = Buffer.concat([excsatBuffer, parametersBuffer]);
+    this.logger.debug(`EXCSAT Object Length: ${excsatObject.length}`);
 
     // DSS Header
     const totalLength = 6 + excsatObject.length;

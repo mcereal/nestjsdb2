@@ -14,7 +14,8 @@ export enum DRDACodePoints {
   RDBNAM = 0x2110, // Relational Database Name
   USRID = 0x11a0, // User ID
   PASSWORD = 0x11a1, // Password
-  SECMEC = 0x11a2, // Security Mechanism
+  // SECMEC = 0x11a2, // Security Mechanism
+  SECMEC = 0x106d, // Security Mechanism
   SECTKN = 0x11dc, // Security Token
   PRDID = 0x112e, // Product ID
   SRVRLSLV = 0x115a, // Server Release Level
