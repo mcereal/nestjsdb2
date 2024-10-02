@@ -4,8 +4,7 @@ import { Logger } from '../utils';
 
 export class MessageBuilder {
   // private correlationId: number;
-  private logger: Logger;
-
+  private readonly logger = new Logger(MessageBuilder.name);
   constructor() {}
 
   constructParameter(codePoint: number, dataBuffer: Buffer): Buffer {

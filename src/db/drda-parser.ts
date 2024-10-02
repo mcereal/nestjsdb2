@@ -24,11 +24,9 @@ import {
  * Utility class for parsing DRDA messages.
  */
 export class DRDAParser {
-  private logger: Logger;
+  private readonly logger = new Logger(DRDAParser.name);
 
-  constructor(logger: Logger) {
-    this.logger = logger;
-  }
+  constructor() {}
 
   /**
    * Parses the DRDA message header from the given data buffer.

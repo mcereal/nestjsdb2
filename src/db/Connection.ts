@@ -50,7 +50,7 @@ export class Connection extends EventEmitter {
     new Map();
   private responseRejectors: Map<number, (error: Error) => void> = new Map();
 
-  private logger: Logger;
+  private readonly logger = new Logger(Connection.name);
   private messageBuilder: MessageBuilder;
   private parser: DRDAParser;
 
@@ -66,7 +66,7 @@ export class Connection extends EventEmitter {
     this.connectionTimeout = timeout || 10000;
     this.logger = new Logger(Connection.name);
     this.messageBuilder = new MessageBuilder();
-    this.parser = new DRDAParser(this.logger);
+    this.parser = new DRDAParser();
     this.parseConnectionString();
   }
 

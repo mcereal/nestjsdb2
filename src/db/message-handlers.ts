@@ -33,7 +33,7 @@ import { DRDAParser } from './drda-parser';
  */
 export class MessageHandlers {
   private connection: Connection;
-  private logger: Logger;
+  private logger = new Logger(MessageHandlers.name);
   private parser: DRDAParser;
 
   /**
@@ -41,10 +41,9 @@ export class MessageHandlers {
    * @param {Connection} connection - The connection object.
    * @param {Logger} logger - The logger object.
    */
-  constructor(connection: Connection, logger: Logger) {
+  constructor(connection: Connection) {
     this.connection = connection;
-    this.logger = logger;
-    this.parser = new DRDAParser(logger);
+    this.parser = new DRDAParser();
   }
 
   /**
