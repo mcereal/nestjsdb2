@@ -121,6 +121,10 @@ export enum DRDAMessageTypes {
   SVRCOD = 'SRV_COD',
   UNKNOWN = 'UNKNOWN',
   ODBC_ERROR = 'ODBC_ERROR',
+  MGRLVLLS = 'MGRLVLLS',
+  SRVCLSNM = 'SRVCLSNM',
+  SRVNAM = 'SRVNAM',
+  SRVRLSLV = 'SRVRLSLV',
 }
 
 export enum DB2DataTypes {

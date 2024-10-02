@@ -13,8 +13,12 @@ import { Row } from './row.interface';
 export interface EXCSATRDResponse extends BaseDRDAResponse {
   type: DRDAMessageTypes.EXCSATRD;
   parameters: {
-    serverPublicKey: Buffer; // Server's public key for encryption
-    serverVersion: string; // Server version
+    serverPublicKey: Buffer;
+    serverVersion: string;
+    managerLevels: number[];
+    serverClassName: string;
+    serverName: string;
+    serverReleaseLevel: string;
   };
 }
 

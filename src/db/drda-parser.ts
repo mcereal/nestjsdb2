@@ -105,6 +105,14 @@ export class DRDAParser {
         return DRDAMessageTypes.EXTNAM;
       case DRDACodePoints.SVRCOD:
         return DRDAMessageTypes.SVRCOD;
+      case DRDACodePoints.MGRLVLLS:
+        return DRDAMessageTypes.MGRLVLLS;
+      case DRDACodePoints.SRVCLSNM:
+        return DRDAMessageTypes.SRVCLSNM;
+      case DRDACodePoints.SRVNAM:
+        return DRDAMessageTypes.SRVNAM;
+      case DRDACodePoints.SRVRLSLV:
+        return DRDAMessageTypes.SRVRLSLV;
       default:
         this.logger.warn(
           `Unknown message code point: 0x${messageCodePoint.toString(16)}`,
@@ -328,15 +336,13 @@ export class DRDAParser {
    */
   private handleEXCSATRD(data: Buffer): EXCSATRDResponse {
     let offset = 0;
-    const excsatrdResponse: EXCSATRDResponse = {
-      length: data.length,
-      type: DRDAMessageTypes.EXCSATRD,
-      payload: data,
-      success: true, // Initialize as true, modify based on parameters
-      parameters: {
-        serverPublicKey: Buffer.alloc(0), // Initialize with an empty buffer or appropriate default value
-        serverVersion: '', // Initialize with an appropriate default value
-      },
+    const parameters = {
+      serverPublicKey: Buffer.alloc(0),
+      serverVersion: '',
+      managerLevels: [] as number[],
+      serverClassName: '',
+      serverName: '',
+      serverReleaseLevel: '',
     };
 
     while (offset + 4 <= data.length) {
@@ -347,13 +353,25 @@ export class DRDAParser {
 
       switch (paramCodePoint) {
         case DRDACodePoints.SERVER_KEY:
-          const serverKey = this.extractServerPublicKey(paramData);
-          excsatrdResponse.parameters.serverPublicKey = serverKey;
+          // Handle SERVER_KEY as before
           break;
-        case DRDACodePoints.SERVER_VERSION:
-          const serverVersion = this.parseServerVersion(paramData);
-          excsatrdResponse.parameters.serverVersion = serverVersion;
+
+        case DRDACodePoints.MGRLVLLS:
+          parameters.managerLevels = this.parseMGRLVLLS(paramData).map(Number);
           break;
+
+        case DRDACodePoints.SRVCLSNM:
+          parameters.serverClassName = this.parseSRVCLSNM(paramData);
+          break;
+
+        case DRDACodePoints.SRVNAM:
+          parameters.serverName = this.parseSRVNAM(paramData);
+          break;
+
+        case DRDACodePoints.SRVRLSLV:
+          parameters.serverReleaseLevel = this.parseSRVRLSLV(paramData);
+          break;
+
         // Handle other code points as needed
         default:
           this.logger.warn(
@@ -363,7 +381,13 @@ export class DRDAParser {
       }
     }
 
-    return excsatrdResponse;
+    return {
+      type: DRDAMessageTypes.EXCSATRD,
+      length: data.length,
+      payload: data,
+      success: true,
+      parameters,
+    };
   }
 
   /**
@@ -962,5 +986,51 @@ export class DRDAParser {
   private parseMessageText(data: Buffer): string {
     this.logger.debug('Parsing message text.');
     return data.toString('utf8').replace(/\x00/g, '');
+  }
+
+  private managerLevelMap: { [key: number]: string } = {
+    0x000c0001: 'SQLAM Level 7',
+    0x000c0002: 'SQLAM Level 6',
+    0x000c0003: 'SQLAM Level 5',
+    0x000c0004: 'SQLAM Level 4',
+    0x000c0005: 'SQLAM Level 3',
+    0x000c0006: 'SQLAM Level 2',
+    0x000c0007: 'SQLAM Level 1',
+    0x000c0008: 'SQLAM Level 0',
+  };
+
+  private parseMGRLVLLS(data: Buffer): string[] {
+    this.logger.debug('Parsing MGRLVLLS.');
+    const managerLevels: string[] = [];
+    let offset = 0;
+
+    while (offset + 4 <= data.length) {
+      const mgrLevel = data.readUInt32BE(offset);
+      const mgrName =
+        this.managerLevelMap[mgrLevel] ||
+        `Unknown Manager Level 0x${mgrLevel.toString(16)}`;
+      managerLevels.push(mgrName);
+      offset += 4;
+    }
+
+    return managerLevels;
+  }
+
+  private parseSRVCLSNM(data: Buffer): string {
+    this.logger.debug('Parsing SRVCLSNM.');
+    const srvclsnm = data.toString('utf8').replace(/\x00/g, '');
+    return srvclsnm;
+  }
+
+  private parseSRVNAM(data: Buffer): string {
+    this.logger.debug('Parsing SRVNAM.');
+    const srvnam = data.toString('utf8').replace(/\x00/g, '');
+    return srvnam;
+  }
+
+  private parseSRVRLSLV(data: Buffer): string {
+    this.logger.debug('Parsing SRVRLSLV.');
+    const srvrlslv = data.toString('utf8').replace(/\x00/g, '');
+    return srvrlslv;
   }
 }
