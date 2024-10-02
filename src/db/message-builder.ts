@@ -51,10 +51,10 @@ export class MessageBuilder {
     parameters.push(this.constructParameter(DRDACodePoints.EXTNAM, extnamData));
 
     // MGRLVLLS (Manager Level List)
-    // const mgrlvllsData = this.constructMgrlvlls();
-    // parameters.push(
-    //   this.constructParameter(DRDACodePoints.MGRLVLLS, mgrlvllsData),
-    // );
+    const mgrlvllsData = this.constructMgrlvlls();
+    parameters.push(
+      this.constructParameter(DRDACodePoints.MGRLVLLS, mgrlvllsData),
+    );
 
     const parametersBuffer = Buffer.concat(parameters);
 
@@ -80,36 +80,36 @@ export class MessageBuilder {
    * Constructs the Manager Level List (MGRLVLLS) parameter.
    * @returns The constructed MGRLVLLS buffer.
    */
-  // private constructMgrlvlls(): Buffer {
-  //   const mgrlvllsData = Buffer.alloc(4 * 4); // Adjusting for only 4 managers, 4 bytes each (code point + level)
-  //   let offset = 0;
+  private constructMgrlvlls(): Buffer {
+    const mgrlvllsData = Buffer.alloc(4 * 4); // Adjusting for only 4 managers, 4 bytes each (code point + level)
+    let offset = 0;
 
-  //   // // AGENT Manager Level 4
-  //   // mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset); // Code Point
-  //   // mgrlvllsData.writeUInt16BE(0x0004, offset + 2); // Level
-  //   // offset += 4;
+    // AGENT Manager Level 4
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0004, offset + 2); // Level
+    offset += 4;
 
-  //   // // SQLAM Manager Level 7
-  //   // mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset); // Code Point
-  //   // mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level
-  //   // offset += 4;
+    // SQLAM Manager Level 7
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level
+    offset += 4;
 
-  //   // // RDB Manager Level 5
-  //   // mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset); // Code Point
-  //   // mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
-  //   // offset += 4;
+    // RDB Manager Level 5
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
+    offset += 4;
 
-  //   // // SECMGR Manager Level 5
-  //   // mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset); // Code Point
-  //   // mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
-  //   // offset += 4;
+    // SECMGR Manager Level 5
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
+    offset += 4;
 
-  //   const mgrlvllsParameter = this.constructParameter(
-  //     DRDACodePoints.MGRLVLLS,
-  //     Buffer.from(new Uint8Array(mgrlvllsData).slice(0, offset)),
-  //   );
-  //   return mgrlvllsParameter;
-  // }
+    const mgrlvllsParameter = this.constructParameter(
+      DRDACodePoints.MGRLVLLS,
+      Buffer.from(new Uint8Array(mgrlvllsData).slice(0, offset)),
+    );
+    return mgrlvllsParameter;
+  }
 
   /**
    * Constructs the EXCSAT message.
@@ -134,9 +134,9 @@ export class MessageBuilder {
     );
     buffers.push(srvnamParameter);
 
-    // // MGRLVLLS (Manager Level List)
-    // const mgrlvllsParameter = this.constructMgrlvlls();
-    // buffers.push(mgrlvllsParameter);
+    // MGRLVLLS (Manager Level List)
+    const mgrlvllsParameter = this.constructMgrlvlls();
+    buffers.push(mgrlvllsParameter);
 
     // PRDID (Product ID)
     const prdidData = Buffer.from('JDB42', 'utf8');
