@@ -7,11 +7,11 @@ export class MessageBuilder {
   private readonly logger = new Logger(MessageBuilder.name);
   constructor() {}
 
-  constructParameter(codePoint: number, dataBuffer: Buffer): Buffer {
-    const length = 4 + dataBuffer.length; // 2 bytes for length, 2 bytes for code point
-    const parameterBuffer = Buffer.alloc(length);
-    parameterBuffer.writeUInt16BE(length, 0); // Length
-    parameterBuffer.writeUInt16BE(codePoint, 2); // Code Point
+  public constructParameter(codePoint: number, dataBuffer: Buffer): Buffer {
+    const parameterLength = 4 + dataBuffer.length;
+    const parameterBuffer = Buffer.alloc(parameterLength);
+    parameterBuffer.writeUInt16BE(parameterLength, 0);
+    parameterBuffer.writeUInt16BE(codePoint, 2);
     dataBuffer.copy(parameterBuffer, 4);
     return parameterBuffer;
   }
@@ -30,31 +30,70 @@ export class MessageBuilder {
     return dssHeader;
   }
 
-  /**
-   * Constructs the ACCSEC message.
-   * @returns The constructed ACCSEC message buffer.
-   */
   public constructACCSECMessage(dbName: string, correlationId: number): Buffer {
     const parameters: Buffer[] = [];
 
     // SECMEC (Security Mechanism)
     const secmecData = Buffer.alloc(2);
     secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
-    parameters.push(this.constructParameter(DRDACodePoints.SECMEC, secmecData));
+    const secmecParam = this.constructParameter(
+      DRDACodePoints.SECMEC,
+      secmecData,
+    );
+    this.logger.debug(
+      `Adding SECMEC parameter: ${secmecParam.toString('hex')}`,
+    );
+    parameters.push(secmecParam);
 
     // RDBNAM (Relational Database Name)
     const rdbnamData = Buffer.from(dbName, 'utf8');
-    parameters.push(this.constructParameter(DRDACodePoints.RDBNAM, rdbnamData));
+    const rdbnamParam = this.constructParameter(
+      DRDACodePoints.RDBNAM,
+      rdbnamData,
+    );
+    this.logger.debug(
+      `Adding RDBNAM parameter: ${rdbnamParam.toString('hex')}`,
+    );
+    parameters.push(rdbnamParam);
 
     // EXTNAM (External Name)
     const extnamData = Buffer.from('MyApp', 'utf8');
-    parameters.push(this.constructParameter(DRDACodePoints.EXTNAM, extnamData));
+    const extnamParam = this.constructParameter(
+      DRDACodePoints.EXTNAM,
+      extnamData,
+    );
+    this.logger.debug(
+      `Adding EXTNAM parameter: ${extnamParam.toString('hex')}`,
+    );
+    parameters.push(extnamParam);
 
     // MGRLVLLS (Manager Level List)
     const mgrlvllsData = this.constructMgrlvlls();
-    parameters.push(
-      this.constructParameter(DRDACodePoints.MGRLVLLS, mgrlvllsData),
+    const mgrlvllsParam = this.constructParameter(
+      DRDACodePoints.MGRLVLLS,
+      mgrlvllsData,
     );
+    this.logger.debug(
+      `Adding MGRLVLLS parameter: ${mgrlvllsParam.toString('hex')}`,
+    );
+    parameters.push(mgrlvllsParam);
+
+    // PRDID (Product ID)
+    const prdidData = Buffer.from('JDB42', 'utf8');
+    const prdidParam = this.constructParameter(DRDACodePoints.PRDID, prdidData);
+    this.logger.debug(`Adding PRDID parameter: ${prdidParam.toString('hex')}`);
+    parameters.push(prdidParam);
+
+    // SRVRLSLV (Server Release Level)
+    const srvrlslvData = Buffer.from('11.5', 'utf8');
+    const srvrlslvParam = this.constructParameter(
+      DRDACodePoints.SRVRLSLV,
+      srvrlslvData,
+    );
+    this.logger.debug(
+      `Adding SRVRLSLV parameter: ${srvrlslvParam.toString('hex')}`,
+    );
+    parameters.push(srvrlslvParam);
 
     const parametersBuffer = Buffer.concat(parameters);
 
@@ -116,52 +155,49 @@ export class MessageBuilder {
    * @returns The constructed EXCSAT message buffer.
    */
   public constructEXCSATMessage(dbName: string, correlationId: number): Buffer {
-    const buffers: Buffer[] = [];
+    const parameters: Buffer[] = [];
+
+    // SECMEC (Security Mechanism)
+    const secmecData = Buffer.alloc(2);
+    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
+    const secmecParam = this.constructParameter(
+      DRDACodePoints.SECMEC,
+      secmecData,
+    );
+    this.logger.debug(
+      `Adding SECMEC parameter: ${secmecParam.toString('hex')}`,
+    );
+    parameters.push(secmecParam);
+
+    // RDBNAM (Relational Database Name)
+    const rdbnamData = Buffer.from(dbName, 'utf8');
+    const rdbnamParam = this.constructParameter(
+      DRDACodePoints.RDBNAM,
+      rdbnamData,
+    );
+    this.logger.debug(
+      `Adding RDBNAM parameter: ${rdbnamParam.toString('hex')}`,
+    );
+    parameters.push(rdbnamParam);
 
     // EXTNAM (External Name)
     const extnamData = Buffer.from('MyApp', 'utf8');
-    const extnamParameter = this.constructParameter(
+    const extnamParam = this.constructParameter(
       DRDACodePoints.EXTNAM,
       extnamData,
     );
-    buffers.push(extnamParameter);
-
-    // SRVNAM (Server Name)
-    const srvnamData = Buffer.from(dbName, 'utf8');
-    const srvnamParameter = this.constructParameter(
-      DRDACodePoints.SRVNAM,
-      srvnamData,
+    this.logger.debug(
+      `Adding EXTNAM parameter: ${extnamParam.toString('hex')}`,
     );
-    buffers.push(srvnamParameter);
+    parameters.push(extnamParam);
 
-    // MGRLVLLS (Manager Level List)
-    // const mgrlvllsParameter = this.constructMgrlvlls();
-    // buffers.push(mgrlvllsParameter);
-
-    // PRDID (Product ID)
-    // const prdidData = Buffer.from('JDB42', 'utf8');
-    // const prdidParameter = this.constructParameter(
-    //   DRDACodePoints.PRDID,
-    //   prdidData,
-    // );
-    // buffers.push(prdidParameter);
-
-    // // SRVRLSLV (Server Release Level)
-    // const srvrlslvData = Buffer.from('11.5', 'utf8');
-    // const srvrlslvParameter = this.constructParameter(
-    //   DRDACodePoints.SRVRLSLV,
-    //   srvrlslvData,
-    // );
-    // buffers.push(srvrlslvParameter);
-
-    // Combine all parameters
-    const parametersBuffer = Buffer.concat(buffers);
+    const parametersBuffer = Buffer.concat(parameters);
 
     // EXCSAT Object
     const excsatLength = 4 + parametersBuffer.length;
     const excsatBuffer = Buffer.alloc(4);
-    excsatBuffer.writeUInt16BE(excsatLength, 0); // Length
-    excsatBuffer.writeUInt16BE(DRDACodePoints.EXCSAT, 2); // Code Point (0x1041)
+    excsatBuffer.writeUInt16BE(excsatLength, 0);
+    excsatBuffer.writeUInt16BE(DRDACodePoints.EXCSAT, 2);
 
     const excsatObject = Buffer.concat([excsatBuffer, parametersBuffer]);
 

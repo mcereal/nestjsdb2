@@ -65,6 +65,13 @@ export class MessageHandlers {
 
       this.logger.debug(`Handling response of type: ${parsedResponse.type}`);
 
+      if (parsedResponse.correlationId === 0) {
+        this.handleDefaultResponse(parsedResponse);
+        return;
+      }
+
+      this.logger.debug(`Handling response of type: ${parsedResponse.type}`);
+
       // Dispatch to specific handler based on response type
       switch (parsedResponse.type) {
         case DRDAMessageTypes.CHRNRQSDSS:
@@ -97,6 +104,22 @@ export class MessageHandlers {
       }
     } catch (error) {
       this.logger.error('Error handling message:', error);
+    }
+  }
+
+  private handleDefaultResponse(response: DRDAResponseType): void {
+    this.logger.info('Handling default response.');
+
+    // Log messages from server
+    if (response.success) {
+      (response as ACCSECRMResponse).parameters.message.forEach((message) => {
+        this.logger.info(`Message: ${message}`);
+      });
+    } else {
+      this.logger.error('Error occurred in default response.');
+      this.connection.handleError(
+        (response as ACCSECRMResponse).parameters.svrcod,
+      );
     }
   }
 

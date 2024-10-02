@@ -307,17 +307,17 @@ export class Connection extends EventEmitter {
   /**
    * Sends the ACCSEC message as the second step of authentication.
    */
-  // Connection.ts
 
-  private async sendACCSEC(): Promise<void> {
+  public async sendACCSEC(): Promise<void> {
     this.correlationId++;
+    const currentCorrelationId = this.correlationId;
     const accsecMessage = this.messageBuilder.constructACCSECMessage(
       this.dbName,
-      this.correlationId,
+      currentCorrelationId,
     );
     this.logger.info('Sending ACCSEC message...');
     await this.send(accsecMessage);
-    const response = await this.receiveResponse(this.correlationId);
+    const response = await this.receiveResponse(currentCorrelationId);
 
     if (!response.success) {
       throw new Error(`ACCSEC failed with response type: ${response.type}`);
