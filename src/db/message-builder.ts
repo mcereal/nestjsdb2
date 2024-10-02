@@ -85,14 +85,14 @@ export class MessageBuilder {
     let offset = 0;
 
     // AGENT Manager
-    // mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
-    // mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
-    // offset += 4;
-
-    // SQLAM Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
-    mgrlvllsData.writeUInt16BE(0x04, offset + 2); // Level for SQLAM Manager (Version 4)
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
+    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
     offset += 4;
+
+    // // SQLAM Manager
+    // mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
+    // mgrlvllsData.writeUInt16BE(0x04, offset + 2); // Level for SQLAM Manager (Version 4)
+    // offset += 4;
 
     // RDB Manager
     // mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
