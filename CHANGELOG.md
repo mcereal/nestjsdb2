@@ -1,3 +1,10 @@
+# [1.3.0-drda.41](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.40...v1.3.0-drda.41) (2024-10-02)
+
+
+### Bug Fixes
+
+* remove mgrlvls from EXCSAT ([ab2732a](https://github.com/mcereal/nestjsdb2/commit/ab2732a63abb765da6a927d57edbdf1dc6a822f3))
+
 # [1.3.0-drda.40](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.39...v1.3.0-drda.40) (2024-10-02)
 
 
