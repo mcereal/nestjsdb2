@@ -135,24 +135,24 @@ export class MessageBuilder {
     buffers.push(srvnamParameter);
 
     // MGRLVLLS (Manager Level List)
-    const mgrlvllsParameter = this.constructMgrlvlls();
-    buffers.push(mgrlvllsParameter);
+    // const mgrlvllsParameter = this.constructMgrlvlls();
+    // buffers.push(mgrlvllsParameter);
 
     // PRDID (Product ID)
-    const prdidData = Buffer.from('JDB42', 'utf8');
-    const prdidParameter = this.constructParameter(
-      DRDACodePoints.PRDID,
-      prdidData,
-    );
-    buffers.push(prdidParameter);
+    // const prdidData = Buffer.from('JDB42', 'utf8');
+    // const prdidParameter = this.constructParameter(
+    //   DRDACodePoints.PRDID,
+    //   prdidData,
+    // );
+    // buffers.push(prdidParameter);
 
-    // SRVRLSLV (Server Release Level)
-    const srvrlslvData = Buffer.from('11.5', 'utf8');
-    const srvrlslvParameter = this.constructParameter(
-      DRDACodePoints.SRVRLSLV,
-      srvrlslvData,
-    );
-    buffers.push(srvrlslvParameter);
+    // // SRVRLSLV (Server Release Level)
+    // const srvrlslvData = Buffer.from('11.5', 'utf8');
+    // const srvrlslvParameter = this.constructParameter(
+    //   DRDACodePoints.SRVRLSLV,
+    //   srvrlslvData,
+    // );
+    // buffers.push(srvrlslvParameter);
 
     // Combine all parameters
     const parametersBuffer = Buffer.concat(buffers);

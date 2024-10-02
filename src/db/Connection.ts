@@ -649,8 +649,12 @@ export class Connection extends EventEmitter {
     }
 
     return new Promise((resolve, reject) => {
-      this.responseResolvers.set(correlationId, resolve);
-      this.responseRejectors.set(correlationId, reject);
+      if (correlationId !== 0) {
+        // Handle correlationId=0 separately
+        this.responseResolvers.set(correlationId, resolve);
+        this.responseRejectors.set(correlationId, reject);
+      }
+
       this.logger.info('Awaiting response from DB2 server...');
 
       const responseTimeout = setTimeout(() => {
