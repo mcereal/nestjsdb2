@@ -470,12 +470,16 @@ export class Connection extends EventEmitter {
           const connectionTimeout = setTimeout(() => {
             const errorMessage = `Connection to DB2 at ${this.hostName}:${this.port} timed out`;
             this.logger.error(errorMessage);
+            this.socket?.removeAllListeners();
+            this.socket?.destroy();
             reject(new Error(errorMessage));
           }, this.connectionTimeout);
 
           const onConnectionError = (err: Error) => {
             this.isConnected = false;
             clearTimeout(connectionTimeout);
+            this.socket?.removeAllListeners();
+            this.socket?.destroy();
             this.logger.error(
               `Connection error to DB2 at ${this.hostName}:${this.port}:`,
               err,
@@ -488,10 +492,8 @@ export class Connection extends EventEmitter {
             const tlsOptions: any = {
               port: this.port,
               host: this.hostName,
-              timeout: this.connectionTimeout,
             };
 
-            // Construct the full path to the SSL certificate
             if (this.sslCertificatePath) {
               try {
                 const certPath = path.resolve(
@@ -500,23 +502,24 @@ export class Connection extends EventEmitter {
                 );
                 tlsOptions['ca'] = [readFileSync(certPath)];
                 this.logger.info(`Using SSL certificate at: ${certPath}`);
-                tlsOptions['rejectUnauthorized'] = true; // Enable certificate verification
+                tlsOptions['rejectUnauthorized'] = true;
               } catch (fileError) {
                 this.logger.error(
                   `Failed to read SSL certificate at: ${this.sslCertificatePath}`,
                   fileError,
                 );
+                clearTimeout(connectionTimeout);
                 reject(fileError);
                 return;
               }
             } else {
-              // No custom CA certificate provided, use default CA store
-              tlsOptions['rejectUnauthorized'] = true; // Ensure certificate verification is enabled
+              tlsOptions['rejectUnauthorized'] = true;
             }
 
             this.socket = tlsConnect(tlsOptions, () => {
               clearTimeout(connectionTimeout);
               if (this.socket instanceof TLSSocket && this.socket.authorized) {
+                this.socket.setTimeout(0); // Disable socket inactivity timeout
                 this.setConnected(true);
                 this.logger.info(
                   `Socket connected securely at ${this.hostName}:${this.port}`,
@@ -525,6 +528,8 @@ export class Connection extends EventEmitter {
                   .then(() => resolve())
                   .catch((authErr) => {
                     this.logger.error('Authentication failed:', authErr);
+                    this.socket?.removeAllListeners();
+                    this.socket?.destroy();
                     reject(authErr);
                   });
               } else {
@@ -532,9 +537,14 @@ export class Connection extends EventEmitter {
                   this.socket instanceof TLSSocket
                     ? this.socket.authorizationError
                     : 'Unknown';
+                clearTimeout(connectionTimeout);
+                this.socket?.removeAllListeners();
+                this.socket?.destroy();
                 reject(
                   new Error(
-                    `TLS connection failed: ${authError || 'Unknown authorization error'}`,
+                    `TLS connection failed: ${
+                      authError || 'Unknown authorization error'
+                    }`,
                   ),
                 );
               }
@@ -544,23 +554,34 @@ export class Connection extends EventEmitter {
             this.socket = new Socket();
             this.socket.connect(this.port, this.hostName, () => {
               clearTimeout(connectionTimeout);
+              this.socket.setTimeout(0); // Disable socket inactivity timeout
               this.setConnected(true);
               this.authenticate()
                 .then(() => resolve())
                 .catch((authErr) => {
                   this.logger.error('Authentication failed:', authErr);
+                  this.socket?.removeAllListeners();
+                  this.socket?.destroy();
                   reject(authErr);
                 });
             });
           }
 
-          this.socket.once('error', onConnectionError);
-          this.socket.once('timeout', () => {
-            reject(
-              new Error(
-                `Connection to DB2 at ${this.hostName}:${this.port} timed out`,
-              ),
-            );
+          // Attach event listeners
+          this.socket.on('data', this.handleData.bind(this));
+          this.socket.on('error', onConnectionError);
+
+          this.socket.on('close', (hadError: boolean) => {
+            this.isConnected = false;
+            if (hadError) {
+              this.logger.error(
+                `Connection to DB2 at ${this.hostName}:${this.port} closed due to an error.`,
+              );
+            } else {
+              this.logger.info(
+                `Connection to DB2 at ${this.hostName}:${this.port} closed gracefully.`,
+              );
+            }
           });
         });
         break; // Break if connection is successful
