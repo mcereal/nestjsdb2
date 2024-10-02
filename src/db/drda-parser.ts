@@ -19,6 +19,7 @@ import {
   EXCSQLSETResponse,
   SECCHKRMResponse,
   EXTNAMResponse,
+  SVRCODResponse,
 } from '../interfaces/drda-specific-responses.interface';
 
 /**
@@ -102,6 +103,8 @@ export class DRDAParser {
         return DRDAMessageTypes.EXCSQLSET;
       case DRDACodePoints.EXTNAM:
         return DRDAMessageTypes.EXTNAM;
+      case DRDACodePoints.SVRCOD:
+        return DRDAMessageTypes.SVRCOD;
       default:
         this.logger.warn(
           `Unknown message code point: 0x${messageCodePoint.toString(16)}`,
@@ -161,6 +164,10 @@ export class DRDAParser {
         case DRDAMessageTypes.EXTNAM:
           const extnamResponse = this.parseEXTNAM(payload);
           return extnamResponse;
+
+        case DRDAMessageTypes.SVRCOD:
+          const svrcodResponse = this.extractSVRCOD(payload);
+          return svrcodResponse;
 
         default:
           this.logger.warn(
@@ -231,7 +238,7 @@ export class DRDAParser {
    * @param payload The payload buffer.
    * @returns The server code as a number.
    */
-  private extractSVRCOD(payload: Buffer): number {
+  private extractSVRCOD(payload: Buffer): SVRCODResponse {
     let offset = 0;
     while (offset + 4 <= payload.length) {
       const paramLength = payload.readUInt16BE(offset);
@@ -242,7 +249,14 @@ export class DRDAParser {
         if (paramData.length < 2) {
           throw new Error('Invalid SVRCOD parameter data length');
         }
-        return paramData.readUInt16BE(0);
+        const svrcod = paramData.readUInt16BE(0);
+        return {
+          parameters: { svrcod },
+          type: DRDAMessageTypes.SVRCOD,
+          length: paramData.length,
+          payload: paramData,
+          success: true,
+        };
       }
 
       offset += paramLength;
