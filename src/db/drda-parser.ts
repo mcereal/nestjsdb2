@@ -306,7 +306,7 @@ export class DRDAParser {
             codePoint: DRDACodePoints.ODBC_ERROR,
             data: Buffer.from(svrcod.toString()),
           });
-          chrnqsdssResponse.success = svrcod === 0;
+          chrnqsdssResponse.success = svrcod.parameters.svrcod === 0;
           break;
         // Handle other code points as needed
         default:
@@ -392,8 +392,8 @@ export class DRDAParser {
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
           const svrcod = this.extractSVRCOD(paramData);
-          accsecrmResponse.success = svrcod === 0;
-          accsecrmResponse.parameters.svrcod = svrcod;
+          accsecrmResponse.success = svrcod.parameters.svrcod === 0;
+          accsecrmResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
         case DRDACodePoints.MSG_TEXT:
           const message = this.parseMessageText(paramData);
@@ -437,8 +437,8 @@ export class DRDAParser {
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
           const svrcod = this.extractSVRCOD(paramData);
-          secchkrmResponse.success = svrcod === 0;
-          secchkrmResponse.parameters.svrcod = svrcod;
+          secchkrmResponse.success = svrcod.parameters.svrcod === 0;
+          secchkrmResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
         case DRDACodePoints.MSG_TEXT:
           const message = this.parseMessageText(paramData);
@@ -483,8 +483,8 @@ export class DRDAParser {
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
           const svrcod = this.extractSVRCOD(paramData);
-          accrdbResponse.success = svrcod === 0;
-          accrdbResponse.parameters.svrcod = svrcod;
+          accrdbResponse.success = svrcod.parameters.svrcod === 0;
+          accrdbResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
         case DRDACodePoints.MSG_TEXT:
           const message = this.parseMessageText(paramData);
@@ -530,8 +530,8 @@ export class DRDAParser {
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
           const svrcod = this.extractSVRCOD(paramData);
-          excsqlsetResponse.success = svrcod === 0;
-          excsqlsetResponse.parameters.svrcod = svrcod;
+          excsqlsetResponse.success = svrcod.parameters.svrcod === 0;
+          excsqlsetResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
         case DRDACodePoints.RSMD:
           const rsmd = this.parseRSMD(paramData);
