@@ -500,7 +500,6 @@ export class Connection extends EventEmitter {
             const tlsOptions: any = {
               port: this.port,
               host: this.hostName,
-              rejectUnauthorized: false,
               timeout: this.connectionTimeout,
             };
 
@@ -508,11 +507,12 @@ export class Connection extends EventEmitter {
             if (this.sslCertificatePath) {
               try {
                 const certPath = path.resolve(
-                  '../../',
+                  process.cwd(),
                   this.sslCertificatePath,
                 );
                 tlsOptions['ca'] = [readFileSync(certPath)];
                 this.logger.info(`Using SSL certificate at: ${certPath}`);
+                tlsOptions['rejectUnauthorized'] = true; // Enable certificate verification
               } catch (fileError) {
                 this.logger.error(
                   `Failed to read SSL certificate at: ${this.sslCertificatePath}`,
@@ -521,6 +521,9 @@ export class Connection extends EventEmitter {
                 reject(fileError);
                 return;
               }
+            } else {
+              // No custom CA certificate provided, use default CA store
+              tlsOptions['rejectUnauthorized'] = true; // Ensure certificate verification is enabled
             }
 
             this.socket = tlsConnect(tlsOptions, async () => {
