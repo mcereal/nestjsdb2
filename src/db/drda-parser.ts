@@ -718,6 +718,27 @@ export class DRDAParser {
           parameters.message.push(message);
           break;
 
+        case DRDACodePoints.MGRLVLLS:
+          // Parse MGRLVLLS parameter
+          const managerLevels = this.parseMGRLVLLS(paramData);
+          parameters.message.push(managerLevels.join(', '));
+          break;
+        case DRDACodePoints.SRVCLSNM:
+          // Parse SRVCLSNM parameter
+          const serverClassName = this.parseSRVCLSNM(paramData);
+          parameters.message.push(serverClassName);
+          break;
+        case DRDACodePoints.SRVNAM:
+          // Parse SRVNAM parameter
+          const serverName = this.parseSRVNAM(paramData);
+          parameters.message.push(serverName);
+          break;
+        case DRDACodePoints.SRVRLSLV:
+          // Parse SRVRLSLV parameter
+          const serverReleaseLevel = this.parseSRVRLSLV(paramData);
+          parameters.message.push(serverReleaseLevel);
+          break;
+
         default:
           this.logger.warn(
             `Unknown parameter code point in EXTNAM response: 0x${paramCodePoint.toString(16)}`,
