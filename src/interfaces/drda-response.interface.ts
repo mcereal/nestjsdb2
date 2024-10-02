@@ -17,6 +17,7 @@ export interface BaseDRDAResponse {
   type: DRDAMessageTypes; // Message type
   payload: Buffer; // The actual data or response content
   success: boolean; // Indicates if the operation was successful
+  correlationId: number; // Correlation ID for the request
 }
 
 /**

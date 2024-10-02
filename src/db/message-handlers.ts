@@ -15,7 +15,6 @@ import {
   DRDACodePoints,
   DRDAMessageTypes,
 } from '../enums/drda-codepoints.enum';
-import { DRDAParser } from './drda-parser';
 import { DRDAResponseType } from '../interfaces/drda-response.interface';
 
 /**
@@ -36,7 +35,6 @@ import { DRDAResponseType } from '../interfaces/drda-response.interface';
 export class MessageHandlers {
   private connection: Connection;
   private logger = new Logger(MessageHandlers.name);
-  private parser: DRDAParser;
 
   /**
    * Constructs a new MessageHandlers instance.
@@ -45,7 +43,6 @@ export class MessageHandlers {
    */
   constructor(connection: Connection) {
     this.connection = connection;
-    this.parser = new DRDAParser();
   }
 
   /**
@@ -226,6 +223,7 @@ export class MessageHandlers {
     this.connection.setServerVersion(serverVersion);
 
     this.logger.info(`Server Version: ${serverVersion}`);
+    this.connection.resolvePendingResponse(response);
   }
 
   /**

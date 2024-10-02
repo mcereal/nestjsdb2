@@ -139,44 +139,45 @@ export class Connection extends EventEmitter {
    * @param data Incoming data buffer.
    */
   private handleData(data: Buffer): void {
+    // Accumulate incoming data
     this.receiveBuffer = Buffer.concat([this.receiveBuffer, data]);
     this.logger.info(`Accumulated buffer length: ${this.receiveBuffer.length}`);
     this.logger.debug(`Received data chunk: ${data.toString('hex')}`);
 
-    while (this.receiveBuffer.length >= 6) {
-      const length = this.receiveBuffer.readUInt16BE(0);
-      this.logger.info(`Parsed message length: ${length}`);
+    // Process all complete messages in the receive buffer
+    try {
+      let offset = 0;
 
-      if (this.receiveBuffer.length < length) {
-        this.logger.info(`Incomplete message. Waiting for more data...`);
-        break;
-      }
+      while (offset < this.receiveBuffer.length) {
+        // Check if there's enough data to read the header
+        if (this.receiveBuffer.length - offset < 6) {
+          // Not enough data for a header, wait for more data
+          break;
+        }
 
-      const messageBuffer = this.receiveBuffer.slice(0, length);
-      this.logger.debug(
-        `Complete message received: ${messageBuffer.toString('hex')}`,
-      );
-      this.receiveBuffer = this.receiveBuffer.slice(length); // Remove processed message from buffer
+        // Peek at the length of the next message
+        const messageLength = this.receiveBuffer.readUInt16BE(offset);
+        if (this.receiveBuffer.length - offset < messageLength) {
+          // Not enough data for the full message, wait for more data
+          break;
+        }
 
-      try {
-        const header = this.parser.parseHeader(messageBuffer);
-        const correlationId = header.correlationId;
-        const responsePayload = header.payload;
-
-        // Identify and parse the response type
-        const responseType = this.parser.identifyResponseType(responsePayload);
-        const parsedResponse = this.parser.parsePayload(
-          responsePayload,
-          responseType,
+        // Extract the complete message
+        const messageBuffer = this.receiveBuffer.slice(
+          offset,
+          offset + messageLength,
         );
 
-        this.logger.info(
-          `Received DRDA response with correlationId: ${correlationId}`,
+        // Parse the message using parseMessages
+        const parsedResponse = this.parser.parseMessages(
+          messageBuffer,
+          this.messageHandlers,
+          this.correlationId,
         );
 
-        // Use the MessageHandlers to process the parsed message
-        this.messageHandlers.handleMessage(parsedResponse);
-
+        // Handle the pending response
+        const correlationId =
+          parsedResponse.correlationId || this.correlationId;
         const pendingResponse = this.pendingResponses.get(correlationId);
         if (pendingResponse && parsedResponse.success) {
           clearTimeout(pendingResponse.timeout);
@@ -187,26 +188,29 @@ export class Connection extends EventEmitter {
             'No pending response resolver to handle the response.',
           );
         }
-      } catch (err) {
-        this.logger.error('Error decoding DRDA response:', err);
 
-        const correlationId = (err as any).correlationId;
-        if (correlationId !== undefined) {
-          const pendingResponse = this.pendingResponses.get(correlationId);
-          if (pendingResponse) {
-            clearTimeout(pendingResponse.timeout);
-            pendingResponse.reject(err);
-            this.pendingResponses.delete(correlationId);
-          }
-        } else {
-          // If correlationId is not available, reject all pending responses (use with caution)
-          this.pendingResponses.forEach((pendingResponse, cid) => {
-            clearTimeout(pendingResponse.timeout);
-            pendingResponse.reject(err);
-            this.pendingResponses.delete(cid);
-          });
-        }
+        // Move the offset forward
+        offset += messageLength;
       }
+
+      // Remove processed data from the buffer
+      this.receiveBuffer = this.receiveBuffer.slice(offset);
+    } catch (error) {
+      this.logger.error('Error parsing DRDA messages:', error);
+      // Handle error as needed
+    }
+  }
+
+  public resolvePendingResponse(response: DRDAResponseType): void {
+    const correlationId = this.correlationId;
+
+    const pendingResponse = this.pendingResponses.get(correlationId);
+    if (pendingResponse && response.success) {
+      clearTimeout(pendingResponse.timeout);
+      pendingResponse.resolve(response);
+      this.pendingResponses.delete(correlationId);
+    } else {
+      this.logger.warn('No pending response resolver to handle the response.');
     }
   }
 
@@ -1047,6 +1051,7 @@ export class Connection extends EventEmitter {
     const parsedResponse = this.parser.parsePayload(
       payload,
       DRDAMessageTypes.EXCSQLSET,
+      this.correlationId,
     ) as EXCSQLSETResponse;
 
     if (!parsedResponse.success) {

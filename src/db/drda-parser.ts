@@ -14,13 +14,13 @@ import {
   CHNRQSDSSResponse,
   EXCSATRDResponse,
   ACCSECRMResponse,
-  SECCHKResponse,
   ACCRDBResponse,
   EXCSQLSETResponse,
   SECCHKRMResponse,
   EXTNAMResponse,
   SVRCODResponse,
 } from '../interfaces/drda-specific-responses.interface';
+import { MessageHandlers } from './message-handlers';
 
 /**
  * Utility class for parsing DRDA messages.
@@ -69,6 +69,45 @@ export class DRDAParser {
       `Parsed Header: length=${length}, dssFlags=${dssFlags}, dssType=${dssType}, correlationId=${correlationId}`,
     );
     return { length, correlationId, dssFlags, dssType, payload };
+  }
+
+  /**
+   * Parses multiple DRDA messages from the given data buffer.
+   * @param data The buffer containing one or more DRDA messages.
+   * @param messageHandlers An instance of MessageHandlers to handle parsed responses.
+   */
+
+  public parseMessages(
+    data: Buffer,
+    messageHandlers: MessageHandlers,
+    correlationId: number,
+  ): DRDAResponseType {
+    try {
+      const header = this.parseHeader(data);
+      const correlationId = header.correlationId;
+      const responsePayload = header.payload;
+
+      // Identify and parse the response type
+      const responseType = this.identifyResponseType(responsePayload);
+      const parsedResponse = this.parsePayload(
+        responsePayload,
+        responseType,
+        correlationId,
+      );
+
+      this.logger.info(
+        `Received DRDA response with correlationId: ${correlationId}`,
+      );
+
+      // Use the MessageHandlers to process the parsed message
+      messageHandlers.handleMessage(parsedResponse);
+
+      // Return the parsed response
+      return parsedResponse;
+    } catch (error) {
+      this.logger.error('Error parsing DRDA message:', error);
+      throw error; // Let handleData catch and handle it
+    }
   }
 
   /**
@@ -137,6 +176,7 @@ export class DRDAParser {
   parsePayload(
     payload: Buffer,
     responseType: DRDAMessageTypes | 'UNKNOWN',
+    correlationId: number,
   ): DRDAResponseType | null {
     if (responseType === 'UNKNOWN') {
       this.logger.warn('Unknown response type. Cannot parse payload.');
@@ -149,40 +189,47 @@ export class DRDAParser {
       type: responseType,
       payload: payload,
       success: true, // Default to true, modify based on parsed data
+      correlationId: correlationId,
     };
 
     try {
       switch (responseType) {
         case DRDAMessageTypes.CHRNRQSDSS:
-          const chrnqsdssResponse = this.handleCHNRQSDSS(payload);
+          const chrnqsdssResponse = this.handleCHNRQSDSS(
+            payload,
+            correlationId,
+          );
           return chrnqsdssResponse;
 
         case DRDAMessageTypes.EXCSATRD:
-          const excsatrdResponse = this.handleEXCSATRD(payload);
+          const excsatrdResponse = this.handleEXCSATRD(payload, correlationId);
           return excsatrdResponse;
 
         case DRDAMessageTypes.ACCSECRM:
-          const accsecrmResponse = this.handleACCSECRM(payload);
+          const accsecrmResponse = this.handleACCSECRM(payload, correlationId);
           return accsecrmResponse;
 
         case DRDAMessageTypes.SECCHKRM:
-          const secchkrmResponse = this.handleSECCHKRM(payload);
+          const secchkrmResponse = this.handleSECCHKRM(payload, correlationId);
           return secchkrmResponse;
 
         case DRDAMessageTypes.ACCRDBRM:
-          const accrdbrmResponse = this.handleACCRDBRM(payload);
+          const accrdbrmResponse = this.handleACCRDBRM(payload, correlationId);
           return accrdbrmResponse;
 
         case DRDAMessageTypes.EXCSQLSET:
-          const excsqlsetResponse = this.handleEXCSQLSET(payload);
+          const excsqlsetResponse = this.handleEXCSQLSET(
+            payload,
+            correlationId,
+          );
           return excsqlsetResponse;
 
         case DRDAMessageTypes.EXTNAM:
-          const extnamResponse = this.handleEXTNAM(payload);
+          const extnamResponse = this.handleEXTNAM(payload, correlationId);
           return extnamResponse;
 
         case DRDAMessageTypes.SVRCOD:
-          const svrcodResponse = this.extractSVRCOD(payload);
+          const svrcodResponse = this.extractSVRCOD(payload, correlationId);
           return svrcodResponse;
 
         default:
@@ -254,7 +301,7 @@ export class DRDAParser {
    * @param payload The payload buffer.
    * @returns The server code as a number.
    */
-  private extractSVRCOD(payload: Buffer): SVRCODResponse {
+  private extractSVRCOD(payload: Buffer, correlationId): SVRCODResponse {
     let offset = 0;
     while (offset + 4 <= payload.length) {
       const paramLength = payload.readUInt16BE(offset);
@@ -272,6 +319,7 @@ export class DRDAParser {
           type: DRDAMessageTypes.SVRCOD,
           length: paramData.length,
           payload: paramData,
+          correlationId: correlationId,
           success,
         };
       }
@@ -282,7 +330,10 @@ export class DRDAParser {
     throw new Error('SVRCOD parameter not found in payload');
   }
 
-  private handleCHNRQSDSS(data: Buffer): CHNRQSDSSResponse {
+  private handleCHNRQSDSS(
+    data: Buffer,
+    correlationId: number,
+  ): CHNRQSDSSResponse {
     let offset = 0;
     const chrnqsdssResponse: CHNRQSDSSResponse = {
       length: data.length,
@@ -294,6 +345,7 @@ export class DRDAParser {
       parameters: {
         svrcod: 0,
       },
+      correlationId: correlationId,
     };
 
     while (offset + 4 <= data.length) {
@@ -311,14 +363,14 @@ export class DRDAParser {
           });
           break;
         case DRDACodePoints.EXTNAM:
-          const extnam = this.handleEXTNAM(paramData);
+          const extnam = this.handleEXTNAM(paramData, correlationId);
           chrnqsdssResponse.chainedData.push({
             codePoint: DRDACodePoints.EXTNAM,
             data: Buffer.from(extnam.parameters.extnam, 'utf8'),
           });
           break;
         case DRDACodePoints.ODBC_ERROR:
-          const svrcod = this.extractSVRCOD(paramData);
+          const svrcod = this.extractSVRCOD(paramData, correlationId);
           chrnqsdssResponse.chainedData.push({
             codePoint: DRDACodePoints.ODBC_ERROR,
             data: Buffer.from(svrcod.toString()),
@@ -342,7 +394,10 @@ export class DRDAParser {
    * @param data The data buffer containing the response.
    * @returns EXCSATRDResponse object.
    */
-  private handleEXCSATRD(data: Buffer): EXCSATRDResponse {
+  private handleEXCSATRD(
+    data: Buffer,
+    correlationId: number,
+  ): EXCSATRDResponse {
     let offset = 0;
     const parameters = {
       serverPublicKey: Buffer.alloc(0),
@@ -409,6 +464,7 @@ export class DRDAParser {
       length: data.length,
       payload: data,
       success: true,
+      correlationId: correlationId,
       parameters,
     };
   }
@@ -420,7 +476,10 @@ export class DRDAParser {
    */
   // DRDAParser.ts
 
-  private handleACCSECRM(data: Buffer): ACCSECRMResponse {
+  private handleACCSECRM(
+    data: Buffer,
+    correlationId: number,
+  ): ACCSECRMResponse {
     let offset = 0;
     const accsecrmResponse: ACCSECRMResponse = {
       length: data.length,
@@ -431,6 +490,7 @@ export class DRDAParser {
         svrcod: 0,
         message: [],
       },
+      correlationId: correlationId,
     };
 
     while (offset + 4 <= data.length) {
@@ -441,7 +501,7 @@ export class DRDAParser {
 
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
-          const svrcod = this.extractSVRCOD(paramData);
+          const svrcod = this.extractSVRCOD(paramData, correlationId);
           accsecrmResponse.success = svrcod.parameters.svrcod === 0;
           accsecrmResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
@@ -469,7 +529,10 @@ export class DRDAParser {
    * @param data The data buffer containing the response.
    * @returns SECCHKRMResponse object.
    */
-  private handleSECCHKRM(data: Buffer): SECCHKRMResponse {
+  private handleSECCHKRM(
+    data: Buffer,
+    correlationId: number,
+  ): SECCHKRMResponse {
     let offset = 0;
     const secchkrmResponse: SECCHKRMResponse = {
       length: data.length,
@@ -479,6 +542,7 @@ export class DRDAParser {
       parameters: {
         svrcod: 0,
       },
+      correlationId: correlationId,
     };
 
     while (offset + 4 <= data.length) {
@@ -489,7 +553,7 @@ export class DRDAParser {
 
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
-          const svrcod = this.extractSVRCOD(paramData);
+          const svrcod = this.extractSVRCOD(paramData, correlationId);
           secchkrmResponse.success = svrcod.parameters.svrcod === 0;
           secchkrmResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
@@ -514,7 +578,7 @@ export class DRDAParser {
    * @param data The data buffer containing the response.
    * @returns ACCRDBResponse object.
    */
-  private handleACCRDBRM(data: Buffer): ACCRDBResponse {
+  private handleACCRDBRM(data: Buffer, correlationId: number): ACCRDBResponse {
     let offset = 0;
     const accrdbResponse: ACCRDBResponse = {
       length: data.length,
@@ -525,6 +589,7 @@ export class DRDAParser {
         messages: [],
         svrcod: 0,
       },
+      correlationId: correlationId,
     };
 
     while (offset + 4 <= data.length) {
@@ -535,7 +600,7 @@ export class DRDAParser {
 
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
-          const svrcod = this.extractSVRCOD(paramData);
+          const svrcod = this.extractSVRCOD(paramData, correlationId);
           accrdbResponse.success = svrcod.parameters.svrcod === 0;
           accrdbResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
@@ -560,7 +625,10 @@ export class DRDAParser {
    * @param data The data buffer containing the response.
    * @returns EXCSQLSETResponse object.
    */
-  private handleEXCSQLSET(data: Buffer): EXCSQLSETResponse {
+  private handleEXCSQLSET(
+    data: Buffer,
+    correlationId: number,
+  ): EXCSQLSETResponse {
     let offset = 0;
     const excsqlsetResponse: EXCSQLSETResponse = {
       length: data.length,
@@ -572,6 +640,7 @@ export class DRDAParser {
         svrcod: 0,
       },
       result: [],
+      correlationId: correlationId,
     };
 
     while (offset + 4 <= data.length) {
@@ -582,7 +651,7 @@ export class DRDAParser {
 
       switch (paramCodePoint) {
         case DRDACodePoints.SVRCOD:
-          const svrcod = this.extractSVRCOD(paramData);
+          const svrcod = this.extractSVRCOD(paramData, correlationId);
           excsqlsetResponse.success = svrcod.parameters.svrcod === 0;
           excsqlsetResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
@@ -702,7 +771,7 @@ export class DRDAParser {
    * @returns The parsed external name as a string.
    * @throws Error if the EXTNAM parameter is not valid.
    */
-  private handleEXTNAM(data: Buffer): EXTNAMResponse {
+  private handleEXTNAM(data: Buffer, correlationId: number): EXTNAMResponse {
     let offset = 0;
     const parameters = {
       svrcod: 0,
@@ -778,6 +847,7 @@ export class DRDAParser {
       payload: data,
       success,
       parameters,
+      correlationId: correlationId,
     };
   }
 
