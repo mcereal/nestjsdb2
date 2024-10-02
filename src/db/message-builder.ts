@@ -84,24 +84,24 @@ export class MessageBuilder {
     const mgrlvllsData = Buffer.alloc(4 * 4); // Adjusting for only 4 managers, 4 bytes each (code point + level)
     let offset = 0;
 
-    // AGENT Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
+    // AGENT Manager Level 4
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0004, offset + 2); // Level
     offset += 4;
 
-    // // SQLAM Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
-    mgrlvllsData.writeUInt16BE(0x04, offset + 2); // Level for SQLAM Manager (Version 4)
+    // SQLAM Manager Level 7
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level
     offset += 4;
 
-    // RDB Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
-    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for RDB Manager (Version 7)
+    // RDB Manager Level 5
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
     offset += 4;
 
-    // // SECMGR Manager
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset);
-    mgrlvllsData.writeUInt16BE(0x03, offset + 2); // Level for Security Manager (Version 3)
+    // SECMGR Manager Level 5
+    mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset); // Code Point
+    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
     offset += 4;
 
     const mgrlvllsParameter = this.constructParameter(
