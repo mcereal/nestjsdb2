@@ -1,3 +1,10 @@
+# [1.3.0-drda.33](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.32...v1.3.0-drda.33) (2024-10-02)
+
+
+### Bug Fixes
+
+* handleEXCSATRD ([a56f70f](https://github.com/mcereal/nestjsdb2/commit/a56f70f3c4ad51df152a94e4803cd4e4cda04bf0))
+
 # [1.3.0-drda.32](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.31...v1.3.0-drda.32) (2024-10-02)
 
 
