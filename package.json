@@ -1,6 +1,6 @@
 {
   "name": "@mcereal/nestjsdb2",
-  "version": "1.3.0-drda.26",
+  "version": "1.3.0-drda.27",
   "description": "NestJS module for interacting with IBM DB2 databases",
   "author": "Michael Curtis <mpbcurtis@gmail.com>",
   "readme": "README.md",
