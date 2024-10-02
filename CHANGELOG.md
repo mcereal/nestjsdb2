@@ -1,3 +1,10 @@
+# [1.3.0-drda.12](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.11...v1.3.0-drda.12) (2024-10-02)
+
+
+### Bug Fixes
+
+* certificate verification fix ([1058674](https://github.com/mcereal/nestjsdb2/commit/105867419aaf661febdeceac2a101bc2ebfc15f8))
+
 # [1.3.0-drda.11](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.10...v1.3.0-drda.11) (2024-10-02)
 
 
