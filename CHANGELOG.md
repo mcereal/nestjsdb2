@@ -1,3 +1,11 @@
+# [1.3.0-drda.15](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.14...v1.3.0-drda.15) (2024-10-02)
+
+
+### Bug Fixes
+
+* correlation id handling ([92d8eae](https://github.com/mcereal/nestjsdb2/commit/92d8eae44ce96b91baba8d3ed043529593cc2d80))
+* pass correlation id to prepared statement ([15b47cd](https://github.com/mcereal/nestjsdb2/commit/15b47cded7f21dda87a980d6c26bbe937188f0f5))
+
 # [1.3.0-drda.14](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.13...v1.3.0-drda.14) (2024-10-02)
 
 
