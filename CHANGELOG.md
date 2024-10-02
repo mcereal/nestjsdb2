@@ -1,3 +1,10 @@
+# [1.3.0-drda.43](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.42...v1.3.0-drda.43) (2024-10-02)
+
+
+### Bug Fixes
+
+* refactor mgrlvls ([f13bc03](https://github.com/mcereal/nestjsdb2/commit/f13bc039d57599ab548f7149fd630827327a2f35))
+
 # [1.3.0-drda.42](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.41...v1.3.0-drda.42) (2024-10-02)
 
 
