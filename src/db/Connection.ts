@@ -329,7 +329,6 @@ export class Connection extends EventEmitter {
     this.correlationId++;
     const secchkMessage = this.messageBuilder.constructSECCHKMessage(
       this.userId,
-      this.serverPublicKey,
       this.password,
       this.correlationId,
     );

@@ -204,33 +204,24 @@ export class MessageBuilder {
    */
   public constructSECCHKMessage(
     userId: string,
-    serverPublicKey: Buffer | null = null,
     password: string,
     correlationId: number,
   ): Buffer {
     const parameters: Buffer[] = [];
 
-    // SECMEC (Security Mechanism)
+    // SECMEC (Security Mechanism) - Set to USRIDPWD (0x03)
     const secmecData = Buffer.alloc(2);
     secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
     parameters.push(this.constructParameter(DRDACodePoints.SECMEC, secmecData));
 
-    // USRID (User ID)
-    const userIdData = Buffer.from(userId, 'utf8');
+    // USRID (User ID) - Add null terminator if required
+    const userIdData = Buffer.from(userId + '\0', 'utf8');
     parameters.push(this.constructParameter(DRDACodePoints.USRID, userIdData));
 
-    // PASSWORD (encrypted)
-    if (!serverPublicKey) {
-      throw new Error('Server public key is missing for encryption');
-    }
-
-    const encryptedPassword = publicEncrypt(
-      { key: serverPublicKey, padding: constants.RSA_PKCS1_PADDING },
-      Buffer.from(password, 'utf8'),
-    );
-
+    // PASSWORD (Unencrypted) - Add null terminator if required
+    const passwordData = Buffer.from(password + '\0', 'utf8');
     parameters.push(
-      this.constructParameter(DRDACodePoints.PASSWORD, encryptedPassword),
+      this.constructParameter(DRDACodePoints.PASSWORD, passwordData),
     );
 
     const parametersBuffer = Buffer.concat(parameters);
