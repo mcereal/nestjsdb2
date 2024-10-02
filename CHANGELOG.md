@@ -1,3 +1,10 @@
+# [1.3.0-drda.36](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.35...v1.3.0-drda.36) (2024-10-02)
+
+
+### Bug Fixes
+
+* test agent mgrlvl ([2a33d84](https://github.com/mcereal/nestjsdb2/commit/2a33d8466bb9c8f5c96695c3be67cfb071d2acac))
+
 # [1.3.0-drda.35](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.34...v1.3.0-drda.35) (2024-10-02)
 
 
