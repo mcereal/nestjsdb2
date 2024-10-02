@@ -24,6 +24,13 @@ import { BigInteger } from './BigInteger';
 import { RSAKey } from './RSAKey';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { MessageHandlers } from './message-handlers';
+
+interface PendingResponse {
+  resolve: (response: DRDAResponseType) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+}
 
 /**
  * Connection class responsible for managing DRDA protocol communication with DB2.
@@ -45,13 +52,14 @@ export class Connection extends EventEmitter {
   private receiveBuffer: Buffer = Buffer.alloc(0);
   private sslCertificatePath: string | null = null;
 
-  // Inside your Connection class
+  private pendingResponses: Map<number, PendingResponse> = new Map();
   private responseResolvers: Map<number, (response: DRDAResponseType) => void> =
     new Map();
   private responseRejectors: Map<number, (error: Error) => void> = new Map();
 
   private readonly logger = new Logger(Connection.name);
   private messageBuilder: MessageBuilder;
+  private messageHandlers: MessageHandlers;
   private parser: DRDAParser;
 
   private rsaKey: RSAKey;
@@ -66,6 +74,7 @@ export class Connection extends EventEmitter {
     this.connectionTimeout = timeout || 10000;
     this.logger = new Logger(Connection.name);
     this.messageBuilder = new MessageBuilder();
+    this.messageHandlers = new MessageHandlers(this);
     this.parser = new DRDAParser();
     this.parseConnectionString();
   }
@@ -138,7 +147,6 @@ export class Connection extends EventEmitter {
     this.logger.debug(`Received data chunk: ${data.toString('hex')}`);
 
     while (this.receiveBuffer.length >= 6) {
-      // Minimum header size
       const length = this.receiveBuffer.readUInt16BE(0);
       this.logger.info(`Parsed message length: ${length}`);
 
@@ -169,11 +177,14 @@ export class Connection extends EventEmitter {
           `Received DRDA response with correlationId: ${correlationId}`,
         );
 
-        const resolve = this.responseResolvers.get(correlationId);
-        if (resolve) {
-          resolve(parsedResponse);
-          this.responseResolvers.delete(correlationId);
-          this.responseRejectors.delete(correlationId);
+        // Use the MessageHandlers to process the parsed message
+        this.messageHandlers.handleMessage(parsedResponse);
+
+        const pendingResponse = this.pendingResponses.get(correlationId);
+        if (pendingResponse) {
+          clearTimeout(pendingResponse.timeout);
+          pendingResponse.resolve(parsedResponse);
+          this.pendingResponses.delete(correlationId);
         } else {
           this.logger.warn(
             'No pending response resolver to handle the response.',
@@ -181,6 +192,16 @@ export class Connection extends EventEmitter {
         }
       } catch (err) {
         this.logger.error('Error decoding DRDA response:', err);
+
+        const correlationId = (err as any).correlationId;
+        if (correlationId !== undefined) {
+          const pendingResponse = this.pendingResponses.get(correlationId);
+          if (pendingResponse) {
+            clearTimeout(pendingResponse.timeout);
+            pendingResponse.reject(err);
+            this.pendingResponses.delete(correlationId);
+          }
+        }
       }
     }
   }
@@ -662,8 +683,11 @@ export class Connection extends EventEmitter {
         this.responseRejectors.delete(correlationId);
       }, 40000); // 40 seconds timeout
 
-      // Cleanup on resolve or reject
-      clearTimeout(responseTimeout);
+      this.pendingResponses.set(correlationId, {
+        resolve,
+        reject,
+        timeout: responseTimeout,
+      });
     });
   }
 

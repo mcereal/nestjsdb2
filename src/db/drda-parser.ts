@@ -57,7 +57,9 @@ export class DRDAParser {
     }
 
     if (data.length < length) {
-      throw new Error('Incomplete DRDA message received.');
+      const error = new Error('Incomplete DRDA message received.');
+      (error as any).correlationId = correlationId;
+      throw error;
     }
 
     const payload = data.slice(headerLength, length);

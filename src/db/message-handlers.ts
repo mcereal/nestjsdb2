@@ -15,6 +15,7 @@ import {
   DRDAMessageTypes,
 } from '../enums/drda-codepoints.enum';
 import { DRDAParser } from './drda-parser';
+import { DRDAResponseType } from '../interfaces/drda-response.interface';
 
 /**
  * Class for handling parsed DRDA message responses.
@@ -47,32 +48,18 @@ export class MessageHandlers {
   }
 
   /**
-   * Handles incoming DRDA messages by parsing and dispatching to specific handlers.
-   * @param {Buffer} data - The data buffer containing the DRDA message.
+   * Handles incoming DRDA messages by dispatching to specific handlers.
+   * @param {DRDAResponseType} parsedResponse - The parsed DRDA response object.
    * @returns {void}
    * @public
    * @method
    * @instance
    * @memberof MessageHandlers
    * @example
-   * handlers.handleMessage(data);
+   * handlers.handleMessage(parsedResponse);
    */
-  public handleMessage(data: Buffer): void {
+  public handleMessage(parsedResponse: DRDAResponseType): void {
     try {
-      // Parse the DRDA message header
-      const header = this.parser.parseHeader(data);
-      this.logger.debug(`Parsed Header: ${JSON.stringify(header)}`);
-
-      // Identify the response type based on the payload
-      const responseType = this.parser.identifyResponseType(header.payload);
-      this.logger.debug(`Identified Response Type: ${responseType}`);
-
-      // Parse the payload based on the identified response type
-      const parsedResponse = this.parser.parsePayload(
-        header.payload,
-        responseType,
-      );
-
       if (!parsedResponse) {
         this.logger.warn('Parsed response is null. Skipping handling.');
         return;
