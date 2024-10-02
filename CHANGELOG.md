@@ -1,3 +1,10 @@
+# [1.3.0-drda.30](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.29...v1.3.0-drda.30) (2024-10-02)
+
+
+### Bug Fixes
+
+* handle more codepoints ([d282e3d](https://github.com/mcereal/nestjsdb2/commit/d282e3d9683586b0927e12a8d825c8def9b08883))
+
 # [1.3.0-drda.29](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.28...v1.3.0-drda.29) (2024-10-02)
 
 
