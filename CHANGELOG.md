@@ -1,3 +1,10 @@
+# [1.3.0-drda.14](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.13...v1.3.0-drda.14) (2024-10-02)
+
+
+### Bug Fixes
+
+* timeout during authentication ([b60d93e](https://github.com/mcereal/nestjsdb2/commit/b60d93ec476a682541583792926f21969f40468a))
+
 # [1.3.0-drda.13](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.12...v1.3.0-drda.13) (2024-10-02)
 
 
