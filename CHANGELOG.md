@@ -1,3 +1,10 @@
+# [1.3.0-drda.20](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.19...v1.3.0-drda.20) (2024-10-02)
+
+
+### Bug Fixes
+
+* add listeners on retry ([130dea5](https://github.com/mcereal/nestjsdb2/commit/130dea566fd11310546913c8332cf03022a77da7))
+
 # [1.3.0-drda.19](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.18...v1.3.0-drda.19) (2024-10-02)
 
 
