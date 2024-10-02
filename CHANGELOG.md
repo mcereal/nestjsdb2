@@ -1,3 +1,10 @@
+# [1.3.0-drda.29](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.28...v1.3.0-drda.29) (2024-10-02)
+
+
+### Bug Fixes
+
+* handleEXTNAM ([a8b2ccf](https://github.com/mcereal/nestjsdb2/commit/a8b2ccf266dd56fb7f9f7596f4505570054a13ad))
+
 # [1.3.0-drda.28](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.27...v1.3.0-drda.28) (2024-10-02)
 
 
