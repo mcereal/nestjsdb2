@@ -1,3 +1,10 @@
+# [1.3.0-drda.16](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.15...v1.3.0-drda.16) (2024-10-02)
+
+
+### Bug Fixes
+
+* logger instantiation issue ([5dfe4e3](https://github.com/mcereal/nestjsdb2/commit/5dfe4e3cf19d33c2153de1312a6e06c50a6af99a))
+
 # [1.3.0-drda.15](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.14...v1.3.0-drda.15) (2024-10-02)
 
 
