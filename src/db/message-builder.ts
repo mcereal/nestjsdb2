@@ -42,7 +42,7 @@ export class MessageBuilder {
 
     // SECMEC (Security Mechanism)
     const secmecData = Buffer.alloc(2);
-    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_USRIDPWD, 0);
+    secmecData.writeUInt16BE(DRDACodePoints.SECMEC_EUSRIDPWD, 0);
     parameters.push(this.constructParameter(DRDACodePoints.SECMEC, secmecData));
 
     // RDBNAM (Relational Database Name)

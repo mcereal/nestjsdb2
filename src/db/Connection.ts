@@ -280,8 +280,9 @@ export class Connection extends EventEmitter {
       (param) => param.codePoint === DRDACodePoints.EXCSATRD,
     );
     if (excsatrd) {
-      this.setServerPublicKey(excsatrd.data);
-      this.logger.info('Server public key acquired.');
+      const pemKey = this.extractServerPublicKey(excsatrd.data);
+      this.setServerPublicKey(Buffer.from(pemKey, 'utf8'));
+      this.logger.info('Server public key acquired and formatted.');
     } else {
       this.logger.warn('EXCSATRD not found in CHNRQSDSS response.');
     }
@@ -645,8 +646,8 @@ export class Connection extends EventEmitter {
         this.logger.error(errorMessage);
         reject(new Error(errorMessage));
         // Remove the resolver and rejector to prevent memory leaks
-        this.responseResolvers.pop();
-        this.responseRejectors.pop();
+        this.responseResolvers.shift();
+        this.responseRejectors.shift();
       }, 40000); // 40 seconds timeout
 
       // Cleanup on resolve or reject
