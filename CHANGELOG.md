@@ -1,3 +1,10 @@
+# [1.3.0-drda.32](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.31...v1.3.0-drda.32) (2024-10-02)
+
+
+### Bug Fixes
+
+* additional codepoints in extnam ([9555ec3](https://github.com/mcereal/nestjsdb2/commit/9555ec3d7c4a5484b7bc5f4db94b7605df1dbb38))
+
 # [1.3.0-drda.31](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.30...v1.3.0-drda.31) (2024-10-02)
 
 
