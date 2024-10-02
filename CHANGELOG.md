@@ -1,3 +1,10 @@
+# [1.3.0-drda.25](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.24...v1.3.0-drda.25) (2024-10-02)
+
+
+### Bug Fixes
+
+* adjust public key retreival ([dc869e4](https://github.com/mcereal/nestjsdb2/commit/dc869e49c729e9855d9fd63345f89ac5ade9da4f))
+
 # [1.3.0-drda.24](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.23...v1.3.0-drda.24) (2024-10-02)
 
 
