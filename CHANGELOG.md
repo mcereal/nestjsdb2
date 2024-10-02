@@ -1,3 +1,10 @@
+# [1.3.0-drda.10](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.9...v1.3.0-drda.10) (2024-10-02)
+
+
+### Bug Fixes
+
+* pathing ([00b814c](https://github.com/mcereal/nestjsdb2/commit/00b814ce5df463bdc7da6646a1f0882eaa6facbc))
+
 # [1.3.0-drda.9](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.8...v1.3.0-drda.9) (2024-10-02)
 
 
