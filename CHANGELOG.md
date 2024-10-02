@@ -1,3 +1,10 @@
+# [1.3.0-drda.17](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.16...v1.3.0-drda.17) (2024-10-02)
+
+
+### Bug Fixes
+
+* different codepoint for SRVRLSLV ([73b5c11](https://github.com/mcereal/nestjsdb2/commit/73b5c11b89b09e32f7980340fb13cc6bcd86f882))
+
 # [1.3.0-drda.16](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.15...v1.3.0-drda.16) (2024-10-02)
 
 
