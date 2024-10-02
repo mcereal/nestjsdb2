@@ -878,7 +878,7 @@ export class Connection extends EventEmitter {
     await this.send(prepareMessage);
     const response = await this.receiveResponse(this.correlationId);
 
-    if (response.type !== DRDAMessageTypes.EXCSQLPREPRM) {
+    if (!response.success) {
       throw new Error(
         `Unexpected response type during prepare: ${response.type}`,
       );
