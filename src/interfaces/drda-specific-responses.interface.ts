@@ -46,6 +46,17 @@ export interface EXCSQLSETResponse extends BaseDRDAResponse {
 }
 
 /**
+ * Response for EXTNAMResponse (Extended Name Response)
+ */
+export interface EXTNAMResponse extends BaseDRDAResponse {
+  type: DRDAMessageTypes.EXTNAM;
+  parameters: {
+    svrcod: number; // Server code indicating success or error
+    message: string[]; // Optional message from the server
+  };
+}
+
+/**
  * Response for SECCHKRM (Security Check Response Message)
  */
 export interface SECCHKResponse extends BaseDRDAResponse {

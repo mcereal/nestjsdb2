@@ -7,6 +7,7 @@ import {
   ACCSECRMResponse,
   SECCHKRMResponse,
   EXCSQLSETResponse,
+  EXTNAMResponse,
 } from '../interfaces/drda-specific-responses.interface';
 import { Connection } from './Connection';
 import { Logger } from '../utils/logger';
@@ -87,13 +88,44 @@ export class MessageHandlers {
         case DRDAMessageTypes.EXCSQLSET:
           this.handleEXCSQLSET(parsedResponse as EXCSQLSETResponse);
           break;
-        // Add cases for other message types as needed
+        case DRDAMessageTypes.EXTNAM:
+          this.handleEXTNAM(parsedResponse as EXTNAMResponse);
+        case DRDAMessageTypes.SVRCOD:
+          this.logger.info(`Server returned error code: ${parsedResponse}`);
+          break;
         default:
           this.logger.warn(`Unhandled response type: ${parsedResponse.type}`);
       }
     } catch (error) {
       this.logger.error('Error handling message:', error);
     }
+  }
+
+  /**
+   * Handles the EXTNAM (Extended Name Response) response.
+   * @param {EXTNAMResponse} response - The parsed EXTNAM response.
+   * @returns {void}
+   * @private
+   * @method
+   * @instance
+   * @memberof MessageHandlers
+   * @example
+   * this.handleEXTNAM(parsedResponse as EXTNAMResponse);
+   */
+  private handleEXTNAM(response: EXTNAMResponse): void {
+    this.logger.info('Handling EXTNAM response.');
+
+    // Check for success or errors
+    if (!response.success) {
+      throw new Error(
+        `EXTNAM response indicates failure with code: ${response.parameters.svrcod}`,
+      );
+    }
+
+    // Log messages from server
+    response.parameters.message.forEach((message) => {
+      this.logger.info(`EXTNAM Message: ${message}`);
+    });
   }
 
   /**
