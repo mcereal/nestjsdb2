@@ -91,7 +91,9 @@ export class MessageHandlers {
         case DRDAMessageTypes.EXTNAM:
           this.handleEXTNAM(parsedResponse as EXTNAMResponse);
         case DRDAMessageTypes.SVRCOD:
-          this.logger.info(`Server returned error code: ${parsedResponse}`);
+          this.logger.info(
+            `Server returned error code: ${JSON.stringify(parsedResponse)}`,
+          );
           break;
         default:
           this.logger.warn(`Unhandled response type: ${parsedResponse.type}`);
@@ -235,23 +237,39 @@ export class MessageHandlers {
    * @instance
    * @memberof MessageHandlers
    */
+  // MessageHandlers.ts
+
   private handleACCSECRM(response: ACCSECRMResponse): void {
     this.logger.info('Handling ACCSECRM response.');
 
     if (response.success) {
       this.logger.info('ACCSECRM indicates success.');
-      // Implement success handling logic, e.g., security check passed
-      this.connection.setSecurityChecked(true);
-    } else {
-      this.logger.error('ACCSECRM indicates failure.');
-      // Implement failure handling logic, e.g., invalid credentials
-      this.connection.handleError(response.parameters.svrcod);
-    }
 
-    // Log messages from server
-    response.parameters.message.forEach((message) => {
-      this.logger.info(`ACCSECRM Message: ${message}`);
-    });
+      // Check if the server public key is provided
+      if (response.parameters.serverPublicKey) {
+        this.connection.setServerPublicKey(response.parameters.serverPublicKey);
+        this.logger.info('Server public key acquired from ACCSECRM response.');
+      }
+
+      if (response.parameters.serverVersion) {
+        this.connection.setServerVersion(response.parameters.serverVersion);
+        this.logger.info(
+          `Server Version: ${response.parameters.serverVersion}`,
+        );
+
+        // Implement success handling logic, e.g., security check passed
+        this.connection.setSecurityChecked(true);
+      } else {
+        this.logger.error('ACCSECRM indicates failure.');
+        // Implement failure handling logic, e.g., invalid credentials
+        this.connection.handleError(response.parameters.svrcod);
+      }
+
+      // Log messages from server
+      response.parameters.message.forEach((message) => {
+        this.logger.info(`ACCSECRM Message: ${message}`);
+      });
+    }
   }
 
   /**

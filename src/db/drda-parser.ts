@@ -370,16 +370,20 @@ export class DRDAParser {
    * @param data The data buffer containing the response.
    * @returns ACCSECRMResponse object.
    */
+  // DRDAParser.ts
+
   private handleACCSECRM(data: Buffer): ACCSECRMResponse {
     let offset = 0;
     const accsecrmResponse: ACCSECRMResponse = {
       length: data.length,
       type: DRDAMessageTypes.ACCSECRM,
       payload: data,
-      success: true, // Initialize as true, modify based on parameters
+      success: true,
       parameters: {
-        svrcod: 0, // Initialize with an appropriate default value
-        message: [], // Initialize with an empty array or appropriate default value
+        svrcod: 0,
+        message: [],
+        serverPublicKey: null, // Add this line
+        serverVersion: '', // Add this line
       },
     };
 
@@ -395,11 +399,20 @@ export class DRDAParser {
           accsecrmResponse.success = svrcod.parameters.svrcod === 0;
           accsecrmResponse.parameters.svrcod = svrcod.parameters.svrcod;
           break;
+        case DRDACodePoints.SECMEC:
+          // Handle security mechanism if needed
+          break;
+        case DRDACodePoints.SECURITY_TOKEN:
+          // Handle security token if needed
+          break;
+        case DRDACodePoints.SERVER_KEY:
+          const serverKey = this.extractServerPublicKey(paramData);
+          accsecrmResponse.parameters.serverPublicKey = serverKey;
+          break;
         case DRDACodePoints.MSG_TEXT:
           const message = this.parseMessageText(paramData);
           accsecrmResponse.parameters.message.push(message);
           break;
-        // Handle other code points as needed
         default:
           this.logger.warn(
             `Unknown ACCSECRM parameter code point: 0x${paramCodePoint.toString(16)}`,

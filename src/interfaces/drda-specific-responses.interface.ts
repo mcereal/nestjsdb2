@@ -89,6 +89,8 @@ export interface ACCSECRMResponse extends BaseDRDAResponse {
   parameters: {
     svrcod: number; // Server code indicating success or error
     message?: string[]; // Optional messages from the server
+    serverPublicKey: Buffer; // Server's public key for encryption
+    serverVersion: string; // Server version
   };
 }
 

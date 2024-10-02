@@ -10,10 +10,7 @@ import { Logger } from '../utils';
 import { EventEmitter } from 'events';
 import {
   ACCRDBResponse,
-  ACCSECRMResponse,
-  CHNRQSDSSResponse,
   EXCSQLSETResponse,
-  SECCHKRMResponse,
 } from '../interfaces/drda-specific-responses.interface';
 import { DRDAResponseType } from '../interfaces/drda-response.interface';
 import { Row } from '../interfaces/row.interface';
@@ -306,6 +303,8 @@ export class Connection extends EventEmitter {
   /**
    * Sends the ACCSEC message as the second step of authentication.
    */
+  // Connection.ts
+
   private async sendACCSEC(): Promise<void> {
     this.correlationId++;
     const accsecMessage = this.messageBuilder.constructACCSECMessage(
@@ -318,6 +317,13 @@ export class Connection extends EventEmitter {
 
     if (!response.success) {
       throw new Error(`ACCSEC failed with response type: ${response.type}`);
+    }
+
+    // Ensure serverPublicKey is set
+    if (!this.serverPublicKey) {
+      throw new Error(
+        'Server public key was not received in ACCSECRM response.',
+      );
     }
 
     this.logger.info('ACCSEC message processed successfully.');
