@@ -23,6 +23,7 @@ import { DRDAParser } from './drda-parser';
 import { BigInteger } from './BigInteger';
 import { RSAKey } from './RSAKey';
 import { readFileSync } from 'fs';
+import path from 'path';
 
 /**
  * Connection class responsible for managing DRDA protocol communication with DB2.
@@ -470,6 +471,7 @@ export class Connection extends EventEmitter {
    * Attempts to establish a connection with the DB2 server, retrying on failure.
    * @param retries Number of retry attempts.
    */
+
   private async retryConnection(retries = 3): Promise<void> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -494,19 +496,31 @@ export class Connection extends EventEmitter {
 
           if (this.useSSL) {
             this.logger.info('Using SSL for connection');
-            const tlsOptions = {
+            const tlsOptions: any = {
               port: this.port,
               host: this.hostName,
               rejectUnauthorized: false,
               timeout: this.connectionTimeout,
             };
 
-            // Use the SSL certificate if provided
+            // Construct the full path to the SSL certificate
             if (this.sslCertificatePath) {
-              tlsOptions['ca'] = [readFileSync(this.sslCertificatePath)];
-              this.logger.info(
-                `Using SSL certificate at: ${this.sslCertificatePath}`,
-              );
+              try {
+                const certPath = path.resolve(
+                  __dirname,
+                  '../../..',
+                  this.sslCertificatePath,
+                );
+                tlsOptions['ca'] = [readFileSync(certPath)];
+                this.logger.info(`Using SSL certificate at: ${certPath}`);
+              } catch (fileError) {
+                this.logger.error(
+                  `Failed to read SSL certificate at: ${this.sslCertificatePath}`,
+                  fileError,
+                );
+                reject(fileError);
+                return;
+              }
             }
 
             this.socket = tlsConnect(tlsOptions, async () => {

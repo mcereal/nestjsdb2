@@ -15,9 +15,9 @@ export default registerAs(
       authType: process.env.DB2_AUTH_TYPE as Db2AuthType,
       username: process.env.DB2_UID || 'defaultUsername',
       password: process.env.DB2_PWD || 'defaultPassword',
+      useTls: process.env.DB2_USE_TLS === 'true',
+      sslCertificatePath: process.env.DB2_SSL_CERT_PATH,
     },
-    useTls: process.env.DB2_USE_TLS === 'true',
-    sslCertificatePath: process.env.DB2_SSL_CERT_PATH,
     retry: {
       maxReconnectAttempts: parseInt(
         process.env.DB2_MAX_RECONNECT_ATTEMPTS || '3',

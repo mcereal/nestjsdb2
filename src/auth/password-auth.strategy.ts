@@ -53,9 +53,6 @@ export class PasswordAuthStrategy extends AuthStrategy {
       }
     }
 
-    this.logger.info(`Use tls: ${useTls}`);
-    this.logger.info(`SSL certificate path: ${sslCertificatePath}`);
-    this.logger.info(`Connection string: ${connectionString}`);
     return connectionString;
   }
 }
