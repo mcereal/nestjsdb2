@@ -84,30 +84,34 @@ export class MessageBuilder {
    * @returns The constructed MGRLVLLS buffer.
    */
   private constructMgrlvlls(): Buffer {
-    const mgrlvllsData = Buffer.alloc(16); // 4 managers * 4 bytes each
+    const mgrlvllsData = Buffer.alloc(4 * 4); // Adjusting for only 4 managers, 4 bytes each (code point + level)
     let offset = 0;
 
     // AGENT Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset);
-    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level 7
+    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for AGENT Manager (Version 7)
     offset += 4;
 
     // SQLAM Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset);
-    mgrlvllsData.writeUInt16BE(0x0009, offset + 2); // Level 9 (for DB2 11.5)
+    mgrlvllsData.writeUInt16BE(0x04, offset + 2); // Level for SQLAM Manager (Version 4)
     offset += 4;
 
     // RDB Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset);
-    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level 7
+    mgrlvllsData.writeUInt16BE(0x07, offset + 2); // Level for RDB Manager (Version 7)
     offset += 4;
 
     // SECMGR Manager
     mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset);
-    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level 5
+    mgrlvllsData.writeUInt16BE(0x03, offset + 2); // Level for Security Manager (Version 3)
     offset += 4;
 
-    return mgrlvllsData.slice(0, offset);
+    const mgrlvllsParameter = this.constructParameter(
+      DRDACodePoints.MGRLVLLS,
+      Buffer.from(new Uint8Array(mgrlvllsData).slice(0, offset)),
+    );
+    return mgrlvllsParameter;
   }
 
   /**
@@ -121,18 +125,16 @@ export class MessageBuilder {
     const srvnamData = Buffer.from(dbName, 'utf8');
     parameters.push(this.constructParameter(DRDACodePoints.SRVNAM, srvnamData));
 
-    // EXTNAM (External Name)
-    const extnamData = Buffer.from('MyApp', 'utf8'); // Use your application name
+    // **Remove EXTNAM if not needed**
+    const extnamData = Buffer.from('MyApp', 'utf8');
     parameters.push(this.constructParameter(DRDACodePoints.EXTNAM, extnamData));
 
     // MGRLVLLS (Manager Level List)
-    const mgrlvllsData = this.constructMgrlvlls();
-    parameters.push(
-      this.constructParameter(DRDACodePoints.MGRLVLLS, mgrlvllsData),
-    );
+    const mgrlvllsParameter = this.constructMgrlvlls();
+    parameters.push(mgrlvllsParameter);
 
     // PRDID (Product ID)
-    const prdidData = Buffer.from('JCC05000', 'utf8'); // Use a valid PRDID
+    const prdidData = Buffer.from('JDB42', 'utf8');
     parameters.push(this.constructParameter(DRDACodePoints.PRDID, prdidData));
 
     // SRVRLSLV (Server Release Level)

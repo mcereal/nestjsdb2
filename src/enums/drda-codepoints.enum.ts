@@ -19,6 +19,7 @@ export enum DRDACodePoints {
   PRDID = 0x112e, // Product ID
   SRVRLSLV = 0x115a, // Server Release Level
   // SRVRLSLV = 0x114A,
+  // SRVRLSLV = 0x1147,
   // Managers and levels
   AGENT = 0x1403, // Agent Manager
   SQLAM = 0x2407, // SQLAM Manager
