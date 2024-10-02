@@ -1,3 +1,10 @@
+# [1.3.0-drda.40](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.39...v1.3.0-drda.40) (2024-10-02)
+
+
+### Bug Fixes
+
+* enable mgrlevels ([5f08996](https://github.com/mcereal/nestjsdb2/commit/5f0899681d628bea10a96f5d6a88e2f0a97706b2))
+
 # [1.3.0-drda.39](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.38...v1.3.0-drda.39) (2024-10-02)
 
 
