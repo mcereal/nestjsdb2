@@ -1,3 +1,10 @@
+# [1.3.0-drda.19](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.18...v1.3.0-drda.19) (2024-10-02)
+
+
+### Bug Fixes
+
+* message sending logic moved to handler ([1dd8445](https://github.com/mcereal/nestjsdb2/commit/1dd844502c08a88304f14a612d997e2ebf0cfd7b))
+
 # [1.3.0-drda.18](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.17...v1.3.0-drda.18) (2024-10-02)
 
 
