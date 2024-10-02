@@ -1,3 +1,10 @@
+# [1.3.0-drda.23](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.22...v1.3.0-drda.23) (2024-10-02)
+
+
+### Bug Fixes
+
+* add EXTNAM in drda parsing ([2004b93](https://github.com/mcereal/nestjsdb2/commit/2004b93b1236c71a6db0cf8b6b74a44d73b183fb))
+
 # [1.3.0-drda.22](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.21...v1.3.0-drda.22) (2024-10-02)
 
 
