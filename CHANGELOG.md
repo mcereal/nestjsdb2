@@ -1,3 +1,10 @@
+# [1.3.0-drda.37](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.36...v1.3.0-drda.37) (2024-10-02)
+
+
+### Bug Fixes
+
+* shift mgrlvls 20 ([3f82fad](https://github.com/mcereal/nestjsdb2/commit/3f82fad7dc36746e17feaa76e3f89a3bc9df7c26))
+
 # [1.3.0-drda.36](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.35...v1.3.0-drda.36) (2024-10-02)
 
 
