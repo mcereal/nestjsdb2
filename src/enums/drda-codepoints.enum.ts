@@ -17,8 +17,8 @@ export enum DRDACodePoints {
   SECMEC = 0x11a2, // Security Mechanism
   SECTKN = 0x11dc, // Security Token
   PRDID = 0x112e, // Product ID
-  SRVRLSLV = 0x115a, // Server Release Level
-  // SRVRLSLV = 0x114A,
+  // SRVRLSLV = 0x115a, // Server Release Level
+  SRVRLSLV = 0x114a,
   // SRVRLSLV = 0x1147,
   // Managers and levels
   AGENT = 0x1403, // Agent Manager

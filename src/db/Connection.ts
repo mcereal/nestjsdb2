@@ -658,7 +658,6 @@ export class Connection extends EventEmitter {
           'No response received from DB2 server in a timely manner.';
         this.logger.error(errorMessage);
         reject(new Error(errorMessage));
-        // Remove the resolver and rejector to prevent memory leaks
         this.responseResolvers.delete(correlationId);
         this.responseRejectors.delete(correlationId);
       }, 40000); // 40 seconds timeout
