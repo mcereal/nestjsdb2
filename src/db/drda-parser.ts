@@ -99,7 +99,8 @@ export class DRDAParser {
         return DRDAMessageTypes.ACCRDBRM;
       case DRDACodePoints.EXCSQLSET:
         return DRDAMessageTypes.EXCSQLSET;
-      // Add cases for other message types as needed
+      case DRDACodePoints.EXTNAM:
+        return DRDAMessageTypes.EXTNAM;
       default:
         this.logger.warn(
           `Unknown message code point: 0x${messageCodePoint.toString(16)}`,
