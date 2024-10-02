@@ -1,3 +1,10 @@
+# [1.3.0-drda.31](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.30...v1.3.0-drda.31) (2024-10-02)
+
+
+### Bug Fixes
+
+* manager level map ([922be40](https://github.com/mcereal/nestjsdb2/commit/922be40e9c8c04aa583c60abed582a232b6aca73))
+
 # [1.3.0-drda.30](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.29...v1.3.0-drda.30) (2024-10-02)
 
 
