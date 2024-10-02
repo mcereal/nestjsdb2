@@ -53,6 +53,7 @@ export interface EXTNAMResponse extends BaseDRDAResponse {
   parameters: {
     svrcod: number; // Server code indicating success or error
     message: string[]; // Optional message from the server
+    extnam: string; // The extended name
   };
 }
 

@@ -18,6 +18,7 @@ import {
   ACCRDBResponse,
   EXCSQLSETResponse,
   SECCHKRMResponse,
+  EXTNAMResponse,
 } from '../interfaces/drda-specific-responses.interface';
 
 /**
@@ -157,7 +158,9 @@ export class DRDAParser {
           const excsqlsetResponse = this.handleEXCSQLSET(payload);
           return excsqlsetResponse;
 
-        // Handle other response types as needed
+        case DRDAMessageTypes.EXTNAM:
+          const extnamResponse = this.parseEXTNAM(payload);
+          return extnamResponse;
 
         default:
           this.logger.warn(
@@ -280,7 +283,7 @@ export class DRDAParser {
           const extnam = this.parseEXTNAM(paramData);
           chrnqsdssResponse.chainedData.push({
             codePoint: DRDACodePoints.EXTNAM,
-            data: Buffer.from(extnam, 'utf8'),
+            data: Buffer.from(extnam.parameters.extnam, 'utf8'),
           });
           break;
         case DRDACodePoints.ODBC_ERROR:
@@ -632,11 +635,18 @@ export class DRDAParser {
    * @returns The parsed external name as a string.
    * @throws Error if the EXTNAM parameter is not valid.
    */
-  private parseEXTNAM(data: Buffer): string {
+  private parseEXTNAM(data: Buffer): EXTNAMResponse {
     // Implement parsing logic for EXTNAM parameter
     // Example: Assume EXTNAM is a null-terminated UTF-8 string
     const extnam = data.toString('utf8').split('\0')[0];
-    return extnam;
+
+    return {
+      type: DRDAMessageTypes.EXTNAM,
+      length: data.length,
+      payload: data,
+      success: true,
+      parameters: { svrcod: 0, message: [], extnam },
+    };
   }
 
   /**
