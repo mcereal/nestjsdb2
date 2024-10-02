@@ -1,3 +1,10 @@
+# [1.3.0-drda.18](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.17...v1.3.0-drda.18) (2024-10-02)
+
+
+### Bug Fixes
+
+* use message handler on data received ([aa93843](https://github.com/mcereal/nestjsdb2/commit/aa938438f1fd5de60a72125001afdcc5e1ae5f48))
+
 # [1.3.0-drda.17](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.16...v1.3.0-drda.17) (2024-10-02)
 
 
