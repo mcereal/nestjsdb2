@@ -1,3 +1,10 @@
+# [1.3.0-drda.22](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.21...v1.3.0-drda.22) (2024-10-02)
+
+
+### Bug Fixes
+
+* SRVCOD and EXTNAM ([6eb38f1](https://github.com/mcereal/nestjsdb2/commit/6eb38f16055d7139919c2539b437cd147590be25))
+
 # [1.3.0-drda.21](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.20...v1.3.0-drda.21) (2024-10-02)
 
 
