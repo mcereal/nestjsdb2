@@ -989,14 +989,16 @@ export class DRDAParser {
   }
 
   private managerLevelMap: { [key: number]: string } = {
-    0x000c0001: 'SQLAM Level 7',
-    0x000c0002: 'SQLAM Level 6',
-    0x000c0003: 'SQLAM Level 5',
+    0x000c0000: 'SQLAM Level 0',
+    0x000c0001: 'SQLAM Level 1',
+    0x000c0002: 'SQLAM Level 2',
+    0x000c0003: 'SQLAM Level 3',
     0x000c0004: 'SQLAM Level 4',
-    0x000c0005: 'SQLAM Level 3',
-    0x000c0006: 'SQLAM Level 2',
-    0x000c0007: 'SQLAM Level 1',
-    0x000c0008: 'SQLAM Level 0',
+    0x000c0005: 'SQLAM Level 5',
+    0x000c0006: 'SQLAM Level 6',
+    0x000c0007: 'SQLAM Level 7',
+    0x000c0008: 'SQLAM Level 8',
+    0x000c0009: 'SQLAM Level 9',
   };
 
   private parseMGRLVLLS(data: Buffer): string[] {
