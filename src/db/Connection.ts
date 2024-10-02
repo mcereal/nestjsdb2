@@ -534,20 +534,19 @@ export class Connection extends EventEmitter {
               tlsOptions['rejectUnauthorized'] = true; // Ensure certificate verification is enabled
             }
 
-            this.socket = tlsConnect(tlsOptions, async () => {
+            this.socket = tlsConnect(tlsOptions, () => {
               clearTimeout(connectionTimeout);
               if (this.socket instanceof TLSSocket && this.socket.authorized) {
                 this.setConnected(true);
                 this.logger.info(
                   `Socket connected securely at ${this.hostName}:${this.port}`,
                 );
-                try {
-                  await this.authenticate();
-                  resolve();
-                } catch (authErr) {
-                  this.logger.error('Authentication failed:', authErr);
-                  reject(authErr);
-                }
+                this.authenticate()
+                  .then(() => resolve())
+                  .catch((authErr) => {
+                    this.logger.error('Authentication failed:', authErr);
+                    reject(authErr);
+                  });
               } else {
                 const authError =
                   this.socket instanceof TLSSocket
@@ -563,20 +562,20 @@ export class Connection extends EventEmitter {
           } else {
             this.logger.info('Using plain TCP for connection');
             this.socket = new Socket();
-            this.socket.connect(this.port, this.hostName, async () => {
+            this.socket.connect(this.port, this.hostName, () => {
               clearTimeout(connectionTimeout);
               this.setConnected(true);
-              try {
-                await this.authenticate();
-                resolve();
-              } catch (authErr) {
-                reject(authErr);
-              }
+              this.authenticate()
+                .then(() => resolve())
+                .catch((authErr) => {
+                  this.logger.error('Authentication failed:', authErr);
+                  reject(authErr);
+                });
             });
           }
 
-          this.socket!.once('error', onConnectionError);
-          this.socket!.once('timeout', () => {
+          this.socket.once('error', onConnectionError);
+          this.socket.once('timeout', () => {
             reject(
               new Error(
                 `Connection to DB2 at ${this.hostName}:${this.port} timed out`,
