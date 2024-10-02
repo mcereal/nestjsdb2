@@ -108,19 +108,35 @@ export class MessageHandlers {
   }
 
   private handleDefaultResponse(response: DRDAResponseType): void {
-    this.logger.info('Handling default response.');
-
-    // Log messages from server
-    if (response.success) {
-      (response as ACCSECRMResponse).parameters.message.forEach((message) => {
-        this.logger.info(`Message: ${message}`);
-      });
-    } else {
-      this.logger.error('Error occurred in default response.');
-      this.connection.handleError(
-        (response as ACCSECRMResponse).parameters.svrcod,
+    this.logger.info(`Received global response: ${JSON.stringify(response)}`);
+    if (!response.success) {
+      if ('parameters' in response) {
+        if ('svrcod' in response.parameters) {
+          this.logger.error(
+            `Protocol error with SVRCOD: ${response.parameters.svrcod}`,
+          );
+        } else {
+          this.logger.error('Protocol error with unknown SVRCOD');
+        }
+      } else {
+        this.logger.error('Protocol error with unknown SVRCOD');
+      }
+      this.handleError(
+        new Error(
+          `Protocol error with SVRCOD: ${(response as any).parameters.svrcod}`,
+        ),
       );
     }
+  }
+
+  private handleError(error: Error): void {
+    this.logger.error('Protocol error:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    this.connection.closeConnection().catch((err) => {
+      this.logger.error('Error closing connection after protocol error:', err);
+    });
   }
 
   /**

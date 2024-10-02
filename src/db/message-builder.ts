@@ -13,6 +13,9 @@ export class MessageBuilder {
     parameterBuffer.writeUInt16BE(parameterLength, 0);
     parameterBuffer.writeUInt16BE(codePoint, 2);
     dataBuffer.copy(parameterBuffer, 4);
+    this.logger.debug(
+      `Constructed Parameter - Code Point: 0x${codePoint.toString(16)}, Length: ${parameterLength}, Data: ${dataBuffer.toString('hex')}`,
+    );
     return parameterBuffer;
   }
 
@@ -96,6 +99,9 @@ export class MessageBuilder {
     parameters.push(srvrlslvParam);
 
     const parametersBuffer = Buffer.concat(parameters);
+    this.logger.debug(
+      `Total ACCSEC Parameters Length: ${parametersBuffer.length}`,
+    );
 
     // ACCSEC Object
     const accsecLength = 4 + parametersBuffer.length;
@@ -104,6 +110,7 @@ export class MessageBuilder {
     accsecBuffer.writeUInt16BE(DRDACodePoints.ACCSEC, 2);
 
     const accsecObject = Buffer.concat([accsecBuffer, parametersBuffer]);
+    this.logger.debug(`ACCSEC Object Length: ${accsecObject.length}`);
 
     // DSS Header
     const totalLength = 6 + accsecObject.length;
@@ -120,34 +127,24 @@ export class MessageBuilder {
    * @returns The constructed MGRLVLLS buffer.
    */
   private constructMgrlvlls(): Buffer {
-    const mgrlvllsData = Buffer.alloc(4 * 4); // Adjusting for only 4 managers, 4 bytes each (code point + level)
-    let offset = 0;
+    const mgrlvllsEntries = [
+      { codePoint: DRDACodePoints.AGENT, level: 0x0004 },
+      { codePoint: DRDACodePoints.SQLAM, level: 0x0007 },
+      { codePoint: DRDACodePoints.RDB, level: 0x0005 },
+      { codePoint: DRDACodePoints.SECMGR, level: 0x0005 },
+    ];
 
-    // AGENT Manager Level 4
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.AGENT, offset); // Code Point
-    mgrlvllsData.writeUInt16BE(0x0004, offset + 2); // Level
-    offset += 4;
+    const buffer = Buffer.alloc(mgrlvllsEntries.length * 4);
+    mgrlvllsEntries.forEach((entry, index) => {
+      const offset = index * 4;
+      buffer.writeUInt16BE(entry.codePoint, offset);
+      buffer.writeUInt16BE(entry.level, offset + 2);
+    });
 
-    // SQLAM Manager Level 7
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SQLAM, offset); // Code Point
-    mgrlvllsData.writeUInt16BE(0x0007, offset + 2); // Level
-    offset += 4;
-
-    // RDB Manager Level 5
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.RDB, offset); // Code Point
-    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
-    offset += 4;
-
-    // SECMGR Manager Level 5
-    mgrlvllsData.writeUInt16BE(DRDACodePoints.SECMGR, offset); // Code Point
-    mgrlvllsData.writeUInt16BE(0x0005, offset + 2); // Level
-    offset += 4;
-
-    const mgrlvllsParameter = this.constructParameter(
-      DRDACodePoints.MGRLVLLS,
-      Buffer.from(new Uint8Array(mgrlvllsData).slice(0, offset)),
+    this.logger.debug(
+      `Constructed MGRLVLLS parameter: ${buffer.toString('hex')}`,
     );
-    return mgrlvllsParameter;
+    return buffer;
   }
 
   /**

@@ -611,13 +611,13 @@ export class Connection extends EventEmitter {
    * Sends data over the socket.
    * @param data The data buffer to send.
    */
-  private async send(data: Buffer): Promise<void> {
+  public async send(message: Buffer): Promise<void> {
     if (!this.isConnected || !this.socket) {
-      throw new Error('Connection is not open.');
+      return Promise.reject(new Error('Connection is not open.'));
     }
 
     return new Promise((resolve, reject) => {
-      const success = this.socket!.write(data, (err: Error | null) => {
+      const success = this.socket.write(message, (err) => {
         if (err) {
           this.logger.error('Error sending data:', err.message);
           reject(new Error(`Failed to send data: ${err.message}`));
@@ -629,7 +629,7 @@ export class Connection extends EventEmitter {
 
       if (!success) {
         this.logger.info('Socket buffer full, waiting for drain event...');
-        this.socket!.once('drain', () => {
+        this.socket.once('drain', () => {
           this.logger.info('Socket buffer drained, continuing to send...');
           resolve();
         });
