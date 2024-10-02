@@ -1103,10 +1103,10 @@ export class DRDAParser {
   }
 
   private managerLevelMap: { [key: number]: string } = {
-    [DRDACodePoints.SQLAM << 16]: 'SQLAM Level', // Shift left to match the format
-    [DRDACodePoints.AGENT << 16]: 'AGENT Level',
-    [DRDACodePoints.RDB << 16]: 'RDB Level',
-    [DRDACodePoints.SECMGR << 16]: 'SECMGR Level',
+    [DRDACodePoints.SQLAM << 20]: 'SQLAM Level', // Shift left to match the format
+    [DRDACodePoints.AGENT << 20]: 'AGENT Level',
+    [DRDACodePoints.RDB << 20]: 'RDB Level',
+    [DRDACodePoints.SECMGR << 20]: 'SECMGR Level',
     // Add other manager levels as needed
   };
 
