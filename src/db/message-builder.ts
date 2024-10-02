@@ -3,11 +3,11 @@ import { constants, publicEncrypt } from 'crypto';
 import { Logger } from '../utils';
 
 export class MessageBuilder {
-  private correlationId: number;
+  // private correlationId: number;
   private logger: Logger;
 
   constructor(correlationId: number, logger: Logger) {
-    this.correlationId = correlationId;
+    // this.correlationId = correlationId;
     this.logger = logger;
   }
 
@@ -22,6 +22,7 @@ export class MessageBuilder {
 
   constructDSSHeader(
     messageLength: number,
+    correlationId: number,
     dssFlags: number = 0xd0,
     dssType: number = 0x01,
   ): Buffer {
@@ -29,7 +30,7 @@ export class MessageBuilder {
     dssHeader.writeUInt16BE(messageLength, 0); // Total Length including DSS Header
     dssHeader.writeUInt8(dssFlags, 2); // DSS Flags
     dssHeader.writeUInt8(dssType, 3); // DSS Type
-    dssHeader.writeUInt16BE(this.correlationId, 4); // Correlation ID
+    dssHeader.writeUInt16BE(correlationId, 4); // Correlation ID
     return dssHeader;
   }
 
@@ -37,7 +38,7 @@ export class MessageBuilder {
    * Constructs the ACCSEC message.
    * @returns The constructed ACCSEC message buffer.
    */
-  public constructACCSECMessage(dbName: string): Buffer {
+  public constructACCSECMessage(dbName: string, correlationId: number): Buffer {
     const parameters: Buffer[] = [];
 
     // SECMEC (Security Mechanism)
@@ -71,7 +72,7 @@ export class MessageBuilder {
 
     // DSS Header
     const totalLength = 6 + accsecObject.length;
-    const dssHeader = this.constructDSSHeader(totalLength);
+    const dssHeader = this.constructDSSHeader(totalLength, correlationId);
 
     // Final ACCSEC message with DSS header
     const message = Buffer.concat([dssHeader, accsecObject]);
@@ -118,7 +119,7 @@ export class MessageBuilder {
    * Constructs the EXCSAT message.
    * @returns The constructed EXCSAT message buffer.
    */
-  public constructEXCSATMessage(dbName: string): Buffer {
+  public constructEXCSATMessage(dbName: string, correlationId: number): Buffer {
     const buffers: Buffer[] = [];
 
     // EXTNAM (External Name)
@@ -138,8 +139,8 @@ export class MessageBuilder {
     buffers.push(srvnamParameter);
 
     // MGRLVLLS (Manager Level List)
-    const mgrlvllsData = this.constructMgrlvlls();
-    buffers.push(mgrlvllsData);
+    const mgrlvllsParameter = this.constructMgrlvlls();
+    buffers.push(mgrlvllsParameter);
 
     // PRDID (Product ID)
     const prdidData = Buffer.from('JDB42', 'utf8');
@@ -170,17 +171,14 @@ export class MessageBuilder {
 
     // DSS Header
     const totalLength = 6 + excsatObject.length;
-    const dssHeader = Buffer.alloc(6);
-    dssHeader.writeUInt16BE(totalLength, 0); // Total Length including DSS Header
-    dssHeader.writeUInt8(0xd0, 2); // DSS Flags (0xD0 indicates request)
-    dssHeader.writeUInt8(0x01, 3); // DSS Type (0x01 for RQSDSS)
-    dssHeader.writeUInt16BE(this.nextCorrelationId(), 4); // Correlation ID
+    const dssHeader = this.constructDSSHeader(totalLength, correlationId);
 
     // Final EXCSAT message with DSS header
     const message = Buffer.concat([dssHeader, excsatObject]);
+
+    // Logging and debugging
     this.logger.info(`Constructed EXCSAT message: ${message.toString('hex')}`);
 
-    // **Corrected Debugging Check**
     if (message.slice(8, 10).toString('hex') !== '1041') {
       this.logger.error(
         `EXCSAT code point mismatch: Expected 1041, Found ${message
@@ -195,17 +193,13 @@ export class MessageBuilder {
       Total Length: ${totalLength} (0x${totalLength.toString(16)})
       DSS Flags: 0x${dssHeader[2].toString(16)}
       DSS Type: 0x${dssHeader[3].toString(16)}
-      Correlation ID: ${this.nextCorrelationId()}
+      Correlation ID: ${correlationId}
       EXCSAT Length: ${excsatLength} (0x${excsatLength.toString(16)})
       EXCSAT Code Point: 0x${excsatBuffer.readUInt16BE(2).toString(16)}
       Parameters: ${parametersBuffer.toString('hex')}
     `);
 
     return message;
-  }
-
-  private nextCorrelationId(): number {
-    return this.correlationId++;
   }
 
   /**
@@ -216,6 +210,7 @@ export class MessageBuilder {
     userId: string,
     serverPublicKey: Buffer | null = null,
     password: string,
+    correlationId: number,
   ): Buffer {
     const parameters: Buffer[] = [];
 
@@ -254,7 +249,7 @@ export class MessageBuilder {
 
     // DSS Header
     const totalLength = 6 + secchkObject.length;
-    const dssHeader = this.constructDSSHeader(totalLength);
+    const dssHeader = this.constructDSSHeader(totalLength, correlationId);
 
     // Final SECCHK message with DSS header
     const message = Buffer.concat([dssHeader, secchkObject]);
@@ -266,7 +261,7 @@ export class MessageBuilder {
    * Constructs the ACCRDB message.
    * @returns The constructed ACCRDB message buffer.
    */
-  public constructACCRDBMessage(dbName: string): Buffer {
+  public constructACCRDBMessage(dbName: string, correlationId: number): Buffer {
     const parameters: Buffer[] = [];
 
     // RDBNAM (Relational Database Name)
@@ -287,7 +282,7 @@ export class MessageBuilder {
 
     // DSS Header
     const totalLength = 6 + accrdbObject.length;
-    const dssHeader = this.constructDSSHeader(totalLength);
+    const dssHeader = this.constructDSSHeader(totalLength, correlationId);
 
     // Final ACCRDB message with DSS header
     const message = Buffer.concat([dssHeader, accrdbObject]);
@@ -300,7 +295,10 @@ export class MessageBuilder {
    * @param statementHandle The handle of the statement to close.
    * @returns The constructed CLOSESTM message buffer.
    */
-  public constructCloseStatementMessage(statementHandle: string): Buffer {
+  public constructCloseStatementMessage(
+    statementHandle: string,
+    correlationId: number,
+  ): Buffer {
     const parameters: Buffer[] = [];
 
     // Statement Handle
@@ -322,7 +320,7 @@ export class MessageBuilder {
 
     // DSS Header
     const totalLength = 6 + closeStmtObject.length;
-    const dssHeader = this.constructDSSHeader(totalLength);
+    const dssHeader = this.constructDSSHeader(totalLength, correlationId);
 
     // Final CLOSESTM message with DSS header
     const message = Buffer.concat([dssHeader, closeStmtObject]);

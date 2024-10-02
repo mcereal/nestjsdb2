@@ -253,8 +253,10 @@ export class Connection extends EventEmitter {
    * Sends the EXCSAT message as the first step of authentication.
    */
   private async sendEXCSAT(): Promise<void> {
+    this.correlationId++;
     const excsatMessage = this.messageBuilder.constructEXCSATMessage(
       this.dbName,
+      this.correlationId,
     );
     this.logger.info('Sending EXCSAT message...');
     await this.send(excsatMessage);
@@ -301,8 +303,10 @@ export class Connection extends EventEmitter {
    * Sends the ACCSEC message as the second step of authentication.
    */
   private async sendACCSEC(): Promise<void> {
+    this.correlationId++;
     const accsecMessage = this.messageBuilder.constructACCSECMessage(
       this.dbName,
+      this.correlationId,
     );
     this.logger.info('Sending ACCSEC message...');
     await this.send(accsecMessage);
@@ -327,10 +331,12 @@ export class Connection extends EventEmitter {
    * Sends the SECCHK message as the third step of authentication.
    */
   private async sendSECCHK(): Promise<void> {
+    this.correlationId++;
     const secchkMessage = this.messageBuilder.constructSECCHKMessage(
       this.userId,
       this.serverPublicKey,
       this.password,
+      this.correlationId,
     );
     this.logger.info('Sending SECCHK message...');
     await this.send(secchkMessage);
@@ -358,8 +364,10 @@ export class Connection extends EventEmitter {
    * Sends the ACCRDB message as the final step of authentication.
    */
   private async sendACCRDB(): Promise<void> {
+    this.correlationId++;
     const accrdbMessage = this.messageBuilder.constructACCRDBMessage(
       this.dbName,
+      this.correlationId,
     );
     this.logger.info('Sending ACCRDB message...');
     await this.send(accrdbMessage);
@@ -745,8 +753,11 @@ export class Connection extends EventEmitter {
   public async sendCloseStatementRequest(
     statementHandle: string,
   ): Promise<void> {
-    const message =
-      this.messageBuilder.constructCloseStatementMessage(statementHandle);
+    this.correlationId++;
+    const message = this.messageBuilder.constructCloseStatementMessage(
+      statementHandle,
+      this.correlationId,
+    );
     await this.send(message);
     const response = await this.receiveResponse();
 
@@ -916,7 +927,11 @@ export class Connection extends EventEmitter {
 
     // DSS Header
     const totalLength = 6 + excsqlprepObject.length;
-    const dssHeader = this.messageBuilder.constructDSSHeader(totalLength);
+    this.correlationId++;
+    const dssHeader = this.messageBuilder.constructDSSHeader(
+      totalLength,
+      this.correlationId,
+    );
 
     // Final EXCSQLPREP message with DSS header
     const message = Buffer.concat([dssHeader, excsqlprepObject]);
@@ -986,7 +1001,11 @@ export class Connection extends EventEmitter {
 
     // DSS Header
     const totalLength = 6 + excsqlexpObject.length;
-    const dssHeader = this.messageBuilder.constructDSSHeader(totalLength);
+    this.correlationId++;
+    const dssHeader = this.messageBuilder.constructDSSHeader(
+      totalLength,
+      this.correlationId,
+    );
 
     // Final EXCSQLEXP message with DSS header
     const message = Buffer.concat([dssHeader, excsqlexpObject]);
