@@ -1,3 +1,10 @@
+# [1.3.0-drda.11](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.10...v1.3.0-drda.11) (2024-10-02)
+
+
+### Bug Fixes
+
+* use encrypted password ([7f6486a](https://github.com/mcereal/nestjsdb2/commit/7f6486a01ca4c9ae3ed613cd2e50b1f69b088351))
+
 # [1.3.0-drda.10](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.9...v1.3.0-drda.10) (2024-10-02)
 
 
