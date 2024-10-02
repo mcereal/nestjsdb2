@@ -1,3 +1,10 @@
+# [1.3.0-drda.24](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.23...v1.3.0-drda.24) (2024-10-02)
+
+
+### Bug Fixes
+
+* handle SRVCOD in handle methods ([468a3a2](https://github.com/mcereal/nestjsdb2/commit/468a3a2e49f6e99b75e7cbd7589f2e4e321f2879))
+
 # [1.3.0-drda.23](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.22...v1.3.0-drda.23) (2024-10-02)
 
 
