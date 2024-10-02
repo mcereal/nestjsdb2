@@ -1,3 +1,10 @@
+# [1.3.0-drda.38](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.37...v1.3.0-drda.38) (2024-10-02)
+
+
+### Bug Fixes
+
+* adjust mgrlvl codepoints ([45ec471](https://github.com/mcereal/nestjsdb2/commit/45ec471834cca1fa17920da21d836392a69a3d6d))
+
 # [1.3.0-drda.37](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.36...v1.3.0-drda.37) (2024-10-02)
 
 
