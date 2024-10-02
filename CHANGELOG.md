@@ -1,3 +1,10 @@
+# [1.3.0-drda.26](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.25...v1.3.0-drda.26) (2024-10-02)
+
+
+### Bug Fixes
+
+* use change SECMEC ([0c56678](https://github.com/mcereal/nestjsdb2/commit/0c56678ff1664723a2a0aa44097fd18638e2a9b6))
+
 # [1.3.0-drda.25](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.24...v1.3.0-drda.25) (2024-10-02)
 
 
