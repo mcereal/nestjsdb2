@@ -382,8 +382,6 @@ export class DRDAParser {
       parameters: {
         svrcod: 0,
         message: [],
-        serverPublicKey: null, // Add this line
-        serverVersion: '', // Add this line
       },
     };
 
@@ -401,13 +399,7 @@ export class DRDAParser {
           break;
         case DRDACodePoints.SECMEC:
           // Handle security mechanism if needed
-          break;
-        case DRDACodePoints.SECURITY_TOKEN:
-          // Handle security token if needed
-          break;
-        case DRDACodePoints.SERVER_KEY:
-          const serverKey = this.extractServerPublicKey(paramData);
-          accsecrmResponse.parameters.serverPublicKey = serverKey;
+          this.logger.debug('SECMEC parameter detected.');
           break;
         case DRDACodePoints.MSG_TEXT:
           const message = this.parseMessageText(paramData);

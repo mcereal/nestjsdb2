@@ -319,13 +319,6 @@ export class Connection extends EventEmitter {
       throw new Error(`ACCSEC failed with response type: ${response.type}`);
     }
 
-    // Ensure serverPublicKey is set
-    if (!this.serverPublicKey) {
-      throw new Error(
-        'Server public key was not received in ACCSECRM response.',
-      );
-    }
-
     this.logger.info('ACCSEC message processed successfully.');
   }
 

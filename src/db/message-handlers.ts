@@ -244,31 +244,14 @@ export class MessageHandlers {
 
     if (response.success) {
       this.logger.info('ACCSECRM indicates success.');
-
-      // Check if the server public key is provided
-      if (response.parameters.serverPublicKey) {
-        this.connection.setServerPublicKey(response.parameters.serverPublicKey);
-        this.logger.info('Server public key acquired from ACCSECRM response.');
-      }
-
-      if (response.parameters.serverVersion) {
-        this.connection.setServerVersion(response.parameters.serverVersion);
-        this.logger.info(
-          `Server Version: ${response.parameters.serverVersion}`,
-        );
-
-        // Implement success handling logic, e.g., security check passed
-        this.connection.setSecurityChecked(true);
-      } else {
-        this.logger.error('ACCSECRM indicates failure.');
-        // Implement failure handling logic, e.g., invalid credentials
-        this.connection.handleError(response.parameters.svrcod);
-      }
-
       // Log messages from server
       response.parameters.message.forEach((message) => {
         this.logger.info(`ACCSECRM Message: ${message}`);
       });
+    } else {
+      this.logger.error('ACCSECRM indicates failure.');
+      // Implement failure handling logic, e.g., throw an error or emit an event
+      this.connection.handleError(response.parameters.svrcod);
     }
   }
 
