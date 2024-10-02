@@ -1,3 +1,10 @@
+# [1.3.0-drda.7](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.6...v1.3.0-drda.7) (2024-10-02)
+
+
+### Bug Fixes
+
+* correctly structure message ([33da7dc](https://github.com/mcereal/nestjsdb2/commit/33da7dc1c22d9bc2c23010bfe5811960014236b1))
+
 # [1.3.0-drda.6](https://github.com/mcereal/nestjsdb2/compare/v1.3.0-drda.5...v1.3.0-drda.6) (2024-10-01)
 
 
