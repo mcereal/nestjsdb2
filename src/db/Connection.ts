@@ -664,7 +664,7 @@ export class Connection extends EventEmitter {
       }, 40000); // 40 seconds timeout
 
       // Cleanup on resolve or reject
-      const cleanup = () => clearTimeout(responseTimeout);
+      clearTimeout(responseTimeout);
     });
   }
 
@@ -951,13 +951,17 @@ export class Connection extends EventEmitter {
   public async sendExecuteRequest(
     statementHandle: string,
     params: any[],
-  ): Promise<void> {
+  ): Promise<number> {
+    this.correlationId++;
+    const currentCorrelationId = this.correlationId;
     const executeMessage = this.constructEXCSQLEXPMessage(
       statementHandle,
       params,
+      currentCorrelationId,
     );
     this.logger.info('Sending EXCSQLEXP message...');
     await this.send(executeMessage);
+    return currentCorrelationId;
   }
 
   /**
@@ -969,6 +973,7 @@ export class Connection extends EventEmitter {
   private constructEXCSQLEXPMessage(
     statementHandle: string,
     params: any[],
+    correlationId: number,
   ): Buffer {
     const parameters: Buffer[] = [];
 
@@ -1003,10 +1008,9 @@ export class Connection extends EventEmitter {
 
     // DSS Header
     const totalLength = 6 + excsqlexpObject.length;
-    this.correlationId++;
     const dssHeader = this.messageBuilder.constructDSSHeader(
       totalLength,
-      this.correlationId,
+      correlationId,
     );
 
     // Final EXCSQLEXP message with DSS header

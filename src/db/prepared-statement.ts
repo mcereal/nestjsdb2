@@ -20,16 +20,20 @@ export class PreparedStatement {
    * @param params - An array of parameters to bind to the SQL statement.
    * @returns The result of the query execution.
    */
+
   public async execute(params: any[] = []): Promise<Row[]> {
     this.logger.info(
       `Executing prepared statement for SQL: ${this.sql} with params: ${JSON.stringify(params)}`,
     );
     try {
-      // Send Execute SQL with parameters
-      await this.connection.sendExecuteRequest(this.statementHandle, params);
+      // Send Execute SQL with parameters and get the correlationId
+      const correlationId = await this.connection.sendExecuteRequest(
+        this.statementHandle,
+        params,
+      );
 
-      // Receive and parse the response
-      const response = await this.connection.receiveResponse();
+      // Receive and parse the response using the correlationId
+      const response = await this.connection.receiveResponse(correlationId);
 
       if (response.type !== DRDAMessageTypes.EXCSQLSET) {
         throw new Error(`Unexpected response type: ${response.type}`);
